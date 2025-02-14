@@ -1,0 +1,17 @@
+.control-button {
+    -fx-background-color: transparent;
+}
+
+.control-button:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.1);
+}
+
+.close-button {
+    -fx-background-color: transparent;
+}
+
+.close-button:hover {
+    -fx-background-color: rgba(255, 0, 0, 0.5);
+}
+
+//https://icons8.com/icons/set/shrink-icon--static--white
