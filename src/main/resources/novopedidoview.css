@@ -1,0 +1,23 @@
+.section-label {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2B2D31;
+    -fx-padding: 0 0 10px 0;
+}
+
+.field-label {
+    -fx-font-size: 14px;
+    -fx-text-fill: #2B2D31;
+}
+
+.text-field, .text-area {
+    -fx-pref-width: 300px;
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #CCCCCC;
+    -fx-border-radius: 5px;
+    -fx-padding: 5px;
+}
+
+.text-field:focused, .text-area:focused {
+    -fx-border-color: #2B2D31;
+}

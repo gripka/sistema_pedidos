@@ -2,6 +2,7 @@ package com.sistema_pedidos.view
 
 import javafx.application.Application
 import javafx.beans.value.ObservableValue
+import javafx.geometry.Insets
 import javafx.scene.Scene
 import javafx.scene.layout.BorderPane
 import javafx.scene.layout.Background
@@ -15,7 +16,7 @@ class MainView(private val stage: Stage) : BorderPane() {
     init {
         // Define the background color as white with rounded corners
         val cornerRadii = CornerRadii(15.0, 15.0, 0.0, 0.0, false)
-        background = Background(BackgroundFill(Color.WHITE, cornerRadii, null))
+        background = Background(BackgroundFill(Color.web("#F7F7F7"), cornerRadii, null))
 
         // Apply a clip to ensure the rounded corners are visible
         val clipRectangle = Rectangle().apply {
@@ -30,11 +31,11 @@ class MainView(private val stage: Stage) : BorderPane() {
         stage.maximizedProperty().addListener { _: ObservableValue<out Boolean>, _: Boolean, maximized: Boolean ->
             if (maximized) {
                 // Remove rounded corners when maximized
-                background = Background(BackgroundFill(Color.WHITE, CornerRadii.EMPTY, null))
+                background = Background(BackgroundFill(Color.web("#F7F7F7"), CornerRadii.EMPTY, null))
                 clip = null
             } else {
                 // Add rounded corners when not maximized
-                background = Background(BackgroundFill(Color.WHITE, cornerRadii, null))
+                background = Background(BackgroundFill(Color.web("#F7F7F7"), cornerRadii, null))
                 clip = clipRectangle
             }
         }
@@ -45,6 +46,7 @@ class MainView(private val stage: Stage) : BorderPane() {
         // Set minimum width and height for the window
         stage.minWidth = 400.0
         stage.minHeight = 300.0
+
     }
 
     fun setCenterView(view: javafx.scene.Node) {

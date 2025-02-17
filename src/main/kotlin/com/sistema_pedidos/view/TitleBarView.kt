@@ -12,6 +12,7 @@ import javafx.scene.layout.BackgroundFill
 import javafx.scene.layout.CornerRadii
 import javafx.geometry.Insets
 import javafx.stage.Stage
+import javafx.application.Platform
 
 class TitleBarView(private val stage: Stage) : HBox() {
     private var xOffset = 0.0
@@ -20,28 +21,45 @@ class TitleBarView(private val stage: Stage) : HBox() {
     private val shrinkIcon = ImageView(Image("/icons/shrink.png"))
 
     init {
-        // Defina a cor de fundo da barra de títulos
-        background = Background(BackgroundFill(Color.web("#333333"), CornerRadii.EMPTY, Insets.EMPTY))
+        // Set the background color of the title bar
+        background = Background(BackgroundFill(Color.web("#2B2D31"), CornerRadii.EMPTY, Insets.EMPTY))
         prefHeight = 35.0
         alignment = Pos.CENTER_LEFT
 
-        // Adicione um contêiner para o ícone de logo
+        // Add a container for the logo icon
         val logoContainer = HBox().apply {
             prefWidth = 40.0
             alignment = Pos.CENTER
+            padding = Insets(0.0, 0.0, 0.0, 22.0) // Add padding to the left of the logo
             children.add(ImageView(Image("/icons/logo.png")).apply {
                 fitHeight = 27.0
                 fitWidth = 27.0
             })
+            setOnMousePressed { event: MouseEvent ->
+                xOffset = event.sceneX
+                yOffset = event.sceneY
+            }
+            setOnMouseDragged { event: MouseEvent ->
+                stage.x = event.screenX - xOffset
+                stage.y = event.screenY - yOffset
+            }
         }
 
-        // Adicione um rótulo ou outros componentes à barra de títulos
+        // Add a label or other components to the title bar
         val titleLabel = Label("Sistema de Pedidos").apply {
             textFill = Color.WHITE
             padding = Insets(0.0, 0.0, 0.0, 10.0) // Move the title slightly to the right
+            setOnMousePressed { event: MouseEvent ->
+                xOffset = event.sceneX
+                yOffset = event.sceneY
+            }
+            setOnMouseDragged { event: MouseEvent ->
+                stage.x = event.screenX - xOffset
+                stage.y = event.screenY - yOffset
+            }
         }
 
-        // Botões de controle da janela
+        // Window control buttons
         val buttonSize = 16.0
         val buttonContainer = HBox(0.0).apply {
             alignment = Pos.CENTER_RIGHT
@@ -58,32 +76,31 @@ class TitleBarView(private val stage: Stage) : HBox() {
             )
         }
 
-        // Adicione os componentes à barra de título
-        children.addAll(logoContainer, titleLabel, HBox().apply {
-            alignment = Pos.CENTER_RIGHT
-            children.add(buttonContainer)
+        // Draggable area for moving the window
+        val draggableArea = HBox().apply {
+            alignment = Pos.CENTER_LEFT
             HBox.setHgrow(this, javafx.scene.layout.Priority.ALWAYS)
-        })
-
-        // Permitir arrastar a janela
-        setOnMousePressed { event: MouseEvent ->
-            xOffset = event.sceneX
-            yOffset = event.sceneY
+            setOnMousePressed { event: MouseEvent ->
+                xOffset = event.sceneX
+                yOffset = event.sceneY
+            }
+            setOnMouseDragged { event: MouseEvent ->
+                stage.x = event.screenX - xOffset
+                stage.y = event.screenY - yOffset
+            }
         }
 
-        setOnMouseDragged { event: MouseEvent ->
-            stage.x = event.screenX - xOffset
-            stage.y = event.screenY - yOffset
-        }
+        // Add components to the title bar
+        children.addAll(logoContainer, titleLabel, draggableArea, buttonContainer)
 
-        // Maximizar a janela ao clicar duas vezes na barra de título
-        setOnMouseClicked { event: MouseEvent ->
+        // Maximize the window when double-clicking the draggable area
+        draggableArea.setOnMouseClicked { event: MouseEvent ->
             if (event.clickCount == 2) {
                 stage.isMaximized = !stage.isMaximized
             }
         }
 
-        // Listener para mudar o ícone de maximize para shrink
+        // Listener to change the maximize icon to shrink icon
         stage.maximizedProperty().addListener { _, _, maximized ->
             if (maximized) {
                 maximizeIcon.image = Image("/icons/shrink.png")
