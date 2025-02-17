@@ -47,6 +47,8 @@ class MainView(private val stage: Stage) : BorderPane() {
         stage.minWidth = 400.0
         stage.minHeight = 300.0
 
+        // Apply the CSS class for the border
+        styleClass.add("window-border")
     }
 
     fun setCenterView(view: javafx.scene.Node) {
@@ -65,7 +67,7 @@ class MainView(private val stage: Stage) : BorderPane() {
 class MainApp : Application() {
     override fun start(primaryStage: Stage) {
         val mainView = MainView(primaryStage)
-        val scene = Scene(mainView, 800.0, 600.0)
+        val scene = Scene(mainView, 780.0, 600.0)
         primaryStage.scene = scene
         primaryStage.show()
     }

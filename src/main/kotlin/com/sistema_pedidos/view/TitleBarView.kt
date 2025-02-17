@@ -25,6 +25,7 @@ class TitleBarView(private val stage: Stage) : HBox() {
         background = Background(BackgroundFill(Color.web("#2B2D31"), CornerRadii.EMPTY, Insets.EMPTY))
         prefHeight = 35.0
         alignment = Pos.CENTER_LEFT
+        styleClass.add("title-bar") // Adiciona a classe CSS
 
         // Add a container for the logo icon
         val logoContainer = HBox().apply {

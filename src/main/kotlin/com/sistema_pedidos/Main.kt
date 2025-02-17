@@ -28,11 +28,11 @@ class Main : Application() {
         val titleBarView = TitleBarView(primaryStage)
 
         // Set the initial view, side menu, and title bar
-        mainView.setCenterView(novoPedidoView)
-        mainView.setLeftMenu(menuView)
         mainView.setTopTitleBar(titleBarView)
+        mainView.setLeftMenu(menuView)
+        mainView.setCenterView(novoPedidoView)
 
-        val scene = Scene(mainView, 800.0, 600.0, Color.TRANSPARENT)
+        val scene = Scene(mainView, 1000.0, 680.0, Color.TRANSPARENT)
         scene.stylesheets.add(javaClass.getResource("/styles.css").toExternalForm())
         primaryStage.initStyle(StageStyle.TRANSPARENT)
         primaryStage.scene = scene

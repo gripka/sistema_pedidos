@@ -18,14 +18,15 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
 
     init {
         background = Background(BackgroundFill(Color.web("#2B2D31"), CornerRadii.EMPTY, Insets.EMPTY))
-        prefWidth = 40.0 // Set width to align with button positioning manually
-        padding = Insets(1.0) // Uniform padding
+        prefWidth = 40.0
+        padding = Insets(1.0)
+        styleClass.addAll("menu-right-border", "menu-left-bottom-border") // Add the new CSS classes here
 
         // Top section (Fixed Button)
         val topButton = createTopButton("/icons/menu.png") { toggleMenu() }
         val topSection = HBox(topButton).apply {
             alignment = Pos.TOP_LEFT
-            padding = Insets(10.0, 0.0, 10.0, 17.0) // Match left padding with other buttons
+            padding = Insets(10.0, 0.0, 10.0, 17.0)
         }
         children.add(topSection)
 
@@ -33,7 +34,7 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
         val sectionsContainer = VBox().apply {
             alignment = Pos.CENTER
             spacing = 10.0
-            padding = Insets(10.0, 0.0, 150.0, 0.0)
+            padding = Insets(10.0, 0.0, 10.0, 0.0)
         }
 
         val homeButton = createMenuButton("/icons/error.png", "Produtos") { onNavigate("produtos") }
@@ -43,11 +44,11 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
         VBox.setVgrow(sectionsContainer, Priority.ALWAYS)
         children.add(sectionsContainer)
 
-// Bottom section
+        // Bottom section
         val bottomSection = VBox().apply {
             alignment = Pos.BOTTOM_CENTER
             spacing = 10.0
-            padding = Insets(0.0, 0.0, 20.0, 0.0) // Adicione padding inferior
+            padding = Insets(0.0, 0.0, 20.0, 0.0) // Add bottom padding
         }
         val settingsButton = createMenuButton("/icons/config.png", "Configurações") { onNavigate("configuracoes") }
         bottomSection.children.add(settingsButton)
@@ -118,7 +119,7 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
     }
 
     private fun toggleMenu() {
-        val targetWidth = if (isExpanded) 40.0 else 230.0 // Ajuste a largura do menu fechado para 40.0
+        val targetWidth = if (isExpanded) 40.0 else 230.0 // Adjust the closed menu width to 40.0
         val transition = object : Transition() {
             init {
                 cycleDuration = Duration.millis(300.0)

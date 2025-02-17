@@ -22,6 +22,8 @@
 .close-button:pressed {
     -fx-scale-x: 0.95;
     -fx-scale-y: 0.95;
+        -fx-background-radius: 0 6 0 0;
+        -fx-border-radius: 0 6 0 0;
 }
 
 //https://icons8.com/icons/set/shrink-icon--static--white
@@ -30,7 +32,7 @@
 .menu-button {
     -fx-background-color: transparent;
     -fx-border-radius: 10px;
-    -fx-text-fill: #F5F5F5;
+    -fx-text-fill: #FFFF00;
 }
 
 .menu-button {
@@ -64,4 +66,33 @@
 .menu-label {
     -fx-text-fill: #F5F5F5; /* Set the text color */
     -fx-font-weight: bold; /* Set the font weight to bold */
+}
+
+.window-border {
+    -fx-border-color: #D3D3D3;
+    -fx-border-width: 1;
+    -fx-padding: -1;
+    -fx-border-width: 1;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+}
+
+.menu-right-bottom-border {
+    -fx-border-color: blue; /* Blue color for the right border */
+    -fx-border-width: 0 1px 0 0; /* Right border only */
+}
+
+.menu-left-bottom-border {
+    -fx-border-color: #363636; /* Pink color for the left and bottom border */
+    -fx-border-width: 0 0 1px 1px; /* Left and bottom border only */
+    -fx-border-radius: 0 0 0 10px; /* Rounded bottom-left corner */
+}
+
+
+.title-bar {
+    -fx-background-color: #2B2D31;
+    -fx-border-color: #363636;
+    -fx-border-width: 1px 1px 0 1px;
+    -fx-background-radius: 0 0 0 0;
+    -fx-border-radius: 9 9 0 0;
 }
