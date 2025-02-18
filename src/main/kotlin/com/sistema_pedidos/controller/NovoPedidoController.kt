@@ -85,14 +85,19 @@ class NovoPedidoController {
             val subtotalField = createSubtotalSection(produto)
 
             children.addAll(
-                Label("${produto.id}. "),
+                Label("${produto.id}. "),  // Número do produto
                 quantidadeField,
                 createProdutoSection(),
                 valorField,
                 subtotalField
             )
 
-            // Add listeners to update subtotal
+            // Se houver mais de um produto, adiciona o botão de remover
+            if (listaProdutos.size > 1) {
+                children.add(createRemoveButton(this, produto))
+            }
+
+            // Atualizar subtotal ao alterar quantidade ou valor
             val updateSubtotal = {
                 val quantidade = ((quantidadeField.children[1] as HBox).children[1] as TextField)
                 val valorUnitario = (valorField.children[1] as TextField)
@@ -112,11 +117,63 @@ class NovoPedidoController {
         }
     }
 
+
+    private fun createRemoveButton(produtoHBox: HBox, produto: Produto): Button {
+        return Button().apply {
+            styleClass.add("remove-button")
+            graphic = ImageView(Image(NovoPedidoController::class.java.getResourceAsStream("/icons/closered.png"))).apply {
+                fitHeight = 15.0
+                fitWidth = 15.0
+                isPreserveRatio = true
+            }
+            prefWidth = 25.0
+            prefHeight = 25.0
+            translateY = 15.0  // Adjusted to match the quantity buttons position
+            setOnAction {
+                produtosContainer.children.remove(produtoHBox)
+                listaProdutos.remove(produto)
+                atualizarNumeracao()
+                atualizarBotoesRemover()
+            }
+        }
+    }
+
+
+    private fun atualizarNumeracao() {
+        produtosContainer.children.forEachIndexed { index, node ->
+            val produtoHBox = node as HBox
+            val labelNumero = produtoHBox.children.first() as Label
+            labelNumero.text = "${index + 1}. " // Atualiza a numeração
+        }
+
+        // Atualizar listaProdutos para manter IDs sincronizados
+        listaProdutos.forEachIndexed { index, produto ->
+            produto.id = index + 1
+        }
+    }
+
     fun addNovoProduto() {
         val novoProduto = Produto(listaProdutos.size + 1, "", 1, 0.0)
         listaProdutos.add(novoProduto)
         produtosContainer.children.add(createProdutosHBox(novoProduto))
+        atualizarBotoesRemover()
     }
+
+    private fun atualizarBotoesRemover() {
+        produtosContainer.children.forEach { node ->
+            val produtoHBox = node as HBox
+            val botaoRemover = produtoHBox.children.find { it is Button } as? Button
+            if (listaProdutos.size > 1) {
+                if (botaoRemover == null) {
+                    val produto = listaProdutos[produtosContainer.children.indexOf(produtoHBox)]
+                    produtoHBox.children.add(createRemoveButton(produtoHBox, produto))
+                }
+            } else {
+                botaoRemover?.let { produtoHBox.children.remove(it) }
+            }
+        }
+    }
+
 
     fun getProdutosContainer(): VBox {
         if (produtosContainer.children.isEmpty()) {

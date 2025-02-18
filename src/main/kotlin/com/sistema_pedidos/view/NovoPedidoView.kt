@@ -14,7 +14,7 @@ class NovoPedidoView(private val fieldWidth: Double = 300.0, private val maxFiel
     private val controller = NovoPedidoController()
 
     init {
-        padding = Insets(15.0, 15.0, 0.0, 30.0)
+        padding = Insets(15.0, 20.0, 1.0, 30.0)
 
         stylesheets.add(javaClass.getResource("/novopedidoview.css").toExternalForm())
 
