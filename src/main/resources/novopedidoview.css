@@ -21,3 +21,33 @@
 .text-field:focused, .text-area:focused {
     -fx-border-color: #2B2D31;
 }
+
+.quantity-button {
+    -fx-min-height: 25px;
+    -fx-max-height: 25px;
+    -fx-min-width: 25px;
+    -fx-max-width: 25px;
+    -fx-background-radius: 5;
+    -fx-border-radius: 5;
+    -fx-padding: 0;
+    -fx-alignment: center;
+    -fx-content-display: center;
+}
+
+.flat-button {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #CCCCCC;
+    -fx-text-fill: #2B2D31;
+}
+
+.flat-button:hover {
+    -fx-background-color: #F5F5F5;
+    -fx-border-color: #2B2D31;
+    -fx-cursor: hand;
+}
+
+.flat-button:pressed {
+    -fx-background-color: #EEEEEE;
+    -fx-scale-x: 0.95;
+    -fx-scale-y: 0.95;
+}

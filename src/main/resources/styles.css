@@ -64,8 +64,8 @@
 }
 
 .menu-label {
-    -fx-text-fill: #F5F5F5; /* Set the text color */
-    -fx-font-weight: bold; /* Set the font weight to bold */
+    -fx-text-fill: #F5F5F5;
+    -fx-font-weight: bold;
 }
 
 .window-border {
@@ -78,14 +78,14 @@
 }
 
 .menu-right-bottom-border {
-    -fx-border-color: blue; /* Blue color for the right border */
-    -fx-border-width: 0 1px 0 0; /* Right border only */
+    -fx-border-color: blue !important;
+    -fx-border-width: 0 1px 0 0;
 }
 
 .menu-left-bottom-border {
-    -fx-border-color: #363636; /* Pink color for the left and bottom border */
-    -fx-border-width: 0 0 1px 1px; /* Left and bottom border only */
-    -fx-border-radius: 0 0 0 10px; /* Rounded bottom-left corner */
+    -fx-border-color: #363636;
+    -fx-border-width: 0 0 1px 1px;
+    -fx-border-radius: 0 0 0 10px;
 }
 
 
@@ -95,4 +95,46 @@
     -fx-border-width: 1px 1px 0 1px;
     -fx-background-radius: 0 0 0 0;
     -fx-border-radius: 9 9 0 0;
+}
+
+.main-scroll-pane {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
+
+.main-scroll-pane > .viewport {
+    -fx-background-color: transparent;
+}
+
+.main-scroll-pane .scroll-bar:vertical {
+    -fx-background-color: transparent;
+    -fx-pref-width: 12px;
+}
+
+.main-scroll-pane .scroll-bar:vertical .increment-button,
+.main-scroll-pane .scroll-bar:vertical .decrement-button,
+.main-scroll-pane .scroll-bar:vertical .increment-arrow,
+.main-scroll-pane .scroll-bar:vertical .decrement-arrow {
+    -fx-padding: 0;
+    -fx-pref-height: 0;
+    visibility: hidden;
+}
+
+.main-scroll-pane .scroll-bar:vertical .track {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.main-scroll-pane .scroll-bar:vertical .thumb {
+    -fx-background-color: #D3D3D3;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+}
+
+.main-scroll-pane .scroll-bar:vertical .thumb:hover {
+    -fx-background-color: #BEBEBE;
+}
+
+.main-scroll-pane .scroll-bar:vertical .thumb:pressed {
+    -fx-background-color: #A9A9A9;
 }

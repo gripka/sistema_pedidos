@@ -27,14 +27,16 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
         val topSection = HBox(topButton).apply {
             alignment = Pos.TOP_LEFT
             padding = Insets(10.0, 0.0, 10.0, 17.0)
+            style = "-fx-border-color: #212121; -fx-border-width: 0 1px 0 0;"
         }
         children.add(topSection)
 
-        // Main sections container
+
         val sectionsContainer = VBox().apply {
             alignment = Pos.CENTER
             spacing = 10.0
             padding = Insets(10.0, 0.0, 10.0, 0.0)
+            style = "-fx-border-color: #212121; -fx-border-width: 0 1px 0 0;"
         }
 
         val homeButton = createMenuButton("/icons/error.png", "Produtos") { onNavigate("produtos") }
@@ -49,6 +51,8 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
             alignment = Pos.BOTTOM_CENTER
             spacing = 10.0
             padding = Insets(0.0, 0.0, 20.0, 0.0) // Add bottom padding
+            style = "-fx-border-color: #212121; -fx-border-width: 0 1px 0 0;"
+
         }
         val settingsButton = createMenuButton("/icons/config.png", "Configurações") { onNavigate("configuracoes") }
         bottomSection.children.add(settingsButton)

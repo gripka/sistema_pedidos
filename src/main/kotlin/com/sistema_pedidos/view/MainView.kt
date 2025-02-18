@@ -4,6 +4,7 @@ import javafx.application.Application
 import javafx.beans.value.ObservableValue
 import javafx.geometry.Insets
 import javafx.scene.Scene
+import javafx.scene.control.ScrollPane
 import javafx.scene.layout.BorderPane
 import javafx.scene.layout.Background
 import javafx.scene.layout.BackgroundFill
@@ -13,12 +14,20 @@ import javafx.scene.shape.Rectangle
 import javafx.stage.Stage
 
 class MainView(private val stage: Stage) : BorderPane() {
+    private val scrollPane = ScrollPane()
+
     init {
-        // Define the background color as white with rounded corners
         val cornerRadii = CornerRadii(15.0, 15.0, 0.0, 0.0, false)
         background = Background(BackgroundFill(Color.web("#F7F7F7"), cornerRadii, null))
 
-        // Apply a clip to ensure the rounded corners are visible
+        // Configure ScrollPane
+        scrollPane.apply {
+            isFitToWidth = true
+            hbarPolicy = ScrollPane.ScrollBarPolicy.NEVER
+            vbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
+            styleClass.add("main-scroll-pane")
+        }
+
         val clipRectangle = Rectangle().apply {
             arcWidth = 15.0
             arcHeight = 15.0
@@ -27,32 +36,25 @@ class MainView(private val stage: Stage) : BorderPane() {
         }
         clip = clipRectangle
 
-        // Add a listener to the stage's maximized property
         stage.maximizedProperty().addListener { _: ObservableValue<out Boolean>, _: Boolean, maximized: Boolean ->
             if (maximized) {
-                // Remove rounded corners when maximized
                 background = Background(BackgroundFill(Color.web("#F7F7F7"), CornerRadii.EMPTY, null))
                 clip = null
             } else {
-                // Add rounded corners when not maximized
                 background = Background(BackgroundFill(Color.web("#F7F7F7"), cornerRadii, null))
                 clip = clipRectangle
             }
         }
 
-        // Allow resizing from the corners
         stage.isResizable = true
-
-        // Set minimum width and height for the window
         stage.minWidth = 400.0
         stage.minHeight = 300.0
-
-        // Apply the CSS class for the border
         styleClass.add("window-border")
     }
 
     fun setCenterView(view: javafx.scene.Node) {
-        center = view
+        scrollPane.content = view
+        center = scrollPane
     }
 
     fun setLeftMenu(menu: javafx.scene.Node) {
