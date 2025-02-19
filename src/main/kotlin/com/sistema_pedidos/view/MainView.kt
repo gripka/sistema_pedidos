@@ -9,24 +9,33 @@ import javafx.scene.layout.BorderPane
 import javafx.scene.layout.Background
 import javafx.scene.layout.BackgroundFill
 import javafx.scene.layout.CornerRadii
+import javafx.scene.layout.VBox
 import javafx.scene.paint.Color
 import javafx.scene.shape.Rectangle
 import javafx.stage.Stage
 
 class MainView(private val stage: Stage) : BorderPane() {
     private val scrollPane = ScrollPane()
+    private val contentContainer = VBox()
 
     init {
         val cornerRadii = CornerRadii(15.0, 15.0, 0.0, 0.0, false)
         background = Background(BackgroundFill(Color.web("#F7F7F7"), cornerRadii, null))
 
-        // Configure ScrollPane
         scrollPane.apply {
             isFitToWidth = true
             hbarPolicy = ScrollPane.ScrollBarPolicy.NEVER
             vbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
             styleClass.add("main-scroll-pane")
+            content = contentContainer
         }
+
+        contentContainer.apply {
+            maxWidthProperty().bind(scrollPane.widthProperty().subtract(12.0))
+            prefWidthProperty().bind(maxWidthProperty())
+        }
+
+        center = scrollPane
 
         val clipRectangle = Rectangle().apply {
             arcWidth = 15.0
@@ -52,8 +61,9 @@ class MainView(private val stage: Stage) : BorderPane() {
         styleClass.add("window-border")
     }
 
+
     fun setCenterView(view: javafx.scene.Node) {
-        scrollPane.content = view
+        contentContainer.children.setAll(view)
         center = scrollPane
     }
 

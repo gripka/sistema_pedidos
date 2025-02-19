@@ -103,12 +103,6 @@
     -fx-background-insets: 0;
 }
 
-.main-scroll-pane {
-    -fx-background-color: transparent;
-    -fx-padding: 0;
-    -fx-background-insets: 0;
-}
-
 .main-scroll-pane .scroll-bar:vertical {
     -fx-background-color: transparent;
     -fx-pref-width: 12px;

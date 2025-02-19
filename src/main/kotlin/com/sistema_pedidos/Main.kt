@@ -1,5 +1,6 @@
 package com.sistema_pedidos
 
+import com.sistema_pedidos.database.DatabaseHelper
 import javafx.application.Application
 import javafx.geometry.Rectangle2D
 import javafx.scene.Scene
@@ -12,6 +13,10 @@ import javafx.scene.image.Image
 
 class Main : Application() {
     override fun start(primaryStage: Stage) {
+        // Inicializa o banco de dados
+        DatabaseHelper()
+        val dbHelper = DatabaseHelper()
+
         val mainView = MainView(primaryStage)
         val novoPedidoView = NovoPedidoView()
         val produtosView = ProdutosView()
@@ -25,6 +30,10 @@ class Main : Application() {
                 "configuracoes" -> mainView.setCenterView(configuracoesView)
             }
         }
+        val tables = dbHelper.listTables()
+        println("Tabelas no banco de dados: $tables")
+
+
         val titleBarView = TitleBarView(primaryStage)
 
         // Set the initial view, side menu, and title bar

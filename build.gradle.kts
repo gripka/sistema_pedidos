@@ -9,8 +9,10 @@ repositories {
 }
 
 dependencies {
-    implementation("org.openjfx:javafx-controls:17.0.2") // Or a later version if needed
-    implementation("org.openjfx:javafx-fxml:17.0.2") // If you're using FXML
+    implementation("org.openjfx:javafx-controls:17.0.2")
+    implementation("org.openjfx:javafx-fxml:17.0.2")
+    implementation("org.xerial:sqlite-jdbc:3.45.1.0")
+    implementation("org.slf4j:slf4j-simple:1.7.36")
 }
 
 application {

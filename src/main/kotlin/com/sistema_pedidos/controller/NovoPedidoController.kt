@@ -92,7 +92,7 @@ class NovoPedidoController {
                 subtotalField
             )
 
-            // Se houver mais de um produto, adiciona o botão de remover
+            // Mais de um produto, botão de remover
             if (listaProdutos.size > 1) {
                 children.add(createRemoveButton(this, produto))
             }
@@ -223,6 +223,12 @@ class NovoPedidoController {
                     text = String.format("%.2f", produto.valorUnitario).replace(".", ",")
                     alignment = Pos.CENTER_RIGHT
 
+                    focusedProperty().addListener { _, _, isFocused ->
+                        if (isFocused) {
+                            Platform.runLater { positionCaret(text.length) }
+                        }
+                    }
+
                     var isUpdating = false
                     textProperty().addListener { _, _, newValue ->
                         if (isUpdating) return@addListener
@@ -233,11 +239,15 @@ class NovoPedidoController {
                                 // Remove non-digits
                                 val digits = newValue.replace(Regex("[^\\d]"), "")
 
-                                // Convert to monetary value (divide by 100)
-                                val value = digits.toDoubleOrNull()?.div(100) ?: 0.0
-
-                                // Format with comma as decimal separator
-                                text = String.format("%.2f", value).replace(".", ",")
+                                if (digits.isEmpty()) {
+                                    text = "0,00"
+                                } else {
+                                    // Format the number without leading zeros
+                                    val reais = if (digits.length <= 2) "0"
+                                    else digits.substring(0, digits.length - 2).toInt().toString()
+                                    val cents = digits.takeLast(2).padStart(2, '0')
+                                    text = "${reais},${cents}"
+                                }
                                 positionCaret(text.length)
                             } finally {
                                 isUpdating = false

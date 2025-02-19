@@ -6,16 +6,250 @@ import javafx.geometry.Pos
 import javafx.scene.control.*
 import javafx.scene.layout.HBox
 import javafx.scene.layout.Priority
+import javafx.scene.layout.Region
 import javafx.scene.layout.VBox
-import javafx.scene.image.Image
-import javafx.scene.image.ImageView
 
 class NovoPedidoView(private val fieldWidth: Double = 300.0, private val maxFieldWidth: Double = 400.0) : VBox() {
     private val controller = NovoPedidoController()
 
+    private fun createEntregaSection(): VBox {
+        val entregaSection = HBox().apply {
+            alignment = Pos.CENTER
+            spacing = 10.0
+            padding = Insets(20.0, 0.0, 0.0, 0.0)
+            children.addAll(
+                Separator().apply { prefWidth = 300.0 },
+                Label("Entrega").apply { styleClass.add("section-label") },
+                Separator().apply { prefWidth = 300.0 }
+            )
+        }
+
+        val checkBoxEntrega = CheckBox("Necessita entrega").apply {
+            styleClass.add("check-box-entrega")
+            padding = Insets(0.0, 0.0, 10.0, 0.0)
+        }
+
+        val entregaForm = VBox(10.0).apply {
+            isVisible = false
+            children.addAll(
+                HBox(10.0).apply {
+                    children.addAll(
+                        VBox(10.0).apply {
+                            HBox.setHgrow(this, Priority.ALWAYS)
+                            children.addAll(
+                                Label("Nome do Destinatário").apply { styleClass.add("field-label") },
+                                TextField().apply {
+                                    styleClass.add("text-field")
+                                    maxWidth = Double.POSITIVE_INFINITY
+                                    HBox.setHgrow(this, Priority.ALWAYS)
+                                }
+                            )
+                        },
+                        VBox(10.0).apply {
+                            children.addAll(
+                                Label("Telefone do Destinatário").apply { styleClass.add("field-label") },
+                                TextField().apply {
+                                    styleClass.add("text-field")
+                                    prefWidth = 130.0
+                                    controller.formatarTelefone(this)
+                                }
+                            )
+                        }
+                    )
+                },
+                HBox(10.0).apply {
+                    children.addAll(
+                        VBox(10.0).apply {
+                            HBox.setHgrow(this, Priority.ALWAYS)
+                            children.addAll(
+                                Label("Endereço").apply { styleClass.add("field-label") },
+                                TextField().apply {
+                                    styleClass.add("text-field")
+                                    maxWidth = Double.POSITIVE_INFINITY
+                                    HBox.setHgrow(this, Priority.ALWAYS)
+                                }
+                            )
+                        },
+                        VBox(10.0).apply {
+                            HBox.setHgrow(this, Priority.ALWAYS)
+                            children.addAll(
+                                Label("Referência").apply { styleClass.add("field-label") },
+                                TextField().apply {
+                                    styleClass.add("text-field")
+                                    maxWidth = Double.POSITIVE_INFINITY
+                                    HBox.setHgrow(this, Priority.ALWAYS)
+                                }
+                            )
+                        }
+                    )
+                },
+                HBox(10.0).apply {
+                    children.addAll(
+                        VBox(10.0).apply {
+                            HBox.setHgrow(this, Priority.ALWAYS)
+                            children.addAll(
+                                Label("Cidade").apply { styleClass.add("field-label") },
+                                TextField().apply {
+                                    styleClass.add("text-field")
+                                    maxWidth = Double.POSITIVE_INFINITY
+                                    HBox.setHgrow(this, Priority.ALWAYS)
+                                }
+                            )
+                        },
+                        VBox(10.0).apply {
+                            children.addAll(
+                                Label("Estado").apply { styleClass.add("field-label") },
+                                TextField().apply {
+                                    styleClass.add("text-field")
+                                    prefWidth = 60.0
+                                    maxWidth = 60.0
+                                }
+                            )
+                        },
+                        VBox(10.0).apply {
+                            children.addAll(
+                                Label("CEP").apply { styleClass.add("field-label") },
+                                TextField().apply {
+                                    styleClass.add("text-field")
+                                    prefWidth = 100.0
+                                    maxWidth = 100.0
+                                }
+                            )
+                        }
+                    )
+                },
+                HBox(10.0).apply {
+                    children.addAll(
+                        VBox(10.0).apply {
+                            children.addAll(
+                                Label("Valor da Entrega").apply { styleClass.add("field-label") },
+                                TextField().apply {
+                                    styleClass.add("text-field")
+                                    prefWidth = 100.0
+                                    maxWidth = 100.0
+                                    alignment = Pos.CENTER_RIGHT
+                                }
+                            )
+                        },
+                        VBox(10.0).apply {
+                            children.addAll(
+                                Label("Data da Entrega").apply { styleClass.add("field-label") },
+                                DatePicker().apply {
+                                    styleClass.add("date-picker")
+                                    prefWidth = 150.0
+                                    maxWidth = 150.0
+                                }
+                            )
+                        },
+                        VBox(10.0).apply {
+                            children.addAll(
+                                Label("Hora da Entrega").apply { styleClass.add("field-label") },
+                                TextField().apply {
+                                    styleClass.add("text-field")
+                                    prefWidth = 100.0
+                                    maxWidth = 100.0
+                                    promptText = "HH:MM"
+                                }
+                            )
+                        }
+                    )
+                }
+            )
+        }
+
+        checkBoxEntrega.setOnAction {
+            entregaForm.isVisible = checkBoxEntrega.isSelected
+        }
+
+        return VBox(10.0).apply {
+            children.addAll(entregaSection, checkBoxEntrega, entregaForm)
+        }
+    }
+
+    private fun createPagamentoSection(): VBox {
+        val pagamentoSection = HBox().apply {
+            alignment = Pos.CENTER
+            spacing = 10.0
+            padding = Insets(20.0, 0.0, 0.0, 0.0)
+            children.addAll(
+                Separator().apply { prefWidth = 300.0 },
+                Label("Pagamento").apply { styleClass.add("section-label") },
+                Separator().apply { prefWidth = 300.0 }
+            )
+        }
+
+        return VBox(10.0).apply {
+            children.addAll(
+                pagamentoSection,
+                HBox(10.0).apply {
+                    children.addAll(
+                        VBox(10.0).apply {
+                            children.addAll(
+                                Label("Forma de Pagamento").apply { styleClass.add("field-label") },
+                                ComboBox<String>().apply {
+                                    items.addAll("Dinheiro", "Cartão de Crédito", "Cartão de Débito", "PIX")
+                                    styleClass.add("combo-box")
+                                    prefWidth = 200.0
+                                }
+                            )
+                        },
+                        VBox(10.0).apply {
+                            children.addAll(
+                                Label("Troco Para").apply { styleClass.add("field-label") },
+                                TextField().apply {
+                                    styleClass.add("text-field")
+                                    prefWidth = 100.0
+                                    maxWidth = 100.0
+                                    alignment = Pos.CENTER_RIGHT
+                                    isDisable = true
+                                }
+                            )
+                        },
+                        VBox(10.0).apply {
+                            children.addAll(
+                                Label("Status").apply { styleClass.add("field-label") },
+                                ComboBox<String>().apply {
+                                    items.addAll("Pendente", "Pago")
+                                    value = "Pendente"
+                                    styleClass.add("combo-box")
+                                    prefWidth = 150.0
+                                }
+                            )
+                        }
+                    )
+                }
+            )
+        }
+    }
+
+    private fun createBottomBar(): HBox {
+        return HBox().apply {
+            padding = Insets(20.0)
+            styleClass.add("bottom-bar")
+            alignment = Pos.CENTER
+            spacing = 20.0
+
+            val totalLabel = Label("Total do Pedido: R$ 0,00").apply {
+                styleClass.add("total-label")
+            }
+
+            val salvarButton = Button("Salvar Pedido").apply {
+                styleClass.add("salvar-button")
+                prefWidth = 200.0
+                prefHeight = 40.0
+            }
+
+            children.addAll(
+                Region().apply { HBox.setHgrow(this, Priority.ALWAYS) },
+                totalLabel,
+                salvarButton,
+                Region().apply { HBox.setHgrow(this, Priority.ALWAYS) }
+            )
+        }
+    }
+
     init {
         padding = Insets(15.0, 20.0, 1.0, 30.0)
-
         stylesheets.add(javaClass.getResource("/novopedidoview.css").toExternalForm())
 
         val clienteSection = HBox().apply {
@@ -96,100 +330,10 @@ class NovoPedidoView(private val fieldWidth: Double = 300.0, private val maxFiel
             )
         }
 
-        val produtosHBox = HBox(10.0).apply {
-            alignment = Pos.CENTER_LEFT
-            children.addAll(
-                VBox(10.0).apply {
-                    children.addAll(
-                        Label("Quantidade").apply { styleClass.add("field-label") },
-                        HBox(5.0).apply {
-                            alignment = Pos.CENTER_LEFT
-                            val quantityBox = this
-                            children.addAll(
-                                Button().apply {
-                                    styleClass.addAll("quantity-button", "flat-button")
-                                    NovoPedidoView::class.java.getResourceAsStream("/icons/menosp.png")?.let {
-                                        graphic = ImageView(Image(it)).apply {
-                                            fitHeight = 30.0
-                                            fitWidth = 30.0
-                                            isPreserveRatio = true
-                                        }
-                                    }
-                                    prefWidth = 35.0
-                                    prefHeight = 35.0
-                                    setOnAction {
-                                        controller.decrementQuantity(quantityBox.children[1] as TextField)
-                                    }
-                                },
-                                TextField().apply {
-                                    styleClass.add("text-field")
-                                    prefWidth = 50.0
-                                    maxWidth = 50.0
-                                    text = "1"
-                                    alignment = Pos.CENTER
-                                    textProperty().addListener { _, _, newValue ->
-                                        controller.validateQuantity(this, newValue)
-                                    }
-                                },
-                                Button().apply {
-                                    styleClass.addAll("quantity-button", "flat-button")
-                                    NovoPedidoView::class.java.getResourceAsStream("/icons/maisp.png")?.let {
-                                        graphic = ImageView(Image(it)).apply {
-                                            fitHeight = 30.0
-                                            fitWidth = 30.0
-                                            isPreserveRatio = true
-                                        }
-                                    }
-                                    prefWidth = 35.0
-                                    prefHeight = 35.0
-                                    setOnAction {
-                                        controller.incrementQuantity(quantityBox.children[1] as TextField)
-                                    }
-                                }
-                            )
-                        }
-                    )
-                },
-                VBox(10.0).apply {
-                    HBox.setHgrow(this, Priority.ALWAYS)
-                    children.addAll(
-                        Label("Produto").apply { styleClass.add("field-label") },
-                        TextField().apply {
-                            styleClass.add("text-field")
-                            maxWidth = Double.POSITIVE_INFINITY
-                            HBox.setHgrow(this, Priority.ALWAYS)
-                        }
-                    )
-                },
-
-                VBox(10.0).apply {
-                    children.addAll(
-                        Label("Valor Unitário").apply { styleClass.add("field-label") },
-                        TextField().apply {
-                            styleClass.add("text-field")
-                            prefWidth = 50.0
-                            maxWidth = 50.0
-                        }
-                    )
-                },
-                VBox(10.0).apply {
-                    children.addAll(
-                        Label("Subtotal").apply { styleClass.add("field-label") },
-                        TextField().apply {
-                            styleClass.add("text-field")
-                            prefWidth = 50.0
-                            maxWidth = 50.0
-                            isEditable = false
-                        }
-                    )
-                }
-            )
-        }
-        // In NovoPedidoView class
         val produtosContainer = controller.getProdutosContainer()
 
         val adicionarProdutoButton = Button("Adicionar Produto").apply {
-            styleClass.addAll("flat-button")
+            styleClass.addAll("novo-pedido-button")
             prefWidth = 150.0
             prefHeight = 35.0
             setOnAction {
@@ -201,6 +345,17 @@ class NovoPedidoView(private val fieldWidth: Double = 300.0, private val maxFiel
             children.addAll(produtosContainer, adicionarProdutoButton)
         }
 
+        val entregaVBox = createEntregaSection()
+        val pagamentoVBox = createPagamentoSection()
+        val bottomBar = createBottomBar()
 
-        children.addAll(clienteVBox, pedidosSection, pedidosContainer)    }
+        children.addAll(
+            clienteVBox,
+            pedidosSection,
+            pedidosContainer,
+            pagamentoVBox,
+            entregaVBox,
+            bottomBar
+        )
+    }
 }
