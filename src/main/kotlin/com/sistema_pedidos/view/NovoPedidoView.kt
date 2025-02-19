@@ -4,12 +4,12 @@ import com.sistema_pedidos.controller.NovoPedidoController
 import javafx.geometry.Insets
 import javafx.geometry.Pos
 import javafx.scene.control.*
-import javafx.scene.layout.HBox
-import javafx.scene.layout.Priority
-import javafx.scene.layout.Region
-import javafx.scene.layout.VBox
+import javafx.scene.layout.*
 
-class NovoPedidoView(private val fieldWidth: Double = 300.0, private val maxFieldWidth: Double = 400.0) : VBox() {
+class NovoPedidoView(
+    private val fieldWidth: Double = 300.0,
+    private val maxFieldWidth: Double = 400.0
+) : BorderPane() {
     private val controller = NovoPedidoController()
 
     private fun createEntregaSection(): VBox {
@@ -249,9 +249,9 @@ class NovoPedidoView(private val fieldWidth: Double = 300.0, private val maxFiel
     }
 
     init {
-        padding = Insets(15.0, 20.0, 1.0, 30.0)
         stylesheets.add(javaClass.getResource("/novopedidoview.css").toExternalForm())
 
+        // Client section
         val clienteSection = HBox().apply {
             alignment = Pos.CENTER
             spacing = 10.0
@@ -347,15 +347,22 @@ class NovoPedidoView(private val fieldWidth: Double = 300.0, private val maxFiel
 
         val entregaVBox = createEntregaSection()
         val pagamentoVBox = createPagamentoSection()
-        val bottomBar = createBottomBar()
 
-        children.addAll(
-            clienteVBox,
-            pedidosSection,
-            pedidosContainer,
-            pagamentoVBox,
-            entregaVBox,
-            bottomBar
-        )
+        val contentVBox = VBox(10.0).apply {
+            padding = Insets(15.0, 20.0, 20.0, 30.0)
+            children.addAll(
+                clienteVBox,
+                pedidosSection,
+                pedidosContainer,
+                pagamentoVBox,
+                entregaVBox
+            )
+        }
+
+        // Set content and bottom bar
+        center = contentVBox
+        bottom = createBottomBar().apply {
+            styleClass.add("bottom-bar")
+        }
     }
 }

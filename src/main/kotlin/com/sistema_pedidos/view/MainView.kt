@@ -64,7 +64,8 @@ class MainView(private val stage: Stage) : BorderPane() {
 
     fun setCenterView(view: javafx.scene.Node) {
         contentContainer.children.setAll(view)
-        center = scrollPane
+        // Remove the bottom handling here
+        bottom = null
     }
 
     fun setLeftMenu(menu: javafx.scene.Node) {
