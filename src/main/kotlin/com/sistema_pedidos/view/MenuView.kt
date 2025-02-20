@@ -20,7 +20,7 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
         background = Background(BackgroundFill(Color.web("#2B2D31"), CornerRadii.EMPTY, Insets.EMPTY))
         prefWidth = 40.0
         padding = Insets(1.0)
-        styleClass.addAll("menu-right-border", "menu-left-bottom-border") // Add the new CSS classes here
+        styleClass.addAll("menu-right-border", "menu-left-bottom-border")
 
         // Top section (Fixed Button)
         val topButton = createTopButton("/icons/menu.png") { toggleMenu() }
@@ -30,7 +30,6 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
             style = "-fx-border-color: #212121; -fx-border-width: 0 1px 0 0;"
         }
         children.add(topSection)
-
 
         val sectionsContainer = VBox().apply {
             alignment = Pos.CENTER
@@ -50,9 +49,8 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
         val bottomSection = VBox().apply {
             alignment = Pos.BOTTOM_CENTER
             spacing = 10.0
-            padding = Insets(0.0, 0.0, 20.0, 0.0) // Add bottom padding
+            padding = Insets(0.0, 0.0, 20.0, 0.0)
             style = "-fx-border-color: #212121; -fx-border-width: 0 1px 0 0;"
-
         }
         val settingsButton = createMenuButton("/icons/config.png", "Configurações") { onNavigate("configuracoes") }
         bottomSection.children.add(settingsButton)
@@ -106,10 +104,10 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
         val hbox = HBox(btn, label).apply {
             alignment = Pos.CENTER_LEFT
             spacing = 10.0
-            padding = Insets(10.0, 0.0, 10.0, 17.0) // Adjust padding to center
+            padding = Insets(10.0, 0.0, 10.0, 17.0)
             setOnMouseEntered {
                 if (btn != selectedButton) {
-                    style = "-fx-background-color: rgba(200, 200, 200, 0.1); -fx-border-radius: 10px;" // Change hover color
+                    style = "-fx-background-color: rgba(200, 200, 200, 0.1); -fx-border-radius: 10px;"
                 }
             }
             setOnMouseExited {
@@ -123,7 +121,7 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
     }
 
     private fun toggleMenu() {
-        val targetWidth = if (isExpanded) 40.0 else 230.0 // Adjust the closed menu width to 40.0
+        val targetWidth = if (isExpanded) 40.0 else 230.0
         val transition = object : Transition() {
             init {
                 cycleDuration = Duration.millis(300.0)

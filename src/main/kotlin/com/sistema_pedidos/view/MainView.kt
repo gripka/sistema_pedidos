@@ -28,6 +28,7 @@ class MainView(private val stage: Stage) : BorderPane() {
             vbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
             styleClass.add("main-scroll-pane")
             content = contentContainer
+            center = scrollPane
         }
 
         contentContainer.apply {
