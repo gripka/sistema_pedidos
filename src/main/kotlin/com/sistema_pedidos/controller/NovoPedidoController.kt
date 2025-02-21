@@ -327,4 +327,19 @@ class NovoPedidoController {
             }
         }
     }
+
+    fun formatarMoeda(textField: TextField) {
+        textField.textProperty().addListener { _, _, newValue ->
+            if (newValue != null) {
+                val cleanValue = newValue.replace(Regex("[^0-9]"), "")
+                if (cleanValue.isNotEmpty()) {
+                    val value = cleanValue.toDouble() / 100
+                    val formattedValue = "%.2f".format(value).replace(".", ",")
+                    if (textField.text != formattedValue) {
+                        textField.text = formattedValue
+                    }
+                }
+            }
+        }
+    }
 }

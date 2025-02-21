@@ -5,14 +5,22 @@ import javafx.geometry.Insets
 import javafx.geometry.Pos
 import javafx.scene.control.*
 import javafx.scene.layout.*
+import javafx.scene.shape.Circle
+import javafx.scene.shape.Rectangle
+import javafx.scene.layout.StackPane
+import javafx.util.Duration
+import javafx.animation.TranslateTransition
+import javafx.beans.property.DoubleProperty
+import javafx.scene.Node
 
 class NovoPedidoView : BorderPane() {
     private val controller = NovoPedidoController()
+    private lateinit var entregaForm: VBox
 
     // Container do conteúdo que pode rolar
     private val contentContainer = VBox().apply {
         spacing = 10.0
-        padding = Insets(15.0, 20.0, 20.0, 30.0)
+        padding = Insets(15.0, 20.0, 40.0, 30.0) // Added bottom padding
         children.addAll(
             createClientSection(),
             createPedidosSection(),
@@ -24,60 +32,69 @@ class NovoPedidoView : BorderPane() {
     init {
         stylesheets.add(javaClass.getResource("/novopedidoview.css").toExternalForm())
 
-        // Criar o ScrollPane para o conteúdo rolável
         val scrollPane = ScrollPane(contentContainer).apply {
             isFitToWidth = true
             hbarPolicy = ScrollPane.ScrollBarPolicy.NEVER
             vbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
             styleClass.add("main-scroll-pane")
+            VBox.setVgrow(this, Priority.ALWAYS)
+            maxHeight = Double.MAX_VALUE
         }
 
-        // Cria um VBox para o layout principal com o ScrollPane e a BottomBar fixa
-        val mainLayout = VBox().apply {
-            // Coloca o ScrollPane no VBox e faz ele crescer para ocupar o espaço restante
-            children.add(scrollPane)
-            VBox.setVgrow(scrollPane, Priority.ALWAYS)
-
-            // Coloca a BottomBar fixa no final
-            children.add(createBottomBar()) // BottomBar fixa
-        }
-
-        // Define o layout principal no centro do BorderPane
-        center = mainLayout
+        center = scrollPane
+        bottom = createBarraInferior()
     }
 
-    // Criar a BottomBar fixa
-    private fun createBottomBar(): HBox {
+    private fun DoubleProperty.animate(endValue: Double, duration: Duration) {
+        TranslateTransition(duration).apply {
+            toX = endValue
+            node = this@animate.bean as Node
+            play()
+        }
+    }
+
+    private fun createBarraInferior(): HBox {
         return HBox().apply {
             padding = Insets(20.0)
-            alignment = Pos.CENTER
             spacing = 20.0
             maxHeight = 80.0
             minHeight = 80.0
-            styleClass.add("bottom-bar")
-            style = """
-            -fx-background-color: white;
-            -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 10, 0, 0, -5);
-            -fx-border-width: 1 0 0 0;
-            -fx-border-color: #e0e0e0;
-        """
+            styleClass.add("barra-inferior")
 
-            val totalLabel = Label("Total do Pedido: R$ 0,00").apply {
-                styleClass.add("total-label")
+            val leftBox = HBox().apply {
+                HBox.setHgrow(this, Priority.ALWAYS)
             }
 
-            val salvarButton = Button("Salvar Pedido").apply {
-                styleClass.add("salvar-button")
-                prefWidth = 200.0
-                prefHeight = 40.0
+            val centerBox = HBox().apply {
+                minWidth = 200.0
+                alignment = Pos.CENTER
+                children.add(
+                    Button("Salvar Pedido").apply {
+                        styleClass.add("salvar-pedido-button")
+                        prefWidth = 200.0
+                        prefHeight = 40.0
+                    }
+                )
             }
 
-            children.addAll(
-                Region().apply { HBox.setHgrow(this, Priority.ALWAYS) },
-                totalLabel,
-                salvarButton,
-                Region().apply { HBox.setHgrow(this, Priority.ALWAYS) }
-            )
+            val rightBox = HBox().apply {
+                HBox.setHgrow(this, Priority.ALWAYS)
+                alignment = Pos.CENTER_RIGHT
+                children.add(
+                    VBox().apply {
+                        styleClass.add("total-container")
+                        padding = Insets(10.0, 20.0, 10.0, 20.0)
+                        alignment = Pos.CENTER
+                        children.add(
+                            Label("Total do Pedido: R$ 0,00").apply {
+                                styleClass.add("total-label")
+                            }
+                        )
+                    }
+                )
+            }
+
+            children.addAll(leftBox, centerBox, rightBox)
         }
     }
 
@@ -190,44 +207,110 @@ class NovoPedidoView : BorderPane() {
             )
         }
 
+        val toggleGroup = ToggleGroup()
+        val formasPagamento = listOf("Dinheiro", "Cartão de Crédito", "Cartão de Débito", "PIX", "Voucher")
+
+        val toggleButtons = HBox(10.0).apply {
+            children.addAll(
+                formasPagamento.map { forma ->
+                    ToggleButton(forma).apply {
+                        this.toggleGroup = toggleGroup
+                        styleClass.add("payment-toggle-button")
+                        prefWidth = 130.0
+                        prefHeight = 35.0
+                        if (forma == "Dinheiro") isSelected = true
+                    }
+                }
+            )
+        }
+
+        val descontoTextField = TextField().apply {
+            styleClass.add("text-field")
+            prefWidth = 100.0
+            maxWidth = 100.0
+            alignment = Pos.CENTER_RIGHT
+            promptText = "0,00"
+            controller.formatarMoeda(this)
+        }
+
+        val trocoParaTextField = TextField().apply {
+            styleClass.add("text-field")
+            prefWidth = 100.0
+            maxWidth = 100.0
+            alignment = Pos.CENTER_RIGHT
+            promptText = "0,00"
+            controller.formatarMoeda(this)
+        }
+
+        val trocoCalculadoLabel = Label("R$ 0,00").apply {
+            styleClass.add("text-field")
+            prefWidth = 100.0
+            maxWidth = 100.0
+            alignment = Pos.CENTER_RIGHT
+            style = "-fx-padding: 5;"
+        }
+
+        val statusToggleGroup = ToggleGroup()
+        val statusButtons = HBox(10.0).apply {
+            children.addAll(
+                ToggleButton("Pendente").apply {
+                    this.toggleGroup = statusToggleGroup
+                    styleClass.add("payment-toggle-button")
+                    prefWidth = 100.0
+                    prefHeight = 35.0
+                    isSelected = true
+                },
+                ToggleButton("Pago").apply {
+                    this.toggleGroup = statusToggleGroup
+                    styleClass.add("payment-toggle-button")
+                    prefWidth = 100.0
+                    prefHeight = 35.0
+                }
+            )
+        }
+
+        toggleGroup.selectedToggleProperty().addListener { _, _, newToggle ->
+            val selectedButton = newToggle as? ToggleButton
+            trocoParaTextField.isDisable = selectedButton?.text != "Dinheiro"
+            trocoCalculadoLabel.isDisable = selectedButton?.text != "Dinheiro"
+        }
+
         return VBox(10.0).apply {
             children.addAll(
                 pagamentoSection,
+                VBox(10.0).apply {
+                    children.addAll(
+                        Label("Forma de Pagamento").apply { styleClass.add("field-label") },
+                        toggleButtons
+                    )
+                },
                 HBox(10.0).apply {
+                    spacing = 10.0
                     children.addAll(
                         VBox(10.0).apply {
                             children.addAll(
-                                Label("Forma de Pagamento").apply { styleClass.add("field-label") },
-                                ComboBox<String>().apply {
-                                    items.addAll("Dinheiro", "Cartão de Crédito", "Cartão de Débito", "PIX")
-                                    styleClass.add("combo-box")
-                                    prefWidth = 200.0
-                                }
+                                Label("Desconto").apply { styleClass.add("field-label") },
+                                descontoTextField
                             )
                         },
                         VBox(10.0).apply {
                             children.addAll(
                                 Label("Troco Para").apply { styleClass.add("field-label") },
-                                TextField().apply {
-                                    styleClass.add("text-field")
-                                    prefWidth = 100.0
-                                    maxWidth = 100.0
-                                    alignment = Pos.CENTER_RIGHT
-                                    isDisable = true
-                                }
+                                trocoParaTextField
                             )
                         },
                         VBox(10.0).apply {
                             children.addAll(
-                                Label("Status").apply { styleClass.add("field-label") },
-                                ComboBox<String>().apply {
-                                    items.addAll("Pendente", "Pago")
-                                    value = "Pendente"
-                                    styleClass.add("combo-box")
-                                    prefWidth = 150.0
-                                }
+                                Label("Troco a Devolver").apply { styleClass.add("field-label") },
+                                trocoCalculadoLabel
                             )
                         }
+                    )
+                },
+                VBox(10.0).apply {
+                    children.addAll(
+                        Label("Status").apply { styleClass.add("field-label") },
+                        statusButtons
                     )
                 }
             )
@@ -246,12 +329,67 @@ class NovoPedidoView : BorderPane() {
             )
         }
 
-        val checkBoxEntrega = CheckBox("Necessita entrega").apply {
-            styleClass.add("check-box-entrega")
-            padding = Insets(0.0, 0.0, 10.0, 0.0)
+        val toggleSwitch = HBox(10.0).apply { // Using HBox to contain switch and label
+            alignment = Pos.CENTER
+
+            val switchContainer = StackPane().apply {
+                minWidth = 56.0 // Match slider width
+                minHeight = 24.0 // Match slider height
+                maxWidth = 56.0
+                maxHeight = 24.0
+                styleClass.add("switch")
+
+                val checkbox = CheckBox().apply {
+                    opacity = 0.0
+                    isFocusTraversable = false
+                }
+
+                val slider = Rectangle(56.0, 24.0).apply {
+                    styleClass.add("slider")
+                    arcWidth = 24.0
+                    arcHeight = 24.0
+                }
+
+                val circle = Circle(10.0).apply {
+                    styleClass.add("slider-circle")
+                    translateX = -14.0
+                }
+
+                setOnMouseClicked { event ->
+                    // Only handle clicks within the slider bounds
+                    if (event.x >= 0 && event.x <= 56.0 && event.y >= 0 && event.y <= 24.0) {
+                        checkbox.isSelected = !checkbox.isSelected
+                        event.consume()
+                    }
+                }
+
+                checkbox.selectedProperty().addListener { _, _, isSelected ->
+                    circle.translateXProperty().animate(
+                        if (isSelected) 14.0 else -14.0,
+                        Duration.millis(200.0)
+                    )
+
+                    if (isSelected) {
+                        slider.styleClass.add("selected")
+                    } else {
+                        slider.styleClass.remove("selected")
+                    }
+
+                    entregaForm.isVisible = isSelected
+                }
+
+                children.addAll(slider, circle, checkbox)
+            }
+
+            val label = Label("").apply {
+                styleClass.add("field-label")
+            }
+
+            children.addAll(switchContainer, label)
         }
 
-        val entregaForm = VBox(10.0).apply {
+
+        entregaForm = VBox(10.0).apply {
             isVisible = false
             children.addAll(
                 HBox(10.0).apply {
@@ -320,6 +458,16 @@ class NovoPedidoView : BorderPane() {
                         },
                         VBox(10.0).apply {
                             children.addAll(
+                                Label("Bairro").apply { styleClass.add("field-label") },
+                                TextField().apply {
+                                    styleClass.add("text-field")
+                                    prefWidth = 350.0
+                                    maxWidth = 350.0
+                                }
+                            )
+                        },
+                        VBox(10.0).apply {
+                            children.addAll(
                                 Label("Estado").apply { styleClass.add("field-label") },
                                 TextField().apply {
                                     styleClass.add("text-field")
@@ -350,6 +498,7 @@ class NovoPedidoView : BorderPane() {
                                     prefWidth = 100.0
                                     maxWidth = 100.0
                                     alignment = Pos.CENTER_RIGHT
+                                    controller.formatarMoeda(this)
                                 }
                             )
                         },
@@ -379,12 +528,8 @@ class NovoPedidoView : BorderPane() {
             )
         }
 
-        checkBoxEntrega.setOnAction {
-            entregaForm.isVisible = checkBoxEntrega.isSelected
-        }
-
         return VBox(10.0).apply {
-            children.addAll(entregaSection, checkBoxEntrega, entregaForm)
+            children.addAll(entregaSection, toggleSwitch, entregaForm)
         }
     }
 }
