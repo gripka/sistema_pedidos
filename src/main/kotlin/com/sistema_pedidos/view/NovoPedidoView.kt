@@ -49,6 +49,7 @@ class NovoPedidoView : BorderPane() {
 
         center = scrollPane
         bottom = createBarraInferior()
+        controller.setupListeners()
     }
 
     private fun DoubleProperty.animate(endValue: Double, duration: Duration) {
@@ -234,6 +235,8 @@ class NovoPedidoView : BorderPane() {
 
     private fun createPagamentoSection(): VBox {
         val descontoToggleGroup = ToggleGroup()
+        controller.setDescontoToggleGroup(descontoToggleGroup) // Add this line here
+
         val pagamentoSection = HBox().apply {
             alignment = Pos.CENTER
             spacing = 10.0
@@ -323,15 +326,12 @@ class NovoPedidoView : BorderPane() {
                                     prefWidth = 120.0
                                     maxWidth = 120.0
                                     alignment = Pos.CENTER_RIGHT
-
-                                    // Initially set as money format
                                     promptText = "R$ 0,00"
                                     var currentTextListener = controller.formatarMoeda(this)
+                                    controller.setDescontoField(this)
 
                                     descontoToggleGroup.selectedToggleProperty().addListener { _, _, newToggle ->
                                         val isValor = (newToggle as? RadioButton)?.id == "valor"
-
-                                        // Remove previous listener and clear text before adding new listener
                                         textProperty().removeListener(currentTextListener)
                                         text = ""
 
@@ -614,7 +614,7 @@ class NovoPedidoView : BorderPane() {
                                     maxWidth = 100.0
                                     alignment = Pos.CENTER_RIGHT
                                     controller.formatarMoeda(this)
-                                }
+                                }.also { controller.setValorEntregaField(it) }
                             )
                         },
                         VBox(10.0).apply {
@@ -712,8 +712,6 @@ class NovoPedidoView : BorderPane() {
                 }
             )
         }
-
-
         return VBox(10.0).apply {
             children.addAll(entregaSection, toggleSwitch, entregaForm)
         }

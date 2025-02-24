@@ -1,29 +1,24 @@
 package com.sistema_pedidos.controller
 
 import javafx.geometry.Pos
-import javafx.scene.control.Button
-import javafx.scene.control.TextField
 import javafx.scene.image.Image
 import javafx.scene.image.ImageView
 import javafx.application.Platform
-import javafx.scene.control.Label
 import com.sistema_pedidos.model.Produto
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
-import javafx.beans.property.StringProperty
+import javafx.scene.control.*
 import javafx.scene.layout.*
-import javafx.scene.paint.Color
+
 
 class NovoPedidoController {
     private val produtosContainer = VBox(10.0)
     private val listaProdutos: ObservableList<Produto> = FXCollections.observableArrayList()
+    private lateinit var valorEntregaField: TextField
     private lateinit var totalLabelRef: Label
+    private lateinit var descontoField: TextField
+    private lateinit var descontoToggleGroup: ToggleGroup
 
-    init {
-        val primeiroProduto = Produto(1L, "", "Produto 1", null, 0.0, null, "UN", 0, 0, "Ativo", null, null)
-        listaProdutos.add(primeiroProduto)
-        produtosContainer.children.add(createProdutosHBox(primeiroProduto))
-    }
     fun incrementQuantity(textField: TextField) {
         val value = textField.text.toInt()
         if (value < 999) textField.text = (value + 1).toString()
@@ -143,7 +138,7 @@ class NovoPedidoController {
     }
 
     fun updateTotal(totalLabel: Label) {
-        var total = 0.0
+        var subtotal = 0.0
 
         produtosContainer.children.forEach { node ->
             val hBox = node as HBox
@@ -152,17 +147,51 @@ class NovoPedidoController {
 
             subtotalField?.let { field ->
                 val subtotalText = field.text.replace(Regex("[^\\d]"), "")
-                total += (subtotalText.toDoubleOrNull() ?: 0.0) / 100
+                subtotal += (subtotalText.toDoubleOrNull() ?: 0.0) / 100
             }
         }
 
-        val formattedValue = String.format("%,.2f", total)
+        val valorEntregaText = valorEntregaField.text.replace(Regex("[^\\d]"), "")
+        val valorEntrega = (valorEntregaText.toDoubleOrNull() ?: 0.0) / 100
+        subtotal += valorEntrega
+
+        // Calculate discount
+        var totalComDesconto = subtotal
+        val descontoText = descontoField.text.replace(Regex("[^\\d]"), "")
+        if (descontoText.isNotEmpty()) {
+            val descontoValue = descontoText.toDouble() / 100
+            val isValor = (descontoToggleGroup.selectedToggle as? RadioButton)?.id == "valor"
+
+            totalComDesconto = if (isValor) {
+                subtotal - descontoValue
+            } else {
+                val percentual = descontoValue
+                if (percentual <= 100) {
+                    subtotal * (1 - (percentual / 100))
+                } else {
+                    subtotal
+                }
+            }
+        }
+
+        val formattedValue = String.format("%,.2f", totalComDesconto)
             .replace(",", ".")
             .replace(".", ",", ignoreCase = true)
             .replaceFirst(",", ".")
 
         Platform.runLater {
             totalLabel.text = "Total do Pedido: R$ $formattedValue"
+        }
+    }
+
+    // Add these listeners in init or a setup method, not in updateTotal
+    fun setupListeners() {
+        valorEntregaField.textProperty().addListener { _, _, _ ->
+            updateTotal(totalLabelRef)
+        }
+
+        descontoField.textProperty().addListener { _, _, _ ->
+            updateTotal(totalLabelRef)
         }
     }
 
@@ -201,7 +230,9 @@ class NovoPedidoController {
         listaProdutos.clear()
         listaProdutos.addAll(updatedProducts)
     }
-
+    fun setValorEntregaField(field: TextField) {
+        valorEntregaField = field
+    }
     fun addNovoProduto() {
         val novoProduto = Produto(
             id = (listaProdutos.size + 1).toLong(),
@@ -399,6 +430,14 @@ class NovoPedidoController {
         }
 
         return textListener
+    }
+
+    fun setDescontoField(field: TextField) {
+        descontoField = field
+    }
+
+    fun setDescontoToggleGroup(group: ToggleGroup) {
+        descontoToggleGroup = group
     }
 
 
