@@ -10,6 +10,7 @@ import javafx.scene.shape.Rectangle
 import javafx.scene.layout.StackPane
 import javafx.util.Duration
 import javafx.animation.TranslateTransition
+import javafx.application.Platform
 import javafx.beans.property.DoubleProperty
 import javafx.collections.ListChangeListener
 import javafx.scene.Node
@@ -21,7 +22,8 @@ import java.util.Locale
 class NovoPedidoView : BorderPane() {
     private val controller = NovoPedidoController()
     private lateinit var entregaForm: VBox
-    private lateinit var totalLabelRef: Label  // Add this line
+    private lateinit var totalLabelRef: Label
+    private lateinit var valorEntregaField: TextField
 
     // Container do conteúdo que pode rolar
     private val contentContainer = VBox().apply {
@@ -359,6 +361,7 @@ class NovoPedidoView : BorderPane() {
                             alignment = Pos.CENTER_RIGHT
                             promptText = "R$ 0,00"
                             controller.formatarMoeda(this)
+                            controller.setTrocoParaField(this)
                         }
                     )
                 },
@@ -383,6 +386,7 @@ class NovoPedidoView : BorderPane() {
                                 CornerRadii(3.0),
                                 BorderWidths(2.0)
                             ))
+                            controller.setTrocoCalculadoLabel(this)
                         }
                     )
                 }
@@ -494,6 +498,12 @@ class NovoPedidoView : BorderPane() {
                         slider.styleClass.remove("selected")
                         entregaForm.isDisable = true
                         entregaForm.opacity = 0.6
+                        // Clear delivery value and update total when delivery is disabled
+                        Platform.runLater {
+                            controller.setValorEntregaField(valorEntregaField)
+                            valorEntregaField.text = "R$ 0,00"
+                            controller.updateTotal(totalLabel)
+                        }
                     }
                 }
 
@@ -614,7 +624,10 @@ class NovoPedidoView : BorderPane() {
                                     maxWidth = 100.0
                                     alignment = Pos.CENTER_RIGHT
                                     controller.formatarMoeda(this)
-                                }.also { controller.setValorEntregaField(it) }
+                                }.also { field ->
+                                    valorEntregaField = field
+                                    controller.setValorEntregaField(field)
+                                }
                             )
                         },
                         VBox(10.0).apply {

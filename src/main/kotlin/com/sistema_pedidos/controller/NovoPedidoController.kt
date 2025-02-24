@@ -18,6 +18,8 @@ class NovoPedidoController {
     private lateinit var totalLabelRef: Label
     private lateinit var descontoField: TextField
     private lateinit var descontoToggleGroup: ToggleGroup
+    private lateinit var trocoParaField: TextField
+    private lateinit var trocoCalculadoLabel: Label
 
     fun incrementQuantity(textField: TextField) {
         val value = textField.text.toInt()
@@ -184,14 +186,23 @@ class NovoPedidoController {
         }
     }
 
-    // Add these listeners in init or a setup method, not in updateTotal
     fun setupListeners() {
         valorEntregaField.textProperty().addListener { _, _, _ ->
             updateTotal(totalLabelRef)
+            calcularTroco()
         }
 
         descontoField.textProperty().addListener { _, _, _ ->
             updateTotal(totalLabelRef)
+            calcularTroco()
+        }
+
+        trocoParaField.textProperty().addListener { _, _, _ ->
+            calcularTroco()
+        }
+
+        totalLabelRef.textProperty().addListener { _, _, _ ->
+            calcularTroco()
         }
     }
 
@@ -440,6 +451,32 @@ class NovoPedidoController {
         descontoToggleGroup = group
     }
 
+    fun setTrocoParaField(field: TextField) {
+        trocoParaField = field
+    }
+
+    fun setTrocoCalculadoLabel(label: Label) {
+        trocoCalculadoLabel = label
+    }
+    fun calcularTroco() {
+        val trocoParaText = trocoParaField.text.replace(Regex("[^\\d]"), "")
+        val trocoPara = (trocoParaText.toDoubleOrNull() ?: 0.0) / 100
+
+        // Get total from total label
+        val totalText = totalLabelRef.text.replace(Regex("[^\\d]"), "")
+        val total = (totalText.toDoubleOrNull() ?: 0.0) / 100
+
+        val troco = if (trocoPara >= total) trocoPara - total else 0.0
+
+        val formattedTroco = String.format("%,.2f", troco)
+            .replace(",", ".")
+            .replace(".", ",", ignoreCase = true)
+            .replaceFirst(",", ".")
+
+        Platform.runLater {
+            trocoCalculadoLabel.text = "R$ $formattedTroco"
+        }
+    }
 
     fun formatarPercentual(textField: TextField): javafx.beans.value.ChangeListener<String> {
         var isUpdating = false
