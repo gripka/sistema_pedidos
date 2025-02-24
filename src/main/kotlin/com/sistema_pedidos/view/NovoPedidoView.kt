@@ -12,6 +12,10 @@ import javafx.util.Duration
 import javafx.animation.TranslateTransition
 import javafx.beans.property.DoubleProperty
 import javafx.scene.Node
+import javafx.util.converter.LocalDateStringConverter as JavaFxLocalDateStringConverter
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
 
 class NovoPedidoView : BorderPane() {
     private val controller = NovoPedidoController()
@@ -196,6 +200,7 @@ class NovoPedidoView : BorderPane() {
     }
 
     private fun createPagamentoSection(): VBox {
+        val descontoToggleGroup = ToggleGroup()
         val pagamentoSection = HBox().apply {
             alignment = Pos.CENTER
             spacing = 10.0
@@ -207,14 +212,15 @@ class NovoPedidoView : BorderPane() {
             )
         }
 
-        val toggleGroup = ToggleGroup()
+        val paymentToggleGroup = ToggleGroup()
         val formasPagamento = listOf("Dinheiro", "Cartão de Crédito", "Cartão de Débito", "PIX", "Voucher")
 
         val toggleButtons = HBox(10.0).apply {
+            alignment = Pos.CENTER
             children.addAll(
                 formasPagamento.map { forma ->
                     ToggleButton(forma).apply {
-                        this.toggleGroup = toggleGroup
+                        toggleGroup = paymentToggleGroup
                         styleClass.add("payment-toggle-button")
                         prefWidth = 130.0
                         prefHeight = 35.0
@@ -224,14 +230,6 @@ class NovoPedidoView : BorderPane() {
             )
         }
 
-        val descontoTextField = TextField().apply {
-            styleClass.add("text-field")
-            prefWidth = 100.0
-            maxWidth = 100.0
-            alignment = Pos.CENTER_RIGHT
-            promptText = "0,00"
-            controller.formatarMoeda(this)
-        }
 
         val trocoParaTextField = TextField().apply {
             styleClass.add("text-field")
@@ -243,11 +241,119 @@ class NovoPedidoView : BorderPane() {
         }
 
         val trocoCalculadoLabel = Label("R$ 0,00").apply {
-            styleClass.add("text-field")
+            styleClass.addAll("text-field")
             prefWidth = 100.0
             maxWidth = 100.0
             alignment = Pos.CENTER_RIGHT
-            style = "-fx-padding: 5;"
+            style = "-fx-padding: 8px 6px;"
+            background = Background(BackgroundFill(javafx.scene.paint.Color.rgb(250, 251, 252), CornerRadii(3.0), Insets.EMPTY))
+            border = Border(BorderStroke(
+                javafx.scene.paint.Color.rgb(223, 225, 230),
+                BorderStrokeStyle.SOLID,
+                CornerRadii(3.0),
+                BorderWidths(2.0)
+            ))
+        }
+
+        val paymentFieldsBox = HBox(20.0).apply {
+            alignment = Pos.CENTER_LEFT
+            children.addAll(
+                VBox(10.0).apply {
+                    prefWidth = 450.0
+                    children.addAll(
+                        Label("Desconto").apply { styleClass.add("field-label") },
+                        HBox(10.0).apply {
+                            alignment = Pos.CENTER_LEFT
+                            spacing = 20.0
+                            children.addAll(
+                                HBox(20.0).apply {
+                                    prefHeight = 36.0
+                                    alignment = Pos.CENTER_LEFT
+                                    children.addAll(
+                                        RadioButton("Valor (R$)").apply {
+                                            toggleGroup = descontoToggleGroup
+                                            isSelected = true
+                                            styleClass.addAll("custom-radio")
+                                            id = "valor"
+                                            prefWidth = 120.0
+                                        },
+                                        RadioButton("Percentual (%)").apply {
+                                            toggleGroup = descontoToggleGroup
+                                            styleClass.addAll("custom-radio")
+                                            id = "percentual"
+                                            prefWidth = 140.0
+                                        }
+                                    )
+                                },
+                                TextField().apply {
+                                    styleClass.add("text-field")
+                                    prefWidth = 120.0
+                                    maxWidth = 120.0
+                                    alignment = Pos.CENTER_RIGHT
+
+                                    // Initially set as money format
+                                    promptText = "R$ 0,00"
+                                    var currentTextListener = controller.formatarMoeda(this)
+
+                                    descontoToggleGroup.selectedToggleProperty().addListener { _, _, newToggle ->
+                                        val isValor = (newToggle as? RadioButton)?.id == "valor"
+
+                                        // Remove previous listener and clear text before adding new listener
+                                        textProperty().removeListener(currentTextListener)
+                                        text = ""
+
+                                        if (isValor) {
+                                            promptText = "R$ 0,00"
+                                            currentTextListener = controller.formatarMoeda(this)
+                                        } else {
+                                            promptText = "0,00"
+                                            currentTextListener = controller.formatarPercentual(this)
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    )
+                },
+                VBox(10.0).apply {
+                    prefWidth = 150.0
+                    children.addAll(
+                        Label("Troco Para").apply { styleClass.add("field-label") },
+                        TextField().apply {
+                            styleClass.add("text-field")
+                            prefWidth = 100.0
+                            maxWidth = 100.0
+                            alignment = Pos.CENTER_RIGHT
+                            promptText = "R$ 0,00"
+                            controller.formatarMoeda(this)
+                        }
+                    )
+                },
+                VBox(10.0).apply {
+                    prefWidth = 150.0
+                    children.addAll(
+                        Label("Troco a Devolver").apply { styleClass.add("field-label") },
+                        Label("R$ 0,00").apply {
+                            styleClass.addAll("text-field")
+                            prefWidth = 100.0
+                            maxWidth = 100.0
+                            alignment = Pos.CENTER_RIGHT
+                            style = "-fx-padding: 8px 6px;"
+                            background = Background(BackgroundFill(
+                                javafx.scene.paint.Color.rgb(250, 251, 252),
+                                CornerRadii(3.0),
+                                Insets.EMPTY
+                            ))
+                            border = Border(BorderStroke(
+                                javafx.scene.paint.Color.rgb(223, 225, 230),
+                                BorderStrokeStyle.SOLID,
+                                CornerRadii(3.0),
+                                BorderWidths(2.0)
+                            ))
+                        }
+                    )
+                }
+            )
         }
 
         val statusToggleGroup = ToggleGroup()
@@ -269,7 +375,7 @@ class NovoPedidoView : BorderPane() {
             )
         }
 
-        toggleGroup.selectedToggleProperty().addListener { _, _, newToggle ->
+        paymentToggleGroup.selectedToggleProperty().addListener { _, _, newToggle ->
             val selectedButton = newToggle as? ToggleButton
             trocoParaTextField.isDisable = selectedButton?.text != "Dinheiro"
             trocoCalculadoLabel.isDisable = selectedButton?.text != "Dinheiro"
@@ -280,33 +386,11 @@ class NovoPedidoView : BorderPane() {
                 pagamentoSection,
                 VBox(10.0).apply {
                     children.addAll(
-                        Label("Forma de Pagamento").apply { styleClass.add("field-label") },
+                        Label("").apply { styleClass.add("field-label") },
                         toggleButtons
                     )
                 },
-                HBox(10.0).apply {
-                    spacing = 10.0
-                    children.addAll(
-                        VBox(10.0).apply {
-                            children.addAll(
-                                Label("Desconto").apply { styleClass.add("field-label") },
-                                descontoTextField
-                            )
-                        },
-                        VBox(10.0).apply {
-                            children.addAll(
-                                Label("Troco Para").apply { styleClass.add("field-label") },
-                                trocoParaTextField
-                            )
-                        },
-                        VBox(10.0).apply {
-                            children.addAll(
-                                Label("Troco a Devolver").apply { styleClass.add("field-label") },
-                                trocoCalculadoLabel
-                            )
-                        }
-                    )
-                },
+                paymentFieldsBox,
                 VBox(10.0).apply {
                     children.addAll(
                         Label("Status").apply { styleClass.add("field-label") },
@@ -352,7 +436,7 @@ class NovoPedidoView : BorderPane() {
 
                 val circle = Circle(10.0).apply {
                     styleClass.add("slider-circle")
-                    translateX = -14.0
+                    translateX = -16.0
                 }
 
                 setOnMouseClicked { event ->
@@ -365,17 +449,19 @@ class NovoPedidoView : BorderPane() {
 
                 checkbox.selectedProperty().addListener { _, _, isSelected ->
                     circle.translateXProperty().animate(
-                        if (isSelected) 14.0 else -14.0,
+                        if (isSelected) 14.0 else -16.0,
                         Duration.millis(200.0)
                     )
 
                     if (isSelected) {
                         slider.styleClass.add("selected")
+                        entregaForm.isDisable = false
+                        entregaForm.opacity = 1.0
                     } else {
                         slider.styleClass.remove("selected")
+                        entregaForm.isDisable = true
+                        entregaForm.opacity = 0.6
                     }
-
-                    entregaForm.isVisible = isSelected
                 }
 
                 children.addAll(slider, circle, checkbox)
@@ -390,7 +476,8 @@ class NovoPedidoView : BorderPane() {
 
 
         entregaForm = VBox(10.0).apply {
-            isVisible = false
+            isDisable = true  // Start disabled
+            opacity = 0.9     // Start with reduced opacity
             children.addAll(
                 HBox(10.0).apply {
                     children.addAll(
@@ -466,16 +553,7 @@ class NovoPedidoView : BorderPane() {
                                 }
                             )
                         },
-                        VBox(10.0).apply {
-                            children.addAll(
-                                Label("Estado").apply { styleClass.add("field-label") },
-                                TextField().apply {
-                                    styleClass.add("text-field")
-                                    prefWidth = 60.0
-                                    maxWidth = 60.0
-                                }
-                            )
-                        },
+
                         VBox(10.0).apply {
                             children.addAll(
                                 Label("CEP").apply { styleClass.add("field-label") },
@@ -509,17 +587,86 @@ class NovoPedidoView : BorderPane() {
                                     styleClass.add("date-picker")
                                     prefWidth = 150.0
                                     maxWidth = 150.0
+                                    isEditable = false
+                                    converter = JavaFxLocalDateStringConverter(
+                                        DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+                                        DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                                    )
+                                    Locale.setDefault(Locale("pt", "BR"))
                                 }
                             )
                         },
                         VBox(10.0).apply {
                             children.addAll(
                                 Label("Hora da Entrega").apply { styleClass.add("field-label") },
-                                TextField().apply {
-                                    styleClass.add("text-field")
-                                    prefWidth = 100.0
-                                    maxWidth = 100.0
-                                    promptText = "HH:MM"
+                                HBox(5.0).apply {
+                                    alignment = Pos.CENTER_LEFT
+                                    children.addAll(
+                                        ComboBox<String>().apply {
+                                            styleClass.add("time-picker")
+                                            prefWidth = 70.0
+                                            maxWidth = 70.0
+                                            isEditable = true
+                                            val hours = (0..23).map { String.format("%02d", it) }
+                                            items.addAll(hours)
+                                            value = "08" // Hora inicial
+
+                                            editor.textProperty().addListener { _, _, newValue ->
+                                                if (newValue.isEmpty()) return@addListener
+
+                                                try {
+                                                    val hour = newValue.toInt()
+                                                    if (hour in 0..23) {
+                                                        value = String.format("%02d", hour)
+                                                    } else {
+                                                        editor.text = value
+                                                    }
+                                                } catch (e: NumberFormatException) {
+                                                    editor.text = value
+                                                }
+                                            }
+
+                                            setOnKeyPressed { event ->
+                                                if (event.code.isDigitKey) {
+                                                    editor.positionCaret(editor.text.length)
+                                                }
+                                            }
+                                        },
+                                        Label(":").apply {
+                                            styleClass.add("field-label")
+                                            style = "-fx-padding: 5 0 0 0;"
+                                        },
+                                        ComboBox<String>().apply {
+                                            styleClass.add("time-picker")
+                                            prefWidth = 70.0
+                                            maxWidth = 70.0
+                                            isEditable = true
+                                            val minutes = (0..59 step 15).map { String.format("%02d", it) }
+                                            items.addAll(minutes)
+                                            value = "00" // Minuto inicial
+
+                                            editor.textProperty().addListener { _, _, newValue ->
+                                                if (newValue.isEmpty()) return@addListener
+
+                                                try {
+                                                    val minute = newValue.toInt()
+                                                    if (minute in 0..59) {
+                                                        value = String.format("%02d", minute)
+                                                    } else {
+                                                        editor.text = value
+                                                    }
+                                                } catch (e: NumberFormatException) {
+                                                    editor.text = value
+                                                }
+                                            }
+
+                                            setOnKeyPressed { event ->
+                                                if (event.code.isDigitKey) {
+                                                    editor.positionCaret(editor.text.length)
+                                                }
+                                            }
+                                        }
+                                    )
                                 }
                             )
                         }
@@ -527,6 +674,7 @@ class NovoPedidoView : BorderPane() {
                 }
             )
         }
+
 
         return VBox(10.0).apply {
             children.addAll(entregaSection, toggleSwitch, entregaForm)

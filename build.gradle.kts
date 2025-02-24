@@ -13,6 +13,7 @@ dependencies {
     implementation("org.openjfx:javafx-fxml:17.0.2")
     implementation("org.xerial:sqlite-jdbc:3.45.1.0")
     implementation("org.slf4j:slf4j-simple:1.7.36")
+    implementation("com.jfoenix:jfoenix:9.0.10")
 }
 
 application {

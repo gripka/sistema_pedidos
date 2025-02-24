@@ -5,15 +5,14 @@ import javafx.scene.control.Button
 import javafx.scene.control.TextField
 import javafx.scene.image.Image
 import javafx.scene.image.ImageView
-import javafx.scene.layout.HBox
-import javafx.scene.layout.Priority
-import javafx.scene.layout.VBox
 import javafx.application.Platform
 import javafx.scene.control.Label
 import com.sistema_pedidos.model.Produto
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
 import javafx.beans.property.StringProperty
+import javafx.scene.layout.*
+import javafx.scene.paint.Color
 
 class NovoPedidoController {
     private val produtosContainer = VBox(10.0)
@@ -104,9 +103,9 @@ class NovoPedidoController {
                 val subtotal = (subtotalField.children[1] as TextField)
 
                 val quantidadeValue = quantidade.text.toIntOrNull() ?: 1
-                val valorUnitarioValue = valorUnitario.text.replace(",", ".").toDoubleOrNull() ?: 0.0
+                val valorUnitarioValue = valorUnitario.text.replace("R$ ", "").replace(",", ".").toDoubleOrNull() ?: 0.0
                 val subtotalValue = (quantidadeValue * valorUnitarioValue)
-                subtotal.text = String.format("%.2f", subtotalValue).replace(".", ",")
+                subtotal.text = "R$ ${String.format("%.2f", subtotalValue).replace(".", ",")}"
             }
 
             val quantidadeTextField = ((quantidadeField.children[1] as HBox).children[1] as TextField)
@@ -218,9 +217,9 @@ class NovoPedidoController {
                 },
                 TextField().apply {
                     styleClass.add("text-field")
-                    prefWidth = 50.0
-                    maxWidth = 80.0
-                    text = String.format("%.2f", produto.valorUnitario).replace(".", ",")
+                    prefWidth = 100.0
+                    maxWidth = 100.0
+                    text = "R$ ${String.format("%.2f", produto.valorUnitario).replace(".", ",")}"
                     alignment = Pos.CENTER_RIGHT
 
                     focusedProperty().addListener { _, _, isFocused ->
@@ -236,17 +235,15 @@ class NovoPedidoController {
                         isUpdating = true
                         Platform.runLater {
                             try {
-                                // Remove non-digits
                                 val digits = newValue.replace(Regex("[^\\d]"), "")
 
                                 if (digits.isEmpty()) {
-                                    text = "0,00"
+                                    text = "R$ 0,00"
                                 } else {
-                                    // Format the number without leading zeros
                                     val reais = if (digits.length <= 2) "0"
                                     else digits.substring(0, digits.length - 2).toInt().toString()
                                     val cents = digits.takeLast(2).padStart(2, '0')
-                                    text = "${reais},${cents}"
+                                    text = "R$ ${reais},${cents}"
                                 }
                                 positionCaret(text.length)
                             } finally {
@@ -275,21 +272,6 @@ class NovoPedidoController {
         }
     }
 
-    private fun createValorSection(): VBox {
-        return VBox(10.0).apply {
-            children.addAll(
-                Label("Valor Unitário").apply {
-                    styleClass.add("field-label")
-                },
-                TextField().apply {
-                    styleClass.add("text-field")
-                    prefWidth = 80.0
-                    maxWidth = 80.0
-                }
-            )
-        }
-    }
-
     private fun createSubtotalSection(produto: Produto): VBox {
         return VBox(10.0).apply {
             children.addAll(
@@ -297,12 +279,22 @@ class NovoPedidoController {
                     styleClass.add("field-label")
                 },
                 TextField().apply {
-                    styleClass.add("text-field")
-                    prefWidth = 80.0
-                    maxWidth = 80.0
-                    isEditable = false
-                    text = (produto.valorUnitario * produto.quantidade).toString()
+                    styleClass.addAll("text-field")
+                    prefWidth = 100.0
+                    maxWidth = 100.0
                     alignment = Pos.CENTER_RIGHT
+                    isEditable = false
+                    text = "R$ 0,00"
+                    style = """
+                    -fx-background-color: rgb(250, 251, 252);
+                    -fx-border-color: rgb(223, 225, 230);
+                    -fx-border-width: 2;
+                    -fx-border-radius: 3;
+                    -fx-background-radius: 3;
+                    -fx-focus-color: transparent;
+                    -fx-faint-focus-color: transparent;
+                """
+                    focusTraversableProperty().set(false)
                 }
             )
         }
@@ -328,18 +320,99 @@ class NovoPedidoController {
         }
     }
 
-    fun formatarMoeda(textField: TextField) {
-        textField.textProperty().addListener { _, _, newValue ->
-            if (newValue != null) {
-                val cleanValue = newValue.replace(Regex("[^0-9]"), "")
-                if (cleanValue.isNotEmpty()) {
-                    val value = cleanValue.toDouble() / 100
-                    val formattedValue = "%.2f".format(value).replace(".", ",")
-                    if (textField.text != formattedValue) {
-                        textField.text = formattedValue
+    fun formatarMoeda(textField: TextField): javafx.beans.value.ChangeListener<String> {
+        var isUpdating = false
+        textField.text = "R$ 0,00"
+
+        val textListener = javafx.beans.value.ChangeListener<String> { _, _, newValue ->
+            if (isUpdating) return@ChangeListener
+
+            isUpdating = true
+            Platform.runLater {
+                try {
+                    val digits = newValue.replace(Regex("[^\\d]"), "").takeLast(10)
+
+                    if (digits.isEmpty()) {
+                        textField.text = "R$ 0,00"
+                    } else {
+                        val value = digits.toDouble() / 100
+                        val formattedValue = String.format("%,.2f", value)
+                            .replace(",", ".")
+                            .replace(".", ",", ignoreCase = true)
+                            .replaceFirst(",", ".")
+                        textField.text = "R$ $formattedValue"
                     }
+                    textField.positionCaret(textField.text.length)
+                } finally {
+                    isUpdating = false
                 }
             }
         }
+
+        textField.textProperty().addListener(textListener)
+
+        textField.focusedProperty().addListener { _, _, isFocused ->
+            if (isFocused) {
+                Platform.runLater {
+                    textField.positionCaret(textField.text.length)
+                }
+            }
+        }
+
+        textField.caretPositionProperty().addListener { _, _, _ ->
+            Platform.runLater {
+                textField.positionCaret(textField.text.length)
+            }
+        }
+
+        return textListener
+    }
+
+
+    fun formatarPercentual(textField: TextField): javafx.beans.value.ChangeListener<String> {
+        var isUpdating = false
+        textField.text = "0,00"
+
+        val textListener = javafx.beans.value.ChangeListener<String> { _, _, newValue ->
+            if (isUpdating) return@ChangeListener
+
+            isUpdating = true
+            Platform.runLater {
+                try {
+                    val digits = newValue.replace(Regex("[^\\d]"), "")
+
+                    if (digits.isEmpty()) {
+                        textField.text = "0,00"
+                    } else {
+                        val value = digits.toDouble() / 100
+                        if (value > 99.99) {
+                            textField.text = "99,99"
+                        } else {
+                            val formatted = String.format("%.2f", value)
+                                .replace(",", ".")
+                                .replace(".", ",")
+                            if (textField.text != formatted) {
+                                textField.text = formatted
+                            }
+                        }
+                    }
+                    textField.positionCaret(textField.text.length)
+                } finally {
+                    isUpdating = false
+                }
+            }
+        }
+
+        textField.textProperty().addListener(textListener)
+
+        textField.focusedProperty().addListener { _, _, isFocused ->
+            if (isFocused) {
+                Platform.runLater {
+                    textField.positionCaret(textField.text.length)
+                }
+            }
+        }
+
+        return textListener
     }
 }
