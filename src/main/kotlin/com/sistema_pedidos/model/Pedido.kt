@@ -4,10 +4,16 @@ import java.sql.Timestamp
 
 data class Pedido(
     val id: Long? = null,
-    val numeroPedido: String? = null,
-    val clienteId: Long,
-    val dataPedido: Timestamp = Timestamp(System.currentTimeMillis()),
-    val total: Double,
-    val dataEntrega: Timestamp? = null,
-    val horaEntrega: Timestamp? = null
+    val numero: String? = null,
+    val clienteId: Long? = null,
+    val telefoneContato: String,
+    val dataPedido: String? = null,
+    val observacao: String?,
+    val status: String = "Pendente",
+    val valorTotal: Double = 0.0,
+    val valorDesconto: Double = 0.0,
+    val tipoDesconto: String?,
+    val formaPagamento: String?,
+    val valorTrocoPara: Double?,
+    val valorTroco: Double?
 )

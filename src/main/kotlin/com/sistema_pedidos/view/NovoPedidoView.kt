@@ -11,6 +11,7 @@ import javafx.scene.layout.StackPane
 import javafx.util.Duration
 import javafx.animation.TranslateTransition
 import javafx.beans.property.DoubleProperty
+import javafx.collections.ListChangeListener
 import javafx.scene.Node
 import javafx.util.converter.LocalDateStringConverter as JavaFxLocalDateStringConverter
 import java.time.format.DateTimeFormatter
@@ -20,6 +21,7 @@ import java.util.Locale
 class NovoPedidoView : BorderPane() {
     private val controller = NovoPedidoController()
     private lateinit var entregaForm: VBox
+    private lateinit var totalLabelRef: Label  // Add this line
 
     // Container do conteúdo que pode rolar
     private val contentContainer = VBox().apply {
@@ -56,8 +58,24 @@ class NovoPedidoView : BorderPane() {
             play()
         }
     }
+    private lateinit var totalLabel: Label
 
-    private fun createBarraInferior(): HBox {
+    fun createBarraInferior(): HBox {
+        totalLabel = Label("Total do Pedido: R$ 0,00").apply {
+            styleClass.add("total-label")
+        }
+
+        // First set the total label
+        controller.setTotalLabel(totalLabel)
+
+        // Then call addNovoProduto without parameters
+        controller.addNovoProduto()
+
+        // Add listener to products container
+        controller.getProdutosContainer().children.addListener(
+            ListChangeListener { _ -> controller.updateTotal(totalLabel) }
+        )
+
         return HBox().apply {
             padding = Insets(20.0)
             spacing = 20.0
@@ -89,11 +107,7 @@ class NovoPedidoView : BorderPane() {
                         styleClass.add("total-container")
                         padding = Insets(10.0, 20.0, 10.0, 20.0)
                         alignment = Pos.CENTER
-                        children.add(
-                            Label("Total do Pedido: R$ 0,00").apply {
-                                styleClass.add("total-label")
-                            }
-                        )
+                        children.add(totalLabel)
                     }
                 )
             }
@@ -149,6 +163,7 @@ class NovoPedidoView : BorderPane() {
                             styleClass.add("text-field")
                             maxWidth = 130.0
                             controller.formatarTelefone(this)
+                            promptText = "(XX) XXXXX-XXXX"
                         }
                     )
                 },
@@ -185,6 +200,19 @@ class NovoPedidoView : BorderPane() {
 
         val produtosContainer = controller.getProdutosContainer()
 
+        val observacaoBox = VBox(10.0).apply {
+            children.addAll(
+                Label("Observação do Pedido").apply {
+                    styleClass.add("field-label")
+                },
+                TextField().apply {
+                    styleClass.add("text-field")
+                    maxWidth = Double.POSITIVE_INFINITY
+                    promptText = "Digite uma observação para o pedido"
+                }
+            )
+        }
+
         val adicionarProdutoButton = Button("Adicionar Produto").apply {
             styleClass.addAll("novo-pedido-button")
             prefWidth = 150.0
@@ -195,7 +223,12 @@ class NovoPedidoView : BorderPane() {
         }
 
         return VBox(10.0).apply {
-            children.addAll(pedidosSection, produtosContainer, adicionarProdutoButton)
+            children.addAll(
+                pedidosSection,
+                produtosContainer,
+                observacaoBox,
+                adicionarProdutoButton
+            )
         }
     }
 
@@ -499,6 +532,8 @@ class NovoPedidoView : BorderPane() {
                                     styleClass.add("text-field")
                                     prefWidth = 130.0
                                     controller.formatarTelefone(this)
+                                    promptText = "(XX) XXXXX-XXXX"
+
                                 }
                             )
                         }
@@ -561,6 +596,8 @@ class NovoPedidoView : BorderPane() {
                                     styleClass.add("text-field")
                                     prefWidth = 100.0
                                     maxWidth = 100.0
+                                    promptText = "XXXXX-XXX"
+                                    controller.formatarCep(this)
                                 }
                             )
                         }
@@ -593,6 +630,7 @@ class NovoPedidoView : BorderPane() {
                                         DateTimeFormatter.ofPattern("dd/MM/yyyy")
                                     )
                                     Locale.setDefault(Locale("pt", "BR"))
+                                    value = java.time.LocalDate.now()
                                 }
                             )
                         },

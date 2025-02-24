@@ -18,98 +18,110 @@ class DatabaseHelper {
     private fun createTables() {
         val queries = arrayOf(
             """CREATE TABLE IF NOT EXISTS clientes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            sobrenome TEXT NOT NULL,
-            telefone TEXT,
-            observacao TEXT
-        )""",
-
-            """CREATE TABLE IF NOT EXISTS pedidos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            numero_pedido TEXT,
-            cliente_id INTEGER,
-            data_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            total DECIMAL(10,2),
-            data_entrega TIMESTAMP,
-            hora_entrega TIMESTAMP,
-            FOREIGN KEY (cliente_id) REFERENCES clientes(id)
-        )""",
-
-            """CREATE TABLE IF NOT EXISTS itens_pedido (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            pedido_id INTEGER,
-            produto TEXT NOT NULL,
-            quantidade INTEGER NOT NULL,
-            valor_unitario DECIMAL(10,2) NOT NULL,
-            subtotal DECIMAL(10,2) NOT NULL,
-            FOREIGN KEY (pedido_id) REFERENCES pedidos(id)
-        )""",
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT,
+                sobrenome TEXT,
+                telefone TEXT UNIQUE,
+                observacao TEXT
+            )""",
 
             """CREATE TABLE IF NOT EXISTS produtos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            quantidade INTEGER NOT NULL,
-            valor_unitario DECIMAL(10,2) NOT NULL,
-            descricao TEXT,
-            categoria TEXT,
-            status TEXT DEFAULT 'ativo'
-        )""",
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                codigo TEXT UNIQUE,
+                nome TEXT NOT NULL,
+                descricao TEXT,
+                valor_unitario DECIMAL(10,2) NOT NULL DEFAULT 0,
+                categoria TEXT,
+                unidade_medida TEXT DEFAULT 'UN' CHECK (unidade_medida IN ('UN', 'KG', 'L', 'M', 'CX')),
+                estoque_minimo INTEGER DEFAULT 0,
+                estoque_atual INTEGER DEFAULT 0,
+                status TEXT CHECK (status IN ('Ativo', 'Inativo')) DEFAULT 'Ativo',
+                data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
 
-            """CREATE TABLE IF NOT EXISTS pagamentos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            pedido_id INTEGER,
-            forma_pagamento TEXT NOT NULL,
-            valor_pago DECIMAL(10,2) NOT NULL,
-            data_pagamento TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            status TEXT NOT NULL,
-            FOREIGN KEY (pedido_id) REFERENCES pedidos(id)
-        )""",
+            """CREATE TABLE IF NOT EXISTS pedidos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                numero TEXT UNIQUE NOT NULL,
+                cliente_id INTEGER NULL,
+                telefone_contato TEXT NOT NULL,
+                data_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                observacao TEXT,
+                status TEXT CHECK (status IN ('Pendente', 'Pago', 'Cancelado')) DEFAULT 'Pendente',
+                valor_total DECIMAL(10,2) DEFAULT 0,
+                valor_desconto DECIMAL(10,2) DEFAULT 0,
+                tipo_desconto TEXT CHECK (tipo_desconto IN ('valor', 'percentual')),
+                forma_pagamento TEXT CHECK (forma_pagamento IN ('Dinheiro', 'Cartão de Crédito', 'Cartão de Débito', 'PIX', 'Voucher')),
+                valor_troco_para DECIMAL(10,2),
+                valor_troco DECIMAL(10,2),
+                FOREIGN KEY (cliente_id) REFERENCES clientes(id)
+            )""",
 
-            """CREATE TABLE IF NOT EXISTS notificacoes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            pedido_id INTEGER,
-            tipo_notificacao TEXT NOT NULL,
-            mensagem TEXT NOT NULL,
-            data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            lido BOOLEAN DEFAULT FALSE,
-            FOREIGN KEY (pedido_id) REFERENCES pedidos(id)
-        )""",
+            """CREATE TABLE IF NOT EXISTS itens_pedido (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pedido_id INTEGER NOT NULL,
+                produto_id INTEGER NOT NULL,
+                quantidade INTEGER NOT NULL DEFAULT 1,
+                valor_unitario DECIMAL(10,2) NOT NULL,
+                subtotal DECIMAL(10,2) NOT NULL,
+                FOREIGN KEY (pedido_id) REFERENCES pedidos(id),
+                FOREIGN KEY (produto_id) REFERENCES produtos(id)
+            )""",
 
-            """CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome_usuario TEXT NOT NULL,
-            senha TEXT NOT NULL,
-            role TEXT NOT NULL,
-            ativo BOOLEAN DEFAULT TRUE
-        )""",
+            """CREATE TABLE IF NOT EXISTS entregas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pedido_id INTEGER NOT NULL UNIQUE,
+                nome_destinatario TEXT NOT NULL,
+                telefone_destinatario TEXT,
+                endereco TEXT NOT NULL,
+                referencia TEXT,
+                cidade TEXT NOT NULL,
+                bairro TEXT NOT NULL,
+                cep TEXT,
+                valor_entrega DECIMAL(10,2),
+                data_entrega DATE NOT NULL,
+                hora_entrega TIME NOT NULL,
+                FOREIGN KEY (pedido_id) REFERENCES pedidos(id)
+            )""",
 
-            """CREATE TABLE IF NOT EXISTS log_usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            usuario_id INTEGER,
-            acao TEXT NOT NULL,
-            data_acao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-        )""",
+            """CREATE TRIGGER IF NOT EXISTS gerar_numero_pedido
+                AFTER INSERT ON pedidos
+                WHEN NEW.numero IS NULL
+                BEGIN
+                    UPDATE pedidos 
+                    SET numero = 'PED' || substr('000' || NEW.id, -4)
+                    WHERE id = NEW.id;
+                END
+            """,
 
-            """CREATE TABLE IF NOT EXISTS descontos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            descricao TEXT NOT NULL,
-            tipo TEXT NOT NULL,
-            valor DECIMAL(10,2) NOT NULL,
-            ativo BOOLEAN DEFAULT TRUE
-        )""",
+            """CREATE TRIGGER IF NOT EXISTS gerar_codigo_produto
+                AFTER INSERT ON produtos
+                WHEN NEW.codigo IS NULL
+                BEGIN
+                    UPDATE produtos
+                    SET codigo = 'PROD' || substr('000000' || NEW.id, -6)
+                    WHERE id = NEW.id;
+                END
+            """,
 
-            """CREATE TABLE IF NOT EXISTS enderecos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            cliente_id INTEGER,
-            endereco TEXT NOT NULL,
-            referencia TEXT,
-            cidade TEXT NOT NULL,
-            estado TEXT NOT NULL,
-            cep TEXT,
-            FOREIGN KEY (cliente_id) REFERENCES clientes(id)
-        )"""
+            """CREATE TRIGGER IF NOT EXISTS atualizar_data_produto
+                AFTER UPDATE ON produtos
+                BEGIN
+                    UPDATE produtos
+                    SET data_atualizacao = CURRENT_TIMESTAMP
+                    WHERE id = NEW.id;
+                END
+            """,
+
+            """CREATE INDEX IF NOT EXISTS idx_cliente_telefone ON clientes(telefone)""",
+            """CREATE INDEX IF NOT EXISTS idx_produto_codigo ON produtos(codigo)""",
+            """CREATE INDEX IF NOT EXISTS idx_produto_nome ON produtos(nome)""",
+            """CREATE INDEX IF NOT EXISTS idx_produto_categoria ON produtos(categoria)""",
+            """CREATE INDEX IF NOT EXISTS idx_pedido_numero ON pedidos(numero)""",
+            """CREATE INDEX IF NOT EXISTS idx_pedido_cliente ON pedidos(cliente_id)""",
+            """CREATE INDEX IF NOT EXISTS idx_item_pedido ON itens_pedido(pedido_id)""",
+            """CREATE INDEX IF NOT EXISTS idx_item_produto ON itens_pedido(produto_id)""",
+            """CREATE INDEX IF NOT EXISTS idx_entrega_pedido ON entregas(pedido_id)"""
         )
 
         getConnection().use { conn ->
@@ -121,7 +133,6 @@ class DatabaseHelper {
         }
     }
 
-    // Move listTables outside of createTables
     fun listTables(): List<String> {
         val tables = mutableListOf<String>()
         val query = "SELECT name FROM sqlite_master WHERE type='table'"

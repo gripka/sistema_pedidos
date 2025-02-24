@@ -235,12 +235,12 @@
 }
 
 .radio-button.custom-radio:hover > .radio {
-    -fx-border-color: #07f;
+    -fx-border-color: #495057;
 }
 
 .radio-button.custom-radio:selected > .radio {
-    -fx-background-color: #07f;
-    -fx-border-color: #07f;
+    -fx-background-color: #495057;
+    -fx-border-color: #495057;
 }
 
 .radio-button.custom-radio > .radio > .dot {

@@ -5,17 +5,27 @@ import javafx.collections.FXCollections
 import javafx.collections.ObservableList
 
 class PedidoController {
-    // Lista de produtos do pedido como ObservableList
     val itensPedido: ObservableList<Produto> = FXCollections.observableArrayList()
 
-    // Função para adicionar produto
-    fun adicionarProduto(id: Int, nome: String, preco: Double, quantidade: Int) {
-        val produto = Produto(id, nome, quantidade, preco)
+    fun adicionarProduto(id: Long, nome: String, valorUnitario: Double, quantidade: Int) {
+        val produto = Produto(
+            id = id,
+            codigo = null,
+            nome = nome,
+            descricao = null,
+            valorUnitario = valorUnitario,
+            categoria = null,
+            unidadeMedida = "UN",
+            estoqueMinimo = 0,
+            estoqueAtual = 0,
+            status = "Ativo",
+            dataCadastro = null,
+            dataAtualizacao = null
+        )
         itensPedido.add(produto)
     }
 
-    // Função para calcular o total do pedido
     fun calcularTotal(): Double {
-        return itensPedido.sumOf { it.valorUnitario * it.quantidade }
+        return itensPedido.sumOf { it.valorUnitario }
     }
 }

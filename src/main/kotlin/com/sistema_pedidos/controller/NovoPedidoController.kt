@@ -17,9 +17,10 @@ import javafx.scene.paint.Color
 class NovoPedidoController {
     private val produtosContainer = VBox(10.0)
     private val listaProdutos: ObservableList<Produto> = FXCollections.observableArrayList()
+    private lateinit var totalLabelRef: Label
+
     init {
-        // Initialize with the first product
-        val primeiroProduto = Produto(1, "", 1, 0.0)
+        val primeiroProduto = Produto(1L, "", "Produto 1", null, 0.0, null, "UN", 0, 0, "Ativo", null, null)
         listaProdutos.add(primeiroProduto)
         produtosContainer.children.add(createProdutosHBox(primeiroProduto))
     }
@@ -84,38 +85,86 @@ class NovoPedidoController {
             val subtotalField = createSubtotalSection(produto)
 
             children.addAll(
-                Label("${produto.id}. "),  // Número do produto
+                Label("${produto.id}. "),
                 quantidadeField,
                 createProdutoSection(),
                 valorField,
                 subtotalField
             )
 
-            // Mais de um produto, botão de remover
             if (listaProdutos.size > 1) {
                 children.add(createRemoveButton(this, produto))
             }
 
-            // Atualizar subtotal ao alterar quantidade ou valor
             val updateSubtotal = {
                 val quantidade = ((quantidadeField.children[1] as HBox).children[1] as TextField)
                 val valorUnitario = (valorField.children[1] as TextField)
                 val subtotal = (subtotalField.children[1] as TextField)
 
                 val quantidadeValue = quantidade.text.toIntOrNull() ?: 1
-                val valorUnitarioValue = valorUnitario.text.replace("R$ ", "").replace(",", ".").toDoubleOrNull() ?: 0.0
-                val subtotalValue = (quantidadeValue * valorUnitarioValue)
-                subtotal.text = "R$ ${String.format("%.2f", subtotalValue).replace(".", ",")}"
+                val valorUnitarioText = valorUnitario.text
+                    .replace(Regex("[^0-9]"), "")
+
+                val valorUnitarioValue = try {
+                    valorUnitarioText.toDouble() / 100
+                } catch (e: NumberFormatException) {
+                    0.0
+                }
+
+                val subtotalValue = quantidadeValue * valorUnitarioValue
+                val formattedValue = String.format("%,.2f", subtotalValue)
+                    .replace(",", ".")
+                    .replace(".", ",", ignoreCase = true)
+                    .replaceFirst(",", ".")
+
+                Platform.runLater {
+                    subtotal.text = "R$ $formattedValue"
+                    updateTotal(totalLabelRef)
+                }
             }
 
             val quantidadeTextField = ((quantidadeField.children[1] as HBox).children[1] as TextField)
             val valorTextField = (valorField.children[1] as TextField)
 
-            quantidadeTextField.textProperty().addListener { _, _, _ -> updateSubtotal() }
-            valorTextField.textProperty().addListener { _, _, _ -> updateSubtotal() }
+            quantidadeTextField.textProperty().addListener { _, _, _ ->
+                updateSubtotal()
+            }
+
+            valorTextField.textProperty().addListener { _, _, _ ->
+                updateSubtotal()
+            }
+
+            Platform.runLater { updateSubtotal() }
         }
     }
 
+    fun setTotalLabel(label: Label) {
+        totalLabelRef = label
+    }
+
+    fun updateTotal(totalLabel: Label) {
+        var total = 0.0
+
+        produtosContainer.children.forEach { node ->
+            val hBox = node as HBox
+            val subtotalVBox = hBox.children.find { it is VBox && it.children[0] is Label && (it.children[0] as Label).text == "Subtotal" } as? VBox
+            val subtotalField = subtotalVBox?.children?.get(1) as? TextField
+
+            subtotalField?.let { field ->
+                val subtotalText = field.text.replace(Regex("[^\\d]"), "")
+                total += (subtotalText.toDoubleOrNull() ?: 0.0) / 100
+            }
+        }
+
+        val formattedValue = String.format("%,.2f", total)
+            .replace(",", ".")
+            .replace(".", ",", ignoreCase = true)
+            .replaceFirst(",", ".")
+
+        Platform.runLater {
+            totalLabel.text = "Total do Pedido: R$ $formattedValue"
+        }
+    }
 
     private fun createRemoveButton(produtoHBox: HBox, produto: Produto): Button {
         return Button().apply {
@@ -142,17 +191,32 @@ class NovoPedidoController {
         produtosContainer.children.forEachIndexed { index, node ->
             val produtoHBox = node as HBox
             val labelNumero = produtoHBox.children.first() as Label
-            labelNumero.text = "${index + 1}. " // Atualiza a numeração
+            labelNumero.text = "${index + 1}. "
         }
 
-        // Atualizar listaProdutos para manter IDs sincronizados
-        listaProdutos.forEachIndexed { index, produto ->
-            produto.id = index + 1
+        // Create new products with updated IDs
+        val updatedProducts = listaProdutos.mapIndexed { index, produto ->
+            produto.copy(id = (index + 1).toLong())
         }
+        listaProdutos.clear()
+        listaProdutos.addAll(updatedProducts)
     }
 
     fun addNovoProduto() {
-        val novoProduto = Produto(listaProdutos.size + 1, "", 1, 0.0)
+        val novoProduto = Produto(
+            id = (listaProdutos.size + 1).toLong(),
+            codigo = "",
+            nome = "Produto ${listaProdutos.size + 1}",
+            descricao = null,
+            valorUnitario = 0.0,
+            categoria = null,
+            unidadeMedida = "UN",
+            estoqueMinimo = 0,
+            estoqueAtual = 0,
+            status = "Ativo",
+            dataCadastro = null,
+            dataAtualizacao = null
+        )
         listaProdutos.add(novoProduto)
         produtosContainer.children.add(createProdutosHBox(novoProduto))
         atualizarBotoesRemover()
@@ -175,9 +239,6 @@ class NovoPedidoController {
 
 
     fun getProdutosContainer(): VBox {
-        if (produtosContainer.children.isEmpty()) {
-            produtosContainer.children.add(createProdutosHBox(Produto(1, "", 1, 0.0)))
-        }
         return produtosContainer
     }
 
@@ -196,7 +257,7 @@ class NovoPedidoController {
                             styleClass.add("text-field")
                             prefWidth = 50.0
                             maxWidth = 50.0
-                            text = produto.quantidade.toString()
+                            text = "1"
                             alignment = Pos.CENTER
                             textProperty().addListener { _, _, newValue ->
                                 validateQuantity(this, newValue)
@@ -221,52 +282,7 @@ class NovoPedidoController {
                     maxWidth = 100.0
                     text = "R$ ${String.format("%.2f", produto.valorUnitario).replace(".", ",")}"
                     alignment = Pos.CENTER_RIGHT
-
-                    focusedProperty().addListener { _, _, isFocused ->
-                        if (isFocused) {
-                            Platform.runLater { positionCaret(text.length) }
-                        }
-                    }
-
-                    var isUpdating = false
-                    textProperty().addListener { _, _, newValue ->
-                        if (isUpdating) return@addListener
-
-                        isUpdating = true
-                        Platform.runLater {
-                            try {
-                                val digits = newValue.replace(Regex("[^\\d]"), "")
-
-                                if (digits.isEmpty()) {
-                                    text = "R$ 0,00"
-                                } else {
-                                    val reais = if (digits.length <= 2) "0"
-                                    else digits.substring(0, digits.length - 2).toInt().toString()
-                                    val cents = digits.takeLast(2).padStart(2, '0')
-                                    text = "R$ ${reais},${cents}"
-                                }
-                                positionCaret(text.length)
-                            } finally {
-                                isUpdating = false
-                            }
-                        }
-                    }
-                }
-            )
-        }
-    }
-
-    private fun createProdutoSection(): VBox {
-        return VBox(10.0).apply {
-            HBox.setHgrow(this, Priority.ALWAYS)
-            children.addAll(
-                Label("Produto").apply {
-                    styleClass.add("field-label")
-                },
-                TextField().apply {
-                    styleClass.add("text-field")
-                    maxWidth = Double.POSITIVE_INFINITY
-                    HBox.setHgrow(this, Priority.ALWAYS)
+                    formatarMoeda(this)
                 }
             )
         }
@@ -295,6 +311,23 @@ class NovoPedidoController {
                     -fx-faint-focus-color: transparent;
                 """
                     focusTraversableProperty().set(false)
+                    formatarMoeda(this)
+                }
+            )
+        }
+    }
+
+    private fun createProdutoSection(): VBox {
+        return VBox(10.0).apply {
+            HBox.setHgrow(this, Priority.ALWAYS)
+            children.addAll(
+                Label("Produto").apply {
+                    styleClass.add("field-label")
+                },
+                TextField().apply {
+                    styleClass.add("text-field")
+                    maxWidth = Double.POSITIVE_INFINITY
+                    HBox.setHgrow(this, Priority.ALWAYS)
                 }
             )
         }
@@ -330,7 +363,7 @@ class NovoPedidoController {
             isUpdating = true
             Platform.runLater {
                 try {
-                    val digits = newValue.replace(Regex("[^\\d]"), "").takeLast(10)
+                    val digits = newValue.replace(Regex("[^\\d]"), "")
 
                     if (digits.isEmpty()) {
                         textField.text = "R$ 0,00"
@@ -414,5 +447,31 @@ class NovoPedidoController {
         }
 
         return textListener
+    }
+
+    fun formatarCep(textField: TextField) {
+        val maxLength = 8
+
+        textField.textProperty().addListener { _, oldValue, newValue ->
+            if (newValue == null) {
+                textField.text = oldValue
+                return@addListener
+            }
+
+            var value = newValue.replace(Regex("[^0-9]"), "")
+
+            if (value.length > maxLength) {
+                value = value.substring(0, maxLength)
+            }
+
+            if (value.length > 5) {
+                value = value.substring(0, 5) + "-" + value.substring(5)
+            }
+
+            if (value != newValue) {
+                textField.text = value
+                textField.positionCaret(textField.text.length)
+            }
+        }
     }
 }
