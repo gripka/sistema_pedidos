@@ -86,15 +86,33 @@ class NovoPedidoView : BorderPane() {
                 maxWidth = Double.POSITIVE_INFINITY
             }
 
-            val centerBox = HBox().apply {
-                alignment = Pos.CENTER
-                children.add(
-                    Button("Salvar Pedido").apply {
-                        styleClass.add("salvar-pedido-button")
-                        prefWidth = 200.0
-                        prefHeight = 40.0
+            val saveButton = Button("Salvar Pedido").apply {
+                styleClass.add("salvar-pedido-button")
+                prefWidth = 200.0
+                prefHeight = 40.0
+                setOnAction {
+                    if (showConfirmationDialog()) {
+                        val clienteInfo = getClienteInfo()
+                        val pagamentoInfo = getPagamentoInfo()
+                        val entregaInfo = getEntregaInfo()
+
+                        if (controller.salvarPedido(clienteInfo, pagamentoInfo, entregaInfo)) {
+                            Alert(Alert.AlertType.INFORMATION).apply {
+                                title = "Sucesso"
+                                headerText = null
+                                contentText = "Pedido salvo com sucesso!"
+                                showAndWait()
+                            }
+                        } else {
+                            Alert(Alert.AlertType.ERROR).apply {
+                                title = "Erro"
+                                headerText = null
+                                contentText = "Erro ao salvar o pedido"
+                                showAndWait()
+                            }
+                        }
                     }
-                )
+                }
             }
 
             val rightRegion = Region().apply {
@@ -124,7 +142,7 @@ class NovoPedidoView : BorderPane() {
                 )
             }
 
-            children.addAll(leftRegion, centerBox, rightRegion, totalContainer)
+            children.addAll(leftRegion, saveButton, rightRegion, totalContainer)
         }
     }
 
@@ -271,10 +289,16 @@ class NovoPedidoView : BorderPane() {
                         styleClass.add("payment-toggle-button")
                         prefWidth = 130.0
                         prefHeight = 35.0
-                        if (forma == "Dinheiro") isSelected = true
+                        if (forma == "Dinheiro") isSelected = true  // Default selection
                     }
                 }
             )
+        }
+
+        paymentToggleGroup.selectedToggleProperty().addListener { _, _, newValue ->
+            if (newValue == null) {
+                paymentToggleGroup.toggles.first().isSelected = true
+            }
         }
 
 
@@ -410,7 +434,7 @@ class NovoPedidoView : BorderPane() {
                     styleClass.add("payment-toggle-button")
                     prefWidth = 100.0
                     prefHeight = 35.0
-                    isSelected = true
+                    isSelected = true  // Ensure Pendente is selected by default
                 },
                 ToggleButton("Pago").apply {
                     this.toggleGroup = statusToggleGroup
@@ -419,6 +443,14 @@ class NovoPedidoView : BorderPane() {
                     prefHeight = 35.0
                 }
             )
+        }
+
+// Add listener to ensure a status is always selected
+        statusToggleGroup.selectedToggleProperty().addListener { _, _, newValue ->
+            if (newValue == null) {
+                // If no toggle is selected, select the default (Pendente)
+                statusToggleGroup.toggles.first().isSelected = true
+            }
         }
 
         paymentToggleGroup.selectedToggleProperty().addListener { _, _, newToggle ->
@@ -445,6 +477,190 @@ class NovoPedidoView : BorderPane() {
                 }
             )
         }
+    }
+
+    private fun showConfirmationDialog(): Boolean {
+        val content = VBox(10.0).apply {
+            padding = Insets(20.0)
+            prefWidth = 500.0
+            style = """
+            -fx-background-color: white;
+            -fx-background-radius: 5;
+        """
+            children.addAll(
+                createConfirmationSection("Cliente", getClienteInfo()),
+                createConfirmationSection("Produtos", getProdutosInfo()),
+                createConfirmationSection("Pagamento", getPagamentoInfo()),
+                createConfirmationSection("Entrega", getEntregaInfo())
+            )
+        }
+
+        val dialog = Dialog<ButtonType>().apply {
+            title = "Confirmação do Pedido"
+            headerText = "Confirme os dados do pedido"
+            dialogPane.content = ScrollPane(content).apply {
+                isFitToWidth = true
+                prefViewportHeight = 400.0
+            }
+            dialogPane.buttonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
+
+            // Centralizar os botões
+            dialogPane.lookupButton(ButtonType.OK).style = "-fx-pref-width: 100px;"
+            dialogPane.lookupButton(ButtonType.CANCEL).style = "-fx-pref-width: 100px;"
+
+            // Customizar o ButtonBar para centralizar
+            (dialogPane.lookup(".button-bar") as ButtonBar).buttonOrder = "C:OK:0:1"
+
+            // Usar a mesma referência do CSS já carregado
+            dialogPane.stylesheets.addAll(this@NovoPedidoView.stylesheets)
+        }
+
+        return dialog.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK
+    }
+
+    private fun createConfirmationSection(title: String, items: List<Pair<String, String>>): VBox {
+        return VBox(5.0).apply {
+            children.add(Label(title).apply {
+                styleClass.add("section-label")
+            })
+
+            items.forEach { (label, value) ->
+                children.add(
+                    HBox(10.0).apply {
+                        children.addAll(
+                            Label("$label:").apply {
+                                styleClass.add("field-label")
+                                prefWidth = 150.0
+                            },
+                            Label(value).apply {
+                                styleClass.add("field-label")
+                            }
+                        )
+                    }
+                )
+            }
+
+            children.add(Separator().apply {
+                padding = Insets(10.0, 0.0, 10.0, 0.0)
+            })
+        }
+    }
+
+    private fun getClienteInfo(): List<Pair<String, String>> {
+        val nomeField = findTextField("Nome")
+        val sobrenomeField = findTextField("Sobrenome")
+        val telefoneField = findTextField("Telefone")
+        val observacaoField = findTextField("Observação")
+
+        return listOf(
+            "Nome" to "${nomeField?.text ?: ""} ${sobrenomeField?.text ?: ""}".trim(),
+            "Telefone" to (telefoneField?.text ?: ""),
+            "Observação" to (observacaoField?.text ?: "")
+        )
+    }
+
+    private fun getProdutosInfo(): List<Pair<String, String>> {
+        val produtos = mutableListOf<Pair<String, String>>()
+
+        controller.getProdutosContainer().children.forEach { node ->
+            val hBox = node as HBox
+            val qtdField = ((hBox.children[1] as VBox).children[1] as HBox).children[1] as TextField
+            val prodField = ((hBox.children[2] as VBox).children[1] as TextField)
+            val valorField = ((hBox.children[3] as VBox).children[1] as TextField)
+            val subtotalField = ((hBox.children[4] as VBox).children[1] as TextField)
+
+            produtos.add("Produto ${produtos.size + 1}" to
+                    "${qtdField.text}x ${prodField.text} (${valorField.text}) = ${subtotalField.text}")
+        }
+
+        return produtos
+    }
+
+    private fun getPagamentoInfo(): List<Pair<String, String>> {
+        val formaPagamento = findSelectedToggleText("payment-toggle-button")
+        val status = findSelectedToggleText("payment-toggle-button", 1)
+        val descontoType = if ((controller.getDescontoToggleGroup().selectedToggle as? RadioButton)?.id == "valor") "Valor" else "Percentual"
+        val desconto = findTextField("Desconto")?.text ?: "R$ 0,00"
+
+        return listOf(
+            "Forma de Pagamento" to (formaPagamento ?: ""),
+            "Status" to (status ?: "Pendente"),
+            "Desconto ($descontoType)" to desconto,
+            "Total do Pedido" to (totalLabel.text)
+        )
+    }
+
+    private fun getEntregaInfo(): List<Pair<String, String>> {
+        if (entregaForm.isDisable) return listOf("Entrega" to "Não")
+
+        val nomeField = findTextField("Nome do Destinatário")
+        val telefoneField = findTextField("Telefone do Destinatário")
+        val enderecoField = findTextField("Endereço")
+        val referenciaField = findTextField("Referência")
+        val cidadeField = findTextField("Cidade")
+        val bairroField = findTextField("Bairro")
+        val cepField = findTextField("CEP")
+        val valorField = valorEntregaField
+        val dataField = findDatePicker("Data da Entrega")
+        val horaField = findTimeValue()
+
+        return listOf(
+            "Entrega" to "Sim",
+            "Nome" to (nomeField?.text ?: ""),
+            "Telefone" to (telefoneField?.text ?: ""),
+            "Endereço" to (enderecoField?.text ?: ""),
+            "Referência" to (referenciaField?.text ?: ""),
+            "Cidade" to (cidadeField?.text ?: ""),
+            "Bairro" to (bairroField?.text ?: ""),
+            "CEP" to (cepField?.text ?: ""),
+            "Valor" to (valorField.text),
+            "Data" to (dataField?.value?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) ?: ""),
+            "Hora" to (horaField ?: "")
+        )
+    }
+
+    private fun findTextField(labelText: String): TextField? {
+        return contentContainer.lookupAll(".text-field")
+            .filterIsInstance<TextField>()
+            .firstOrNull { field ->
+                val parent = field.parent
+                if (parent is VBox) {
+                    val label = parent.children.firstOrNull { it is Label } as? Label
+                    label?.text == labelText
+                } else false
+            }
+    }
+
+    private fun findSelectedToggleText(styleClass: String, index: Int = 0): String? {
+        return contentContainer.lookupAll(".$styleClass")
+            .filterIsInstance<ToggleButton>()
+            .groupBy { it.toggleGroup }
+            .values
+            .elementAtOrNull(index)
+            ?.firstOrNull { it.isSelected }
+            ?.text
+    }
+
+    private fun findDatePicker(labelText: String): DatePicker? {
+        return contentContainer.lookupAll(".date-picker")
+            .filterIsInstance<DatePicker>()
+            .firstOrNull { picker ->
+                val parent = picker.parent
+                if (parent is VBox) {
+                    val label = parent.children.firstOrNull { it is Label } as? Label
+                    label?.text == labelText
+                } else false
+            }
+    }
+
+    private fun findTimeValue(): String? {
+        val timeContainer = contentContainer.lookupAll(".time-picker")
+            .filterIsInstance<ComboBox<String>>()
+            .toList()
+
+        return if (timeContainer.size >= 2) {
+            "${timeContainer[0].value}:${timeContainer[1].value}"
+        } else null
     }
 
     private fun createEntregaSection(): VBox {

@@ -416,3 +416,170 @@
 .time-picker .arrow-button .arrow {
     -fx-background-color: white;
 }
+
+.dialog-pane {
+    -fx-background-color: #f8f9fa;
+    -fx-selection-bar: transparent;
+    -fx-selection-bar-non-focused: transparent;
+}
+
+.dialog-pane .header-panel {
+    -fx-background-color: #2B2D30;
+}
+
+.dialog-pane .header-panel .label {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+.dialog-pane .button-bar .container {
+    -fx-background-color: white;
+}
+
+.dialog-pane .content.label {
+    -fx-font-size: 14px;
+    -fx-text-fill: #2B2D31;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+    -fx-highlight-fill: transparent;
+}
+
+.dialog-pane .button {
+    -fx-background-color: #6056e8;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-border-radius: 5px;
+    -fx-background-radius: 5px;
+    -fx-cursor: hand;
+    -fx-padding: 8 16;
+    -fx-min-width: 100px;
+}
+
+.dialog-pane .button:hover {
+    -fx-background-color: #433a94;
+}
+
+.dialog-pane .button:pressed {
+    -fx-scale-x: 0.98;
+    -fx-scale-y: 0.98;
+}
+
+.dialog-pane .button.cancel-button {
+    -fx-background-color: #e9ecef;
+    -fx-text-fill: #2B2D31;
+}
+
+.dialog-pane .button.cancel-button:hover {
+    -fx-background-color: #dee2e6;
+}
+
+.dialog-pane .scroll-pane .scroll-bar:vertical {
+    -fx-background-color: transparent;
+    -fx-pref-width: 12px;
+}
+
+.dialog-pane .scroll-pane {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+}
+
+.dialog-pane .scroll-pane .scroll-bar:vertical .increment-button,
+.dialog-pane .scroll-pane .scroll-bar:vertical .decrement-button,
+.dialog-pane .scroll-pane .scroll-bar:vertical .increment-arrow,
+.dialog-pane .scroll-pane .scroll-bar:vertical .decrement-arrow {
+    -fx-padding: 0;
+    -fx-pref-height: 0;
+    visibility: hidden;
+}
+.dialog-pane .scroll-pane .scroll-bar:vertical .thumb:hover {
+    -fx-background-color: #BEBEBE;
+}
+
+.dialog-pane .scroll-pane .scroll-bar:vertical .thumb:pressed {
+    -fx-background-color: #A9A9A9;
+}
+.dialog-pane .scroll-pane .scroll-bar:vertical .thumb {
+    -fx-background-color: #D3D3D3;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+}
+
+.dialog-pane .scroll-pane .scroll-bar:vertical .track {
+
+.dialog-pane .scroll-pane .viewport {
+    -fx-background-color: transparent;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.dialog-pane .scroll-bar:vertical .track {
+    -fx-background-color: transparent;
+}
+
+.dialog-pane .scroll-bar:vertical .thumb {
+    -fx-background-color: #dee2e6;
+    -fx-background-radius: 5px;
+}
+
+.dialog-pane > .title-bar {
+    -fx-background-color: #2B2D31;
+    -fx-padding: 4 4 4 4;
+}
+
+.dialog-pane > .title-bar > .title {
+    -fx-fill: white;
+    -fx-font-size: 14px;
+}
+
+.dialog-pane > .title-bar > .window-buttons {
+    -fx-background-color: #2B2D31;
+}
+
+.dialog-pane > .title-bar > .window-buttons > .close-button {
+    -fx-background-color: #2B2D31;
+}
+
+.dialog-pane > .title-bar > .window-buttons > .close-button:hover {
+    -fx-background-color: #E81123;
+}
+.custom-dialog {
+    -fx-background-color: white;
+    -fx-border-color: #363636;
+    -fx-border-width: 1px;
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+}
+
+.custom-dialog .dialog-title {
+    -fx-font-size: 14px;
+    -fx-text-fill: white;
+}
+
+.custom-dialog .header-text {
+    -fx-font-size: 14px;
+    -fx-text-fill: #2B2D31;
+}
+
+.custom-dialog > *.header-panel {
+    -fx-padding: 0;
+    -fx-background-color: white;
+    -fx-background-insets: 0;
+    -fx-border-width: 0;
+}
+
+.custom-dialog .title-bar {
+    -fx-background-color: #2B2D31;
+    -fx-background-radius: 10 10 0 0;
+    -fx-border-color: #363636;
+    -fx-border-width: 1px;
+    -fx-border-radius: 10 10 0 0;
+}
+
+.custom-dialog > *.button-bar > *.container {
+    -fx-background-color: #f8f9fa;
+    -fx-border-color: #dee2e6;
+    -fx-border-width: 1 0 0 0;
+}

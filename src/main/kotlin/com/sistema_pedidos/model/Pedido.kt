@@ -4,7 +4,7 @@ import java.sql.Timestamp
 
 data class Pedido(
     val id: Long? = null,
-    val numero: String? = null,
+    val numero: String,
     val clienteId: Long? = null,
     val telefoneContato: String,
     val dataPedido: String? = null,

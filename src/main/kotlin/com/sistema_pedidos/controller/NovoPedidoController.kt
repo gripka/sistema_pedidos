@@ -1,5 +1,7 @@
 package com.sistema_pedidos.controller
 
+import com.sistema_pedidos.database.DatabaseHelper
+import com.sistema_pedidos.model.Pedido
 import javafx.geometry.Pos
 import javafx.scene.image.Image
 import javafx.scene.image.ImageView
@@ -9,7 +11,8 @@ import javafx.collections.FXCollections
 import javafx.collections.ObservableList
 import javafx.scene.control.*
 import javafx.scene.layout.*
-
+import java.sql.SQLException
+import java.sql.Statement
 
 class NovoPedidoController {
     private val produtosContainer = VBox(10.0)
@@ -17,7 +20,7 @@ class NovoPedidoController {
     private lateinit var valorEntregaField: TextField
     private lateinit var totalLabelRef: Label
     private lateinit var descontoField: TextField
-    private lateinit var descontoToggleGroup: ToggleGroup
+    internal lateinit var descontoToggleGroup: ToggleGroup
     private lateinit var trocoParaField: TextField
     private lateinit var trocoCalculadoLabel: Label
 
@@ -184,6 +187,10 @@ class NovoPedidoController {
         Platform.runLater {
             totalLabel.text = "R$ $formattedValue"
         }
+    }
+
+    fun getDescontoToggleGroup(): ToggleGroup {
+        return descontoToggleGroup
     }
 
     fun setupListeners() {
@@ -548,6 +555,137 @@ class NovoPedidoController {
                 textField.text = value
                 textField.positionCaret(textField.text.length)
             }
+        }
+    }
+
+    fun salvarPedido(clienteInfo: List<Pair<String, String>>,
+                     pagamentoInfo: List<Pair<String, String>>,
+                     entregaInfo: List<Pair<String, String>>): Boolean {
+        try {
+            val telefoneContato = clienteInfo.find { it.first == "Telefone" }?.second ?: ""
+            val observacao = clienteInfo.find { it.first == "Observação" }?.second
+            val status = pagamentoInfo.find { it.first == "Status" }?.second ?: "Pendente"
+
+            fun parseMoneyValue(value: String): Double {
+                val cleanValue = value.replace("R$", "")
+                    .replace(" ", "")
+                    .replace(".", "")
+                    .replace(",", ".")
+                    .trim()
+
+                return try {
+                    cleanValue.toDouble()
+                } catch (e: NumberFormatException) {
+                    0.00
+                }
+            }
+
+            val valorTotal = parseMoneyValue(pagamentoInfo.find { it.first == "Total do Pedido" }?.second ?: "0,00")
+
+            val descontoInfo = pagamentoInfo.find { it.first.startsWith("Desconto") }
+            val valorDesconto = parseMoneyValue(descontoInfo?.second ?: "0,00")
+            val tipoDesconto = if (descontoInfo?.first?.contains("Percentual") == true) "percentual" else "valor"
+
+            val formaPagamento = pagamentoInfo.find { it.first == "Forma de Pagamento" }?.second
+            val valorTrocoPara = parseMoneyValue(trocoParaField.text)
+            val valorTroco = parseMoneyValue(trocoCalculadoLabel.text)
+
+            DatabaseHelper().getConnection().use { connection ->
+                connection.autoCommit = false
+                try {
+                    var numeroGerado = ""
+                    connection.createStatement().use { stmt ->
+                        val rs = stmt.executeQuery("SELECT COALESCE(MAX(CAST(SUBSTR(numero, 4) AS INTEGER)), 0) + 1 as next_num FROM pedidos")
+                        if (rs.next()) {
+                            numeroGerado = "PED%04d".format(rs.getInt("next_num"))
+                        }
+                    }
+
+                    val pedidoQuery = """
+                    INSERT INTO pedidos (numero, telefone_contato, observacao, status,
+                    valor_total, valor_desconto, tipo_desconto, forma_pagamento, valor_troco_para, valor_troco)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent()
+
+                    val pedidoId = connection.prepareStatement(pedidoQuery, Statement.RETURN_GENERATED_KEYS).use { stmt ->
+                        stmt.setString(1, numeroGerado)
+                        stmt.setString(2, telefoneContato)
+                        stmt.setString(3, observacao)
+                        stmt.setString(4, status)
+                        stmt.setDouble(5, valorTotal)
+                        stmt.setDouble(6, valorDesconto)
+                        stmt.setString(7, tipoDesconto)
+                        stmt.setString(8, formaPagamento)
+                        stmt.setDouble(9, valorTrocoPara)
+                        stmt.setDouble(10, valorTroco)
+
+                        stmt.executeUpdate()
+                        stmt.generatedKeys.use { keys ->
+                            if (keys.next()) keys.getLong(1) else throw SQLException("Failed to get pedido ID")
+                        }
+                    }
+
+                    val itemQuery = """
+                    INSERT INTO itens_pedido (pedido_id, produto_id, nome_produto, quantidade, valor_unitario, subtotal)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """.trimIndent()
+
+                    produtosContainer.children.forEach { node ->
+                        val hBox = node as HBox
+                        val qtdField = ((hBox.children[1] as VBox).children[1] as HBox).children[1] as TextField
+                        val produtoField = ((hBox.children[2] as VBox).children[1] as TextField)
+                        val valorField = ((hBox.children[3] as VBox).children[1] as TextField)
+                        val subtotalField = ((hBox.children[4] as VBox).children[1] as TextField)
+
+                        val quantidade = qtdField.text.toInt()
+                        val nomeProduto = produtoField.text
+                        val valorUnitario = parseMoneyValue(valorField.text)
+                        val subtotal = parseMoneyValue(subtotalField.text)
+
+                        connection.prepareStatement(itemQuery).use { stmt ->
+                            stmt.setLong(1, pedidoId)
+                            stmt.setObject(2, null)
+                            stmt.setString(3, nomeProduto)
+                            stmt.setInt(4, quantidade)
+                            stmt.setDouble(5, valorUnitario)
+                            stmt.setDouble(6, subtotal)
+                            stmt.executeUpdate()
+                        }
+                    }
+
+                    if (entregaInfo.first().second == "Sim") {
+                        val entregaQuery = """
+                        INSERT INTO entregas (pedido_id, nome_destinatario, telefone_destinatario,
+                        endereco, referencia, cidade, bairro, cep, valor_entrega, data_entrega, hora_entrega)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """.trimIndent()
+
+                        connection.prepareStatement(entregaQuery).use { stmt ->
+                            stmt.setLong(1, pedidoId)
+                            stmt.setString(2, entregaInfo.find { it.first == "Nome" }?.second)
+                            stmt.setString(3, entregaInfo.find { it.first == "Telefone" }?.second)
+                            stmt.setString(4, entregaInfo.find { it.first == "Endereço" }?.second)
+                            stmt.setString(5, entregaInfo.find { it.first == "Referência" }?.second)
+                            stmt.setString(6, entregaInfo.find { it.first == "Cidade" }?.second)
+                            stmt.setString(7, entregaInfo.find { it.first == "Bairro" }?.second)
+                            stmt.setString(8, entregaInfo.find { it.first == "CEP" }?.second)
+                            stmt.setDouble(9, parseMoneyValue(entregaInfo.find { it.first == "Valor" }?.second ?: "0,00"))
+                            stmt.setString(10, entregaInfo.find { it.first == "Data" }?.second)
+                            stmt.setString(11, entregaInfo.find { it.first == "Hora" }?.second)
+                            stmt.executeUpdate()
+                        }
+                    }
+
+                    connection.commit()
+                    return true
+                } catch (e: Exception) {
+                    connection.rollback()
+                    throw e
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
         }
     }
 }

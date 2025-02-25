@@ -6,13 +6,18 @@ import java.sql.SQLException
 
 class DatabaseHelper {
     private val dbPath = "jdbc:sqlite:pedidos.db"
+    private var connection: Connection? = null
 
     init {
+        connection = DriverManager.getConnection(dbPath)
         createTables()
     }
 
-    private fun getConnection(): Connection {
-        return DriverManager.getConnection(dbPath)
+    fun getConnection(): Connection {
+        if (connection == null || connection?.isClosed == true) {
+            connection = DriverManager.getConnection(dbPath)
+        }
+        return connection!!
     }
 
     private fun createTables() {
@@ -48,8 +53,8 @@ class DatabaseHelper {
                 data_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 observacao TEXT,
                 status TEXT CHECK (status IN ('Pendente', 'Pago', 'Cancelado')) DEFAULT 'Pendente',
-                valor_total DECIMAL(10,2) DEFAULT 0,
-                valor_desconto DECIMAL(10,2) DEFAULT 0,
+                valor_total DECIMAL(10,2) DEFAULT 0.00,
+                valor_desconto DECIMAL(10,2) DEFAULT 0.00,
                 tipo_desconto TEXT CHECK (tipo_desconto IN ('valor', 'percentual')),
                 forma_pagamento TEXT CHECK (forma_pagamento IN ('Dinheiro', 'Cartão de Crédito', 'Cartão de Débito', 'PIX', 'Voucher')),
                 valor_troco_para DECIMAL(10,2),
@@ -60,7 +65,8 @@ class DatabaseHelper {
             """CREATE TABLE IF NOT EXISTS itens_pedido (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 pedido_id INTEGER NOT NULL,
-                produto_id INTEGER NOT NULL,
+                produto_id INTEGER NULL,
+                nome_produto TEXT NOT NULL,
                 quantidade INTEGER NOT NULL DEFAULT 1,
                 valor_unitario DECIMAL(10,2) NOT NULL,
                 subtotal DECIMAL(10,2) NOT NULL,
@@ -111,6 +117,36 @@ class DatabaseHelper {
                     SET data_atualizacao = CURRENT_TIMESTAMP
                     WHERE id = NEW.id;
                 END
+            """,
+            """CREATE TRIGGER IF NOT EXISTS formatar_valores_monetarios
+                BEFORE INSERT ON pedidos
+                BEGIN
+                    UPDATE pedidos 
+                    SET valor_total = ROUND(NEW.valor_total, 2),
+                        valor_desconto = ROUND(NEW.valor_desconto, 2),
+                        valor_troco_para = ROUND(NEW.valor_troco_para, 2),
+                        valor_troco = ROUND(NEW.valor_troco, 2)
+                    WHERE id = NEW.id;
+                END;
+            """,
+
+            """CREATE TRIGGER IF NOT EXISTS formatar_valores_itens
+                BEFORE INSERT ON itens_pedido
+                BEGIN
+                    UPDATE itens_pedido
+                    SET valor_unitario = ROUND(NEW.valor_unitario, 2),
+                        subtotal = ROUND(NEW.subtotal, 2)
+                    WHERE id = NEW.id;
+                END;
+            """,
+
+            """CREATE TRIGGER IF NOT EXISTS formatar_valores_entregas
+                BEFORE INSERT ON entregas
+                BEGIN
+                    UPDATE entregas
+                    SET valor_entrega = ROUND(NEW.valor_entrega, 2)
+                    WHERE id = NEW.id;
+                END;
             """,
 
             """CREATE INDEX IF NOT EXISTS idx_cliente_telefone ON clientes(telefone)""",
