@@ -25,10 +25,9 @@ class NovoPedidoView : BorderPane() {
     private lateinit var totalLabelRef: Label
     private lateinit var valorEntregaField: TextField
 
-    // Container do conteúdo que pode rolar
     private val contentContainer = VBox().apply {
         spacing = 10.0
-        padding = Insets(15.0, 20.0, 40.0, 30.0) // Added bottom padding
+        padding = Insets(15.0, 20.0, 40.0, 30.0)
         children.addAll(
             createClientSection(),
             createPedidosSection(),
@@ -64,17 +63,12 @@ class NovoPedidoView : BorderPane() {
     private lateinit var totalLabel: Label
 
     fun createBarraInferior(): HBox {
-        totalLabel = Label("Total do Pedido: R$ 0,00").apply {
-            styleClass.add("total-label")
+        totalLabel = Label("R$ 0,00").apply {
+            styleClass.add("total-value-label")
         }
 
-        // First set the total label
         controller.setTotalLabel(totalLabel)
-
-        // Then call addNovoProduto without parameters
         controller.addNovoProduto()
-
-        // Add listener to products container
         controller.getProdutosContainer().children.addListener(
             ListChangeListener { _ -> controller.updateTotal(totalLabel) }
         )
@@ -85,13 +79,14 @@ class NovoPedidoView : BorderPane() {
             maxHeight = 80.0
             minHeight = 80.0
             styleClass.add("barra-inferior")
+            alignment = Pos.CENTER
 
-            val leftBox = HBox().apply {
+            val leftRegion = Region().apply {
                 HBox.setHgrow(this, Priority.ALWAYS)
+                maxWidth = Double.POSITIVE_INFINITY
             }
 
             val centerBox = HBox().apply {
-                minWidth = 200.0
                 alignment = Pos.CENTER
                 children.add(
                     Button("Salvar Pedido").apply {
@@ -102,20 +97,34 @@ class NovoPedidoView : BorderPane() {
                 )
             }
 
-            val rightBox = HBox().apply {
+            val rightRegion = Region().apply {
                 HBox.setHgrow(this, Priority.ALWAYS)
-                alignment = Pos.CENTER_RIGHT
+                maxWidth = Double.POSITIVE_INFINITY
+            }
+
+            val totalContainer = VBox().apply {
+                styleClass.add("total-container")
+                padding = Insets(10.0, 20.0, 10.0, 20.0)
+                alignment = Pos.CENTER_LEFT
+                minWidth = 300.0
+                maxWidth = 300.0
                 children.add(
-                    VBox().apply {
-                        styleClass.add("total-container")
-                        padding = Insets(10.0, 20.0, 10.0, 20.0)
-                        alignment = Pos.CENTER
-                        children.add(totalLabel)
+                    HBox(5.0).apply {
+                        alignment = Pos.CENTER_LEFT
+                        children.addAll(
+                            Label("Total do Pedido:").apply {
+                                styleClass.add("total-label")
+                            },
+                            Region().apply {
+                                HBox.setHgrow(this, Priority.ALWAYS)
+                            },
+                            totalLabel
+                        )
                     }
                 )
             }
 
-            children.addAll(leftBox, centerBox, rightBox)
+            children.addAll(leftRegion, centerBox, rightRegion, totalContainer)
         }
     }
 
@@ -237,7 +246,7 @@ class NovoPedidoView : BorderPane() {
 
     private fun createPagamentoSection(): VBox {
         val descontoToggleGroup = ToggleGroup()
-        controller.setDescontoToggleGroup(descontoToggleGroup) // Add this line here
+        controller.setDescontoToggleGroup(descontoToggleGroup)
 
         val pagamentoSection = HBox().apply {
             alignment = Pos.CENTER
@@ -450,12 +459,12 @@ class NovoPedidoView : BorderPane() {
             )
         }
 
-        val toggleSwitch = HBox(10.0).apply { // Using HBox to contain switch and label
+        val toggleSwitch = HBox(10.0).apply {
             alignment = Pos.CENTER
 
             val switchContainer = StackPane().apply {
-                minWidth = 56.0 // Match slider width
-                minHeight = 24.0 // Match slider height
+                minWidth = 56.0
+                minHeight = 24.0
                 maxWidth = 56.0
                 maxHeight = 24.0
                 styleClass.add("switch")
@@ -477,7 +486,6 @@ class NovoPedidoView : BorderPane() {
                 }
 
                 setOnMouseClicked { event ->
-                    // Only handle clicks within the slider bounds
                     if (event.x >= 0 && event.x <= 56.0 && event.y >= 0 && event.y <= 24.0) {
                         checkbox.isSelected = !checkbox.isSelected
                         event.consume()
@@ -519,8 +527,8 @@ class NovoPedidoView : BorderPane() {
 
 
         entregaForm = VBox(10.0).apply {
-            isDisable = true  // Start disabled
-            opacity = 0.9     // Start with reduced opacity
+            isDisable = true
+            opacity = 0.9
             children.addAll(
                 HBox(10.0).apply {
                     children.addAll(
@@ -660,7 +668,7 @@ class NovoPedidoView : BorderPane() {
                                             isEditable = true
                                             val hours = (0..23).map { String.format("%02d", it) }
                                             items.addAll(hours)
-                                            value = "08" // Hora inicial
+                                            value = "08"
 
                                             editor.textProperty().addListener { _, _, newValue ->
                                                 if (newValue.isEmpty()) return@addListener
@@ -694,7 +702,7 @@ class NovoPedidoView : BorderPane() {
                                             isEditable = true
                                             val minutes = (0..59 step 15).map { String.format("%02d", it) }
                                             items.addAll(minutes)
-                                            value = "00" // Minuto inicial
+                                            value = "00"
 
                                             editor.textProperty().addListener { _, _, newValue ->
                                                 if (newValue.isEmpty()) return@addListener

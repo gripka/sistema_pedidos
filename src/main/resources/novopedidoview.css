@@ -127,7 +127,7 @@
 }
 
 .salvar-pedido-button {
-    -fx-background-color: #28a745;
+    -fx-background-color: #6056e8;
     -fx-text-fill: white;
     -fx-font-size: 14px;
     -fx-font-weight: bold;
@@ -137,7 +137,7 @@
 }
 
 .salvar-pedido-button:hover {
-    -fx-background-color: #218838;
+    -fx-background-color: #433a94;
 }
 
 .salvar-pedido-button:pressed {
@@ -153,6 +153,12 @@
 }
 
 .total-label {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #495057;
+}
+
+.total-value-label {
     -fx-font-size: 16px;
     -fx-font-weight: bold;
     -fx-text-fill: #495057;
@@ -202,7 +208,7 @@
 }
 
 .switch .slider.selected {
-    -fx-stroke: #0974f1;
+    -fx-stroke: #6056e8;
     -fx-effect: dropshadow(gaussian, rgba(9, 117, 241, 0.6), 8, 0, 0, 0);
 }
 
@@ -276,7 +282,7 @@
 
 .date-picker:focused {
     -fx-background-color: rgb(255, 255, 255);
-    -fx-border-color: rgb(76, 154, 255);
+    -fx-border-color: #6056e8;
 }
 
 .date-picker > .text-field {
@@ -333,7 +339,7 @@
 }
 
 .date-picker-popup .spinner .button:hover {
-    -fx-background-color: rgba(0, 119, 255, 0.06);
+    -fx-background-color: #cbe5ff;
 }
 
 .date-picker-popup .calendar-grid {
@@ -357,7 +363,7 @@
 }
 
 .date-picker-popup .calendar-grid .day-cell.selected {
-    -fx-background-color: #07f;
+    -fx-background-color: #6056e8;
     -fx-text-fill: white;
 }
 

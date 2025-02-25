@@ -182,7 +182,7 @@ class NovoPedidoController {
             .replaceFirst(",", ".")
 
         Platform.runLater {
-            totalLabel.text = "Total do Pedido: R$ $formattedValue"
+            totalLabel.text = "R$ $formattedValue"
         }
     }
 
