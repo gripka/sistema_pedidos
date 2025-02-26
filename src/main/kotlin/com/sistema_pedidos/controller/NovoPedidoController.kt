@@ -567,14 +567,20 @@ class NovoPedidoController {
             val status = pagamentoInfo.find { it.first == "Status" }?.second ?: "Pendente"
 
             fun parseMoneyValue(value: String): Double {
-                val cleanValue = value.replace("R$", "")
-                    .replace(" ", "")
-                    .replace(".", "")
-                    .replace(",", ".")
-                    .trim()
-
                 return try {
-                    cleanValue.toDouble()
+                    val cleanValue = value.replace("R$", "")
+                        .replace(" ", "")
+                        .trim()
+
+                    // Se não houver números, retorna 0.00
+                    if (cleanValue.replace(Regex("[^0-9]"), "").isEmpty()) {
+                        0.00
+                    } else {
+                        // Primeiro, remove todos os pontos e substitui a vírgula por ponto
+                        cleanValue.replace(".", "")
+                            .replace(",", ".")
+                            .toDouble()
+                    }
                 } catch (e: NumberFormatException) {
                     0.00
                 }
