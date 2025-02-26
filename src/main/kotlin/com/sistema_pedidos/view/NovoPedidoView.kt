@@ -14,6 +14,7 @@ import javafx.application.Platform
 import javafx.beans.property.DoubleProperty
 import javafx.collections.ListChangeListener
 import javafx.scene.Node
+import javafx.stage.StageStyle
 import javafx.util.converter.LocalDateStringConverter as JavaFxLocalDateStringConverter
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -48,6 +49,7 @@ class NovoPedidoView : BorderPane() {
             maxHeight = Double.MAX_VALUE
         }
 
+        controller.setContentContainer(contentContainer)
         center = scrollPane
         bottom = createBarraInferior()
         controller.setupListeners()
@@ -102,6 +104,7 @@ class NovoPedidoView : BorderPane() {
                                 headerText = null
                                 contentText = "Pedido salvo com sucesso!"
                                 showAndWait()
+                                controller.resetForm()
                             }
                         } else {
                             Alert(Alert.AlertType.ERROR).apply {
@@ -459,6 +462,61 @@ class NovoPedidoView : BorderPane() {
             trocoCalculadoLabel.isDisable = selectedButton?.text != "Dinheiro"
         }
 
+        val retiradaFields = HBox(10.0).apply {
+            id = "retirada-fields"
+            spacing = 20.0
+            children.addAll(
+                VBox(10.0).apply {
+                    children.addAll(
+                        Label("Data de Retirada").apply { styleClass.add("field-label") },
+                        DatePicker().apply {
+                            value = java.time.LocalDate.now()
+                            styleClass.add("date-picker")
+                            prefWidth = 150.0
+                            maxWidth = 150.0
+                            promptText = "dd/mm/aaaa"
+                            converter = JavaFxLocalDateStringConverter(
+                                DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+                                DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                            )
+                        }
+                    )
+                },
+                VBox(10.0).apply {
+                    children.addAll(
+                        Label("Hora da Retirada").apply { styleClass.add("field-label") },
+                        HBox(5.0).apply {
+                            alignment = Pos.CENTER_LEFT
+                            children.addAll(
+                                ComboBox<String>().apply {
+                                    styleClass.add("time-picker")
+                                    prefWidth = 70.0
+                                    maxWidth = 70.0
+                                    isEditable = true
+                                    val hours = (0..23).map { String.format("%02d", it) }
+                                    items.addAll(hours)
+                                    value = "08"
+                                },
+                                Label(":").apply {
+                                    styleClass.add("field-label")
+                                    style = "-fx-padding: 5 0 0 0;"
+                                },
+                                ComboBox<String>().apply {
+                                    styleClass.add("time-picker")
+                                    prefWidth = 70.0
+                                    maxWidth = 70.0
+                                    isEditable = true
+                                    val minutes = (0..59 step 15).map { String.format("%02d", it) }
+                                    items.addAll(minutes)
+                                    value = "00"
+                                }
+                            )
+                        }
+                    )
+                }
+            )
+        }
+
         return VBox(10.0).apply {
             children.addAll(
                 pagamentoSection,
@@ -474,7 +532,8 @@ class NovoPedidoView : BorderPane() {
                         Label("Status").apply { styleClass.add("field-label") },
                         statusButtons
                     )
-                }
+                },
+                retiradaFields
             )
         }
     }
@@ -496,6 +555,7 @@ class NovoPedidoView : BorderPane() {
         }
 
         val dialog = Dialog<ButtonType>().apply {
+            initStyle(StageStyle.UNDECORATED)
             title = "Confirmação do Pedido"
             headerText = "Confirme os dados do pedido"
             dialogPane.content = ScrollPane(content).apply {
@@ -581,13 +641,32 @@ class NovoPedidoView : BorderPane() {
         val status = findSelectedToggleText("payment-toggle-button", 1)
         val descontoType = if ((controller.getDescontoToggleGroup().selectedToggle as? RadioButton)?.id == "valor") "Valor" else "Percentual"
         val desconto = findTextField("Desconto")?.text ?: "R$ 0,00"
+        val dataRetirada = findDatePicker("Data de Retirada")?.value?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) ?: ""
+        val horaRetirada = findPickupTimeValue() ?: ""
 
         return listOf(
             "Forma de Pagamento" to (formaPagamento ?: ""),
             "Status" to (status ?: "Pendente"),
             "Desconto ($descontoType)" to desconto,
+            "Data de Retirada" to dataRetirada,
+            "Hora de Retirada" to horaRetirada,
             "Total do Pedido" to (totalLabel.text)
         )
+    }
+
+    private fun findPickupTimeValue(): String? {
+        val timeContainer = contentContainer.lookupAll(".time-picker")
+            .filterIsInstance<ComboBox<String>>()
+            .filter { picker ->
+                val parent = picker.parent?.parent as? VBox
+                val label = parent?.children?.firstOrNull { it is Label } as? Label
+                label?.text == "Hora da Retirada"
+            }
+            .toList()
+
+        return if (timeContainer.size >= 2) {
+            "${timeContainer[0].value}:${timeContainer[1].value}"
+        } else null
     }
 
     private fun getEntregaInfo(): List<Pair<String, String>> {
@@ -684,6 +763,7 @@ class NovoPedidoView : BorderPane() {
                 maxWidth = 56.0
                 maxHeight = 24.0
                 styleClass.add("switch")
+                style = "-fx-cursor: hand;"
 
                 val checkbox = CheckBox().apply {
                     opacity = 0.0
@@ -701,11 +781,11 @@ class NovoPedidoView : BorderPane() {
                     translateX = -16.0
                 }
 
+                children.setAll(slider, circle, checkbox)
+
                 setOnMouseClicked { event ->
-                    if (event.x >= 0 && event.x <= 56.0 && event.y >= 0 && event.y <= 24.0) {
-                        checkbox.isSelected = !checkbox.isSelected
-                        event.consume()
-                    }
+                    checkbox.isSelected = !checkbox.isSelected
+                    event.consume()
                 }
 
                 checkbox.selectedProperty().addListener { _, _, isSelected ->
@@ -718,11 +798,44 @@ class NovoPedidoView : BorderPane() {
                         slider.styleClass.add("selected")
                         entregaForm.isDisable = false
                         entregaForm.opacity = 1.0
+                        // Disable pickup fields
+                        contentContainer.lookupAll(".date-picker").forEach { node ->
+                            val datePicker = node as? DatePicker
+                            val parent = datePicker?.parent as? VBox
+                            val label = parent?.children?.firstOrNull { it is Label } as? Label
+                            if (label?.text == "Data de Retirada") {
+                                datePicker?.isDisable = true
+                            }
+                        }
+                        contentContainer.lookupAll(".time-picker").forEach { node ->
+                            val timePicker = node as? ComboBox<*>
+                            val parent = timePicker?.parent?.parent as? VBox
+                            val label = parent?.children?.firstOrNull { it is Label } as? Label
+                            if (label?.text == "Hora da Retirada") {
+                                timePicker?.isDisable = true
+                            }
+                        }
                     } else {
                         slider.styleClass.remove("selected")
                         entregaForm.isDisable = true
                         entregaForm.opacity = 0.6
-                        // Clear delivery value and update total when delivery is disabled
+                        // Enable pickup fields
+                        contentContainer.lookupAll(".date-picker").forEach { node ->
+                            val datePicker = node as? DatePicker
+                            val parent = datePicker?.parent as? VBox
+                            val label = parent?.children?.firstOrNull { it is Label } as? Label
+                            if (label?.text == "Data de Retirada") {
+                                datePicker?.isDisable = false
+                            }
+                        }
+                        contentContainer.lookupAll(".time-picker").forEach { node ->
+                            val timePicker = node as? ComboBox<*>
+                            val parent = timePicker?.parent?.parent as? VBox
+                            val label = parent?.children?.firstOrNull { it is Label } as? Label
+                            if (label?.text == "Hora da Retirada") {
+                                timePicker?.isDisable = false
+                            }
+                        }
                         Platform.runLater {
                             controller.setValorEntregaField(valorEntregaField)
                             valorEntregaField.text = "R$ 0,00"
@@ -730,8 +843,6 @@ class NovoPedidoView : BorderPane() {
                         }
                     }
                 }
-
-                children.addAll(slider, circle, checkbox)
             }
 
             val label = Label("").apply {
@@ -740,7 +851,6 @@ class NovoPedidoView : BorderPane() {
 
             children.addAll(switchContainer, label)
         }
-
 
         entregaForm = VBox(10.0).apply {
             isDisable = true
@@ -767,7 +877,6 @@ class NovoPedidoView : BorderPane() {
                                     prefWidth = 130.0
                                     controller.formatarTelefone(this)
                                     promptText = "(XX) XXXXX-XXXX"
-
                                 }
                             )
                         }
@@ -822,7 +931,6 @@ class NovoPedidoView : BorderPane() {
                                 }
                             )
                         },
-
                         VBox(10.0).apply {
                             children.addAll(
                                 Label("CEP").apply { styleClass.add("field-label") },
@@ -949,6 +1057,7 @@ class NovoPedidoView : BorderPane() {
                 }
             )
         }
+
         return VBox(10.0).apply {
             children.addAll(entregaSection, toggleSwitch, entregaForm)
         }

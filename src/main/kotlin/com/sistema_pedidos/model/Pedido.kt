@@ -15,5 +15,7 @@ data class Pedido(
     val tipoDesconto: String?,
     val formaPagamento: String?,
     val valorTrocoPara: Double?,
-    val valorTroco: Double?
+    val valorTroco: Double?,
+    val dataRetirada: String? = null,
+    val horaRetirada: String? = null
 )

@@ -23,6 +23,7 @@ class NovoPedidoController {
     internal lateinit var descontoToggleGroup: ToggleGroup
     private lateinit var trocoParaField: TextField
     private lateinit var trocoCalculadoLabel: Label
+    private lateinit var contentContainer: VBox
 
     fun incrementQuantity(textField: TextField) {
         val value = textField.text.toInt()
@@ -48,6 +49,10 @@ class NovoPedidoController {
         } else {
             textField.text = "1"
         }
+    }
+
+    fun setContentContainer(container: VBox) {
+        contentContainer = container
     }
 
     fun formatarTelefone(textField: TextField) {
@@ -558,6 +563,104 @@ class NovoPedidoController {
         }
     }
 
+    fun resetForm() {
+        // Reset all text fields in the client section
+        contentContainer.lookupAll(".text-field").forEach { node ->
+            if (node is TextField) {
+                node.text = if (node.promptText?.contains("R$") == true) "R$ 0,00" else ""
+            }
+        }
+
+        // Reset date pickers
+        contentContainer.lookupAll(".date-picker").forEach { node ->
+            if (node is DatePicker) {
+                if (node.parent?.parent?.toString()?.contains("retirada-fields") == true) {
+                    node.value = null
+                } else {
+                    node.value = java.time.LocalDate.now()
+                }
+            }
+        }
+
+        // Reset time pickers
+        contentContainer.lookupAll(".time-picker").forEach { node ->
+            if (node is ComboBox<*>) {
+                if ((node.parent as? HBox)?.parent?.toString()?.contains("retirada-fields") == true) {
+                    node.value = if (node.prefWidth == 70.0) "08" else "00"
+                }
+            }
+        }
+
+        // Reset payment method buttons
+        contentContainer.lookupAll(".payment-toggle-button").forEach { node ->
+            if (node is ToggleButton) {
+                node.isSelected = node.text == "Dinheiro"
+            }
+        }
+
+        // Reset status buttons
+        contentContainer.lookupAll(".payment-toggle-button").forEach { node ->
+            if (node is ToggleButton && (node.text == "Pendente" || node.text == "Pago")) {
+                node.isSelected = node.text == "Pendente"
+            }
+        }
+
+        // Reset discount type
+        descontoToggleGroup.selectToggle(
+            descontoToggleGroup.toggles.find { (it as RadioButton).id == "valor" }
+        )
+
+        // Reset delivery switch and form
+        val deliverySwitch = contentContainer.lookup(".switch") as? StackPane
+        deliverySwitch?.let {
+            val checkbox = it.children.find { node -> node is CheckBox } as? CheckBox
+            checkbox?.isSelected = false
+        }
+
+        // Reset products
+        produtosContainer.children.clear()
+        listaProdutos.clear()
+        addNovoProduto()
+
+        // Reset total label
+        totalLabelRef.text = "R$ 0,00"
+
+        // Reset troco fields
+        trocoParaField.text = "R$ 0,00"
+        trocoCalculadoLabel.text = "R$ 0,00"
+
+        // Reset valor entrega
+        valorEntregaField.text = "R$ 0,00"
+
+        // Reset desconto field
+        descontoField.text = if ((descontoToggleGroup.selectedToggle as? RadioButton)?.id == "valor")
+            "R$ 0,00" else "0,00"
+    }
+
+    private fun parseMoneyValue(value: String): Double {
+        // Remove R$ e espaços
+        var cleanValue = value.replace(Regex("[R$\\s]"), "")
+
+        // Remove os pontos de separador de milhar
+        cleanValue = cleanValue.replace(".", "")
+
+        // Substitui vírgula por ponto para decimal
+        cleanValue = cleanValue.replace(",", ".")
+
+        // Converte para Double dividindo por 100 apenas se não houver ponto decimal
+        return try {
+            if (!value.contains(",")) {
+                // Se não tem vírgula, assume que é um valor em centavos
+                cleanValue.toDouble() / 100
+            } else {
+                // Se tem vírgula, é um valor já formatado com decimais
+                cleanValue.toDouble()
+            }
+        } catch (e: NumberFormatException) {
+            0.0
+        }
+    }
+
     fun salvarPedido(clienteInfo: List<Pair<String, String>>,
                      pagamentoInfo: List<Pair<String, String>>,
                      entregaInfo: List<Pair<String, String>>): Boolean {
@@ -565,26 +668,6 @@ class NovoPedidoController {
             val telefoneContato = clienteInfo.find { it.first == "Telefone" }?.second ?: ""
             val observacao = clienteInfo.find { it.first == "Observação" }?.second
             val status = pagamentoInfo.find { it.first == "Status" }?.second ?: "Pendente"
-
-            fun parseMoneyValue(value: String): Double {
-                return try {
-                    val cleanValue = value.replace("R$", "")
-                        .replace(" ", "")
-                        .trim()
-
-                    // Se não houver números, retorna 0.00
-                    if (cleanValue.replace(Regex("[^0-9]"), "").isEmpty()) {
-                        0.00
-                    } else {
-                        // Primeiro, remove todos os pontos e substitui a vírgula por ponto
-                        cleanValue.replace(".", "")
-                            .replace(",", ".")
-                            .toDouble()
-                    }
-                } catch (e: NumberFormatException) {
-                    0.00
-                }
-            }
 
             val valorTotal = parseMoneyValue(pagamentoInfo.find { it.first == "Total do Pedido" }?.second ?: "0,00")
 
@@ -608,10 +691,11 @@ class NovoPedidoController {
                     }
 
                     val pedidoQuery = """
-                    INSERT INTO pedidos (numero, telefone_contato, observacao, status,
-                    valor_total, valor_desconto, tipo_desconto, forma_pagamento, valor_troco_para, valor_troco)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """.trimIndent()
+                        INSERT INTO pedidos (numero, telefone_contato, observacao, status,
+                        valor_total, valor_desconto, tipo_desconto, forma_pagamento, valor_troco_para, valor_troco,
+                        data_retirada, hora_retirada)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """.trimIndent()
 
                     val pedidoId = connection.prepareStatement(pedidoQuery, Statement.RETURN_GENERATED_KEYS).use { stmt ->
                         stmt.setString(1, numeroGerado)
@@ -624,6 +708,8 @@ class NovoPedidoController {
                         stmt.setString(8, formaPagamento)
                         stmt.setDouble(9, valorTrocoPara)
                         stmt.setDouble(10, valorTroco)
+                        stmt.setString(11, pagamentoInfo.find { it.first == "Data de Retirada" }?.second)
+                        stmt.setString(12, pagamentoInfo.find { it.first == "Hora de Retirada" }?.second)
 
                         stmt.executeUpdate()
                         stmt.generatedKeys.use { keys ->

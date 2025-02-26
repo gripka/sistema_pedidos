@@ -59,6 +59,8 @@ class DatabaseHelper {
                 forma_pagamento TEXT CHECK (forma_pagamento IN ('Dinheiro', 'Cartão de Crédito', 'Cartão de Débito', 'PIX', 'Voucher')),
                 valor_troco_para DECIMAL(10,2),
                 valor_troco DECIMAL(10,2),
+                data_retirada DATE,
+                hora_retirada TIME,
                 FOREIGN KEY (cliente_id) REFERENCES clientes(id)
             )""",
 
