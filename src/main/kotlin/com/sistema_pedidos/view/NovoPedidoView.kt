@@ -103,6 +103,17 @@ class NovoPedidoView : BorderPane() {
                                 title = "Sucesso"
                                 headerText = null
                                 contentText = "Pedido salvo com sucesso!"
+                                graphic = null
+                                initStyle(StageStyle.UNDECORATED)
+                                dialogPane.apply {
+                                    stylesheets.addAll(this@NovoPedidoView.stylesheets)
+                                    styleClass.add("success")
+                                }
+                                setOnShown {
+                                    val window = dialogPane.scene.window
+                                    window.centerOnScreen()
+                                }
+
                                 showAndWait()
                                 controller.resetForm()
                             }
@@ -111,6 +122,12 @@ class NovoPedidoView : BorderPane() {
                                 title = "Erro"
                                 headerText = null
                                 contentText = "Erro ao salvar o pedido"
+                                graphic = null
+                                initStyle(StageStyle.UNDECORATED)
+                                dialogPane.apply {
+                                    stylesheets.addAll(this@NovoPedidoView.stylesheets)
+                                    styleClass.add("error")
+                                }
                                 showAndWait()
                             }
                         }
@@ -564,27 +581,35 @@ class NovoPedidoView : BorderPane() {
             }
             dialogPane.buttonTypes.addAll(ButtonType.OK, ButtonType.CANCEL)
 
-            // Centralizar os botões
             dialogPane.lookupButton(ButtonType.OK).style = "-fx-pref-width: 100px;"
             dialogPane.lookupButton(ButtonType.CANCEL).style = "-fx-pref-width: 100px;"
 
-            // Customizar o ButtonBar para centralizar
             (dialogPane.lookup(".button-bar") as ButtonBar).buttonOrder = "C:OK:0:1"
 
-            // Usar a mesma referência do CSS já carregado
             dialogPane.stylesheets.addAll(this@NovoPedidoView.stylesheets)
+
+            dialogPane.style = """
+            -fx-border-color: #D3D3D3;
+            -fx-border-width: 1px;
+        """
         }
 
         return dialog.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK
     }
 
     private fun createConfirmationSection(title: String, items: List<Pair<String, String>>): VBox {
+        val filteredItems = if (title == "Pagamento" && getEntregaInfo().first().second == "Sim") {
+            items.filter { !it.first.contains("Retirada") }
+        } else {
+            items
+        }
+
         return VBox(5.0).apply {
             children.add(Label(title).apply {
                 styleClass.add("section-label")
             })
 
-            items.forEach { (label, value) ->
+            filteredItems.forEach { (label, value) ->
                 children.add(
                     HBox(10.0).apply {
                         children.addAll(
@@ -735,6 +760,11 @@ class NovoPedidoView : BorderPane() {
     private fun findTimeValue(): String? {
         val timeContainer = contentContainer.lookupAll(".time-picker")
             .filterIsInstance<ComboBox<String>>()
+            .filter { picker ->
+                val parent = picker.parent?.parent as? VBox
+                val label = parent?.children?.firstOrNull { it is Label } as? Label
+                label?.text == "Hora da Entrega"
+            }
             .toList()
 
         return if (timeContainer.size >= 2) {

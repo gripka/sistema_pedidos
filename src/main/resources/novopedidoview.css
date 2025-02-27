@@ -545,41 +545,107 @@
 .dialog-pane > .title-bar > .window-buttons > .close-button:hover {
     -fx-background-color: #E81123;
 }
-.custom-dialog {
+
+/* Reset completo dos espaços do alert */
+.alert {
     -fx-background-color: white;
-    -fx-border-color: #363636;
-    -fx-border-width: 1px;
-    -fx-border-radius: 10;
-    -fx-background-radius: 10;
-}
-
-.custom-dialog .dialog-title {
-    -fx-font-size: 14px;
-    -fx-text-fill: white;
-}
-
-.custom-dialog .header-text {
-    -fx-font-size: 14px;
-    -fx-text-fill: #2B2D31;
-}
-
-.custom-dialog > *.header-panel {
     -fx-padding: 0;
-    -fx-background-color: white;
-    -fx-background-insets: 0;
-    -fx-border-width: 0;
-}
-
-.custom-dialog .title-bar {
-    -fx-background-color: #2B2D31;
-    -fx-background-radius: 10 10 0 0;
-    -fx-border-color: #363636;
+    -fx-border-color: #d3d3d3;
     -fx-border-width: 1px;
-    -fx-border-radius: 10 10 0 0;
 }
 
-.custom-dialog > *.button-bar > *.container {
-    -fx-background-color: #f8f9fa;
-    -fx-border-color: #dee2e6;
-    -fx-border-width: 1 0 0 0;
+.alert .dialog-pane {
+    -fx-background-color: white;
+    -fx-padding: 0;
+    -fx-border-color: #d3d3d3;
+    -fx-border-width: 1px;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+}
+
+/* Reset de todos os paddings internos */
+.alert .dialog-pane > * {
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+}
+
+/* Remover ícones e espaços padrão */
+.alert .dialog-pane .graphic,
+.alert .dialog-pane > .graphic,
+.dialog-pane .window-icon {
+    visibility: hidden;
+    -fx-min-width: 0;
+    -fx-pref-width: 0;
+    -fx-max-width: 0;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+}
+
+/* Ocultar header */
+.alert .dialog-pane .header-panel {
+    visibility: hidden;
+    -fx-pref-height: 0;
+    -fx-min-height: 0;
+    -fx-max-height: 0;
+    -fx-padding: 0;
+}
+
+/* Estilos do conteúdo */
+.alert .dialog-pane .content {
+    -fx-padding: 0;
+    -fx-alignment: center;
+    -fx-min-height: 80px;
+    -fx-pref-height: 80px;
+    -fx-min-width: 400px;
+    -fx-background-insets: 0;
+}
+
+.alert.success .content.label,
+.alert.error .content.label {
+    -fx-font-size: 15px;
+    -fx-padding: 20px 20px 00px 20px;
+    -fx-content-display: left;
+    -fx-graphic-text-gap: 20;
+    -fx-alignment: center-left;
+    -fx-background-insets: 0;
+    -fx-min-width: 400px;
+}
+
+.alert.success .content.label {
+    -fx-graphic: url("/icons/success.png");
+}
+
+.alert.error .content.label {
+    -fx-graphic: url("/icons/error.png");
+}
+
+.alert .dialog-pane .button-bar {
+    -fx-alignment: center;
+    -fx-padding: 0 0 20px 0;
+}
+
+.alert .dialog-pane .button-bar > .container {
+    -fx-alignment: center;
+    -fx-padding: 0 0 20px 0;
+}
+
+.alert .dialog-pane .button {
+    -fx-background-color: #6056e8;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-border-radius: 5px;
+    -fx-background-radius: 5px;
+    -fx-cursor: hand;
+    -fx-padding: 8 16;
+    -fx-min-width: 100px;
+}
+
+.alert .dialog-pane .button:hover {
+    -fx-background-color: #433a94;
+}
+
+.alert .dialog-pane .button:pressed {
+    -fx-scale-x: 0.98;
+    -fx-scale-y: 0.98;
 }

@@ -152,7 +152,8 @@ class NovoPedidoController {
 
         produtosContainer.children.forEach { node ->
             val hBox = node as HBox
-            val subtotalVBox = hBox.children.find { it is VBox && it.children[0] is Label && (it.children[0] as Label).text == "Subtotal" } as? VBox
+            val subtotalVBox =
+                hBox.children.find { it is VBox && it.children[0] is Label && (it.children[0] as Label).text == "Subtotal" } as? VBox
             val subtotalField = subtotalVBox?.children?.get(1) as? TextField
 
             subtotalField?.let { field ->
@@ -221,11 +222,12 @@ class NovoPedidoController {
     private fun createRemoveButton(produtoHBox: HBox, produto: Produto): Button {
         return Button().apply {
             styleClass.add("remove-button")
-            graphic = ImageView(Image(NovoPedidoController::class.java.getResourceAsStream("/icons/closered.png"))).apply {
-                fitHeight = 15.0
-                fitWidth = 15.0
-                isPreserveRatio = true
-            }
+            graphic =
+                ImageView(Image(NovoPedidoController::class.java.getResourceAsStream("/icons/closered.png"))).apply {
+                    fitHeight = 15.0
+                    fitWidth = 15.0
+                    isPreserveRatio = true
+                }
             prefWidth = 25.0
             prefHeight = 25.0
             translateY = 15.0  // Adjusted to match the quantity buttons position
@@ -253,9 +255,11 @@ class NovoPedidoController {
         listaProdutos.clear()
         listaProdutos.addAll(updatedProducts)
     }
+
     fun setValorEntregaField(field: TextField) {
         valorEntregaField = field
     }
+
     fun addNovoProduto() {
         val novoProduto = Produto(
             id = (listaProdutos.size + 1).toLong(),
@@ -470,6 +474,7 @@ class NovoPedidoController {
     fun setTrocoCalculadoLabel(label: Label) {
         trocoCalculadoLabel = label
     }
+
     fun calcularTroco() {
         val trocoParaText = trocoParaField.text.replace(Regex("[^\\d]"), "")
         val trocoPara = (trocoParaText.toDoubleOrNull() ?: 0.0) / 100
@@ -571,22 +576,28 @@ class NovoPedidoController {
             }
         }
 
-        // Reset date pickers
+// Reset date pickers and time pickers
         contentContainer.lookupAll(".date-picker").forEach { node ->
             if (node is DatePicker) {
-                if (node.parent?.parent?.toString()?.contains("retirada-fields") == true) {
+                // Force a visual update by temporarily setting to null
+                Platform.runLater {
+                    val today = java.time.LocalDate.now()
                     node.value = null
-                } else {
-                    node.value = java.time.LocalDate.now()
+                    node.value = today
                 }
             }
         }
 
-        // Reset time pickers
         contentContainer.lookupAll(".time-picker").forEach { node ->
             if (node is ComboBox<*>) {
-                if ((node.parent as? HBox)?.parent?.toString()?.contains("retirada-fields") == true) {
-                    node.value = if (node.prefWidth == 70.0) "08" else "00"
+                // Reset hours to 08 and minutes to 00 based on parent component
+                val parent = node.parent?.parent as? VBox
+                val label = parent?.children?.firstOrNull { it is Label } as? Label
+                val isHourField =
+                    label?.text?.contains("Hora") == true && node == (node.parent as HBox).children.first()
+                Platform.runLater {
+                    node.value = null
+                    node.value = if (isHourField) "08" else "00"
                 }
             }
         }
@@ -661,9 +672,11 @@ class NovoPedidoController {
         }
     }
 
-    fun salvarPedido(clienteInfo: List<Pair<String, String>>,
-                     pagamentoInfo: List<Pair<String, String>>,
-                     entregaInfo: List<Pair<String, String>>): Boolean {
+    fun salvarPedido(
+        clienteInfo: List<Pair<String, String>>,
+        pagamentoInfo: List<Pair<String, String>>,
+        entregaInfo: List<Pair<String, String>>
+    ): Boolean {
         try {
             val telefoneContato = clienteInfo.find { it.first == "Telefone" }?.second ?: ""
             val observacao = clienteInfo.find { it.first == "Observação" }?.second
@@ -684,7 +697,8 @@ class NovoPedidoController {
                 try {
                     var numeroGerado = ""
                     connection.createStatement().use { stmt ->
-                        val rs = stmt.executeQuery("SELECT COALESCE(MAX(CAST(SUBSTR(numero, 4) AS INTEGER)), 0) + 1 as next_num FROM pedidos")
+                        val rs =
+                            stmt.executeQuery("SELECT COALESCE(MAX(CAST(SUBSTR(numero, 4) AS INTEGER)), 0) + 1 as next_num FROM pedidos")
                         if (rs.next()) {
                             numeroGerado = "PED%04d".format(rs.getInt("next_num"))
                         }
@@ -697,25 +711,33 @@ class NovoPedidoController {
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """.trimIndent()
 
-                    val pedidoId = connection.prepareStatement(pedidoQuery, Statement.RETURN_GENERATED_KEYS).use { stmt ->
-                        stmt.setString(1, numeroGerado)
-                        stmt.setString(2, telefoneContato)
-                        stmt.setString(3, observacao)
-                        stmt.setString(4, status)
-                        stmt.setDouble(5, valorTotal)
-                        stmt.setDouble(6, valorDesconto)
-                        stmt.setString(7, tipoDesconto)
-                        stmt.setString(8, formaPagamento)
-                        stmt.setDouble(9, valorTrocoPara)
-                        stmt.setDouble(10, valorTroco)
-                        stmt.setString(11, pagamentoInfo.find { it.first == "Data de Retirada" }?.second)
-                        stmt.setString(12, pagamentoInfo.find { it.first == "Hora de Retirada" }?.second)
+                    val pedidoId =
+                        connection.prepareStatement(pedidoQuery, Statement.RETURN_GENERATED_KEYS).use { stmt ->
+                            stmt.setString(1, numeroGerado)
+                            stmt.setString(2, telefoneContato)
+                            stmt.setString(3, observacao)
+                            stmt.setString(4, status)
+                            stmt.setDouble(5, valorTotal)
+                            stmt.setDouble(6, valorDesconto)
+                            stmt.setString(7, tipoDesconto)
+                            stmt.setString(8, formaPagamento)
+                            stmt.setDouble(9, valorTrocoPara)
+                            stmt.setDouble(10, valorTroco)
 
-                        stmt.executeUpdate()
-                        stmt.generatedKeys.use { keys ->
-                            if (keys.next()) keys.getLong(1) else throw SQLException("Failed to get pedido ID")
+                            // Se houver entrega, define data e hora de retirada como "Entrega"
+                            if (entregaInfo.first().second == "Sim") {
+                                stmt.setString(11, "Entrega")
+                                stmt.setString(12, "Entrega")
+                            } else {
+                                stmt.setString(11, pagamentoInfo.find { it.first == "Data de Retirada" }?.second)
+                                stmt.setString(12, pagamentoInfo.find { it.first == "Hora de Retirada" }?.second)
+                            }
+
+                            stmt.executeUpdate()
+                            stmt.generatedKeys.use { keys ->
+                                if (keys.next()) keys.getLong(1) else throw SQLException("Failed to get pedido ID")
+                            }
                         }
-                    }
 
                     val itemQuery = """
                     INSERT INTO itens_pedido (pedido_id, produto_id, nome_produto, quantidade, valor_unitario, subtotal)
@@ -761,7 +783,10 @@ class NovoPedidoController {
                             stmt.setString(6, entregaInfo.find { it.first == "Cidade" }?.second)
                             stmt.setString(7, entregaInfo.find { it.first == "Bairro" }?.second)
                             stmt.setString(8, entregaInfo.find { it.first == "CEP" }?.second)
-                            stmt.setDouble(9, parseMoneyValue(entregaInfo.find { it.first == "Valor" }?.second ?: "0,00"))
+                            stmt.setDouble(
+                                9,
+                                parseMoneyValue(entregaInfo.find { it.first == "Valor" }?.second ?: "0,00")
+                            )
                             stmt.setString(10, entregaInfo.find { it.first == "Data" }?.second)
                             stmt.setString(11, entregaInfo.find { it.first == "Hora" }?.second)
                             stmt.executeUpdate()
@@ -769,6 +794,33 @@ class NovoPedidoController {
                     }
 
                     connection.commit()
+                    println("Pedido saved successfully. Starting print process...")
+                    val printerController = PrinterController()
+                    val produtos = produtosContainer.children.map { node ->
+                        val hBox = node as HBox
+                        val qtdField = ((hBox.children[1] as VBox).children[1] as HBox).children[1] as TextField
+                        val produtoField = ((hBox.children[2] as VBox).children[1] as TextField)
+                        val valorField = ((hBox.children[3] as VBox).children[1] as TextField)
+                        val subtotalField = ((hBox.children[4] as VBox).children[1] as TextField)
+
+                        mapOf(
+                            "quantidade" to qtdField.text,
+                            "nome" to produtoField.text,
+                            "valorUnitario" to valorField.text.replace("R$ ", ""),
+                            "subtotal" to subtotalField.text.replace("R$ ", "")
+                        )
+                    }
+                    println("Products mapped for printing: ${produtos.size} items")
+
+
+                    printerController.imprimirPedido(
+                        numeroPedido = numeroGerado,
+                        clienteInfo = clienteInfo,
+                        produtos = produtos,
+                        pagamentoInfo = pagamentoInfo,
+                        entregaInfo = entregaInfo
+                    )
+
                     return true
                 } catch (e: Exception) {
                     connection.rollback()

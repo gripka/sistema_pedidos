@@ -38,7 +38,7 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
             style = "-fx-border-color: #212121; -fx-border-width: 0 1px 0 0;"
         }
 
-        val homeButton = createMenuButton("/icons/error.png", "Produtos") { onNavigate("produtos") }
+        val homeButton = createMenuButton("/icons/produtos.png", "Produtos") { onNavigate("produtos") }
         val newOrderButton = createMenuButton("/icons/novopedido.png", "Novo Pedido") { onNavigate("novoPedido") }
         val ordersButton = createMenuButton("/icons/pedidos.png", "Histórico de Pedidos") { onNavigate("historicoPedidos") }
         sectionsContainer.children.addAll(newOrderButton, ordersButton, homeButton)
