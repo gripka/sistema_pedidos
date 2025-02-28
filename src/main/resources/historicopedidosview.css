@@ -1,0 +1,591 @@
+/* General Style */
+.root {
+    -fx-font-family: system;
+    -fx-font-size: 14px;
+}
+
+/* Table View Styling */
+.table-view {
+    -fx-background-color: white;
+    -fx-table-cell-border-color: transparent;
+    -fx-border-color: rgb(223, 225, 230);
+    -fx-border-width: 2px;
+    -fx-border-radius: 3px;
+    -fx-padding: 0;
+    -fx-hbar-policy: as-needed;  /* Show horizontal scrollbar as needed */
+
+}
+
+/* Horizontal scrollbar specific styling */
+.table-view .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+    -fx-pref-height: 12px;
+}
+
+.table-view .scroll-bar:horizontal .track {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-background-radius: 0;
+}
+
+.table-view .scroll-bar:horizontal .thumb {
+    -fx-background-color: #dee2e6;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+}
+
+.table-view .scroll-bar:horizontal .thumb:hover {
+    -fx-background-color: #c5c9cc;
+}
+
+.table-view .scroll-bar:horizontal .thumb:pressed {
+    -fx-background-color: #adb5bd;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: #f8f9fa;
+    -fx-border-width: 0 0 2 0;
+    -fx-border-color: rgb(223, 225, 230);
+}
+
+.table-view .column-header, .table-view .filler {
+    -fx-size: 35px;
+    -fx-background-color: transparent;
+    -fx-border-width: 0 1 0 0;
+    -fx-border-color: rgb(223, 225, 230);
+}
+
+.table-view .column-header .label {
+    -fx-alignment: center-left;
+    -fx-font-weight: bold;
+    -fx-text-fill: #495057;
+    -fx-padding: 8px;
+}
+
+.table-row-cell {
+    -fx-cell-size: 40px;
+    -fx-background-color: white;
+    -fx-border-width: 0 0 1 0;
+    -fx-border-color: rgb(223, 225, 230);
+}
+
+.table-row-cell:odd {
+    -fx-background-color: rgb(250, 251, 252);
+}
+
+.table-row-cell:selected {
+    -fx-background-color: #e3edfb;
+    -fx-text-fill: #495057;
+}
+
+.table-cell {
+    -fx-alignment: center-left;
+    -fx-padding: 8px;
+    -fx-text-fill: #212529;
+}
+
+/* Status Cell Styling */
+.status-pendente {
+    -fx-background-color: #fff3cd;
+    -fx-text-fill: #856404;
+    -fx-padding: 5px;
+    -fx-background-radius: 3px;
+    -fx-font-weight: bold;
+}
+
+.status-pago {
+    -fx-background-color: #d4edda;
+    -fx-text-fill: #155724;
+    -fx-padding: 5px;
+    -fx-background-radius: 3px;
+    -fx-font-weight: bold;
+}
+
+.status-cancelado {
+    -fx-background-color: #f8d7da;
+    -fx-text-fill: #721c24;
+    -fx-padding: 5px;
+    -fx-background-radius: 3px;
+    -fx-font-weight: bold;
+}
+
+.status-finalizado {
+    -fx-background-color: #cce5ff;
+    -fx-text-fill: #004085;
+    -fx-padding: 5px;
+    -fx-background-radius: 3px;
+    -fx-font-weight: bold;
+}
+
+/* Filter Controls */
+.filter-container {
+    -fx-padding: 10px 0px;
+    -fx-spacing: 10px;
+    /* removed background-color, border-color, border-width, and border-radius */
+}
+
+.section-label {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #2B2D31;
+    -fx-padding: 0 0 10px 0;
+}
+
+.field-label {
+    -fx-font-size: 14px;
+    -fx-text-fill: #2B2D31;
+    -fx-min-height: 50px;
+    -fx-max-height: 50px;
+}
+
+.text-field {
+    -fx-background-color: rgb(250, 251, 252);
+    -fx-border-color: rgb(223, 225, 230);
+    -fx-text-fill: rgb(9, 30, 66);
+    -fx-cursor: text;
+    -fx-border-radius: 3px;
+    -fx-border-width: 2px;
+    -fx-border-style: solid;
+    -fx-box-sizing: border-box;
+    -fx-font-size: 14px;
+    -fx-transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+    -fx-line-height: 1.42857;
+    -fx-padding: 8px 6px;
+    -fx-pref-height: 36px;
+}
+
+.text-field:hover {
+    -fx-background-color: rgb(235, 236, 240);
+}
+
+.text-field:focused {
+    -fx-background-color: rgb(255, 255, 255);
+    -fx-border-color: rgb(76, 154, 255);
+}
+
+
+.combo-box {
+    -fx-background-color: rgb(250, 251, 252);
+    -fx-border-color: rgb(223, 225, 230);
+    -fx-border-width: 2px;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+    -fx-pref-height: 36px;
+}
+
+.combo-box:hover {
+    -fx-background-color: rgb(235, 236, 240);
+}
+
+.combo-box:focused {
+    -fx-background-color: rgb(255, 255, 255);
+    -fx-border-color: #6056e8;
+}
+
+/* Buttons */
+.action-button {
+    -fx-min-width: 130px;
+    -fx-pref-height: 40px;
+    -fx-text-fill: #FFFFFF;
+    -fx-padding: 5px 10px;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+    -fx-background-color: #495057;
+    -fx-border-color: #495057;
+    -fx-border-width: 2px;
+    -fx-border-radius: 5px;
+    -fx-background-radius: 5px;
+    -fx-background-insets: 0;
+}
+
+.action-button:hover {
+    -fx-background-color: #FFFFFF;
+    -fx-text-fill: #495057;
+}
+
+.action-button:pressed {
+    -fx-scale-x: 0.98;
+    -fx-scale-y: 0.98;
+}
+
+.primary-button,
+.secondary-button {
+    -fx-background-color: #4CAF50; /* Green background like salvar-pedido-button */
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 8px 16px;
+    -fx-background-radius: 4px;
+    -fx-cursor: hand;
+    -fx-border-width: 0;
+}
+
+.primary-button:hover,
+.secondary-button:hover {
+    -fx-background-color: #45a049; /* Slightly darker green on hover */
+}
+
+.primary-button:pressed,
+.secondary-button:pressed {
+    -fx-background-color: #3d8b40; /* Even darker when pressed */
+    -fx-translate-y: 1px;
+}
+
+/* Dialog styling */
+.dialog-pane {
+    -fx-background-color: #f8f9fa;
+    -fx-selection-bar: transparent;
+    -fx-selection-bar-non-focused: transparent;
+}
+
+.dialog-pane .header-panel {
+    -fx-background-color: #2B2D30;
+}
+
+.dialog-pane .header-panel .label {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: white;
+}
+
+.dialog-pane .content.label {
+    -fx-font-size: 14px;
+    -fx-text-fill: #2B2D31;
+}
+
+.dialog-pane .button {
+    -fx-background-color: #6056e8;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-border-radius: 5px;
+    -fx-background-radius: 5px;
+    -fx-cursor: hand;
+    -fx-padding: 8 16;
+    -fx-min-width: 100px;
+}
+
+.dialog-pane .button:hover {
+    -fx-background-color: #433a94;
+}
+
+.dialog-pane .button:pressed {
+    -fx-scale-x: 0.98;
+    -fx-scale-y: 0.98;
+}
+
+/* Alert styling */
+.alert {
+    -fx-background-color: white;
+    -fx-padding: 0;
+    -fx-border-color: #d3d3d3;
+    -fx-border-width: 1px;
+}
+
+.alert .dialog-pane {
+    -fx-background-color: white;
+    -fx-padding: 0;
+    -fx-border-color: #d3d3d3;
+    -fx-border-width: 1px;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+}
+
+/* Pagination Controls */
+.pagination {
+    -fx-page-information-visible: false;
+}
+
+.pagination .pagination-control .button {
+    -fx-background-color: white;
+    -fx-border-color: #dee2e6;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+}
+
+.pagination .pagination-control .button:hover {
+    -fx-background-color: #e9ecef;
+}
+
+.pagination .pagination-control .button:disabled {
+    -fx-opacity: 0.5;
+}
+
+.pagination .page {
+    -fx-background-color: white;
+}
+/* Button Styling */
+.button {
+    -fx-background-color: #6056e8;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-border-radius: 5px;
+    -fx-background-radius: 5px;
+    -fx-cursor: hand;
+    -fx-padding: 8px 16px;
+}
+
+.button:hover {
+    -fx-background-color: #433a94;
+}
+
+.button:pressed {
+    -fx-scale-x: 0.98;
+    -fx-scale-y: 0.98;
+}
+
+/* Secondary Button Styling */
+.button.secondary-button {
+    -fx-background-color: #e9ecef;
+    -fx-text-fill: #495057;
+    -fx-border-color: #ced4da;
+}
+
+.button.secondary-button:hover {
+    -fx-background-color: #dee2e6;
+}
+
+/* Small Button Styling */
+.button.small-button {
+    -fx-font-size: 12px;
+    -fx-padding: 5px 10px;
+    -fx-min-width: 70px;
+}
+
+/* Scrollbar Styling */
+.scroll-bar {
+    -fx-background-color: transparent;
+    -fx-pref-width: 12px;
+    -fx-pref-height: 12px;
+}
+
+.scroll-bar .track {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.scroll-bar .thumb {
+    -fx-background-color: #dee2e6;
+    -fx-background-radius: 6px;
+    -fx-border-radius: 6px;
+}
+
+.scroll-bar .thumb:hover {
+    -fx-background-color: #c5c9cc;
+}
+
+.scroll-bar .thumb:pressed {
+    -fx-background-color: #adb5bd;
+}
+
+.scroll-bar .increment-button,
+.scroll-bar .decrement-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 3px;
+}
+
+.scroll-bar .increment-arrow,
+.scroll-bar .decrement-arrow {
+    -fx-background-color: #6c757d;
+    -fx-shape: " ";
+    -fx-padding: 3px;
+}
+
+/* Date Picker Styling */
+.date-picker {
+    -fx-background-color: rgb(250, 251, 252);
+    -fx-border-color: rgb(223, 225, 230);
+    -fx-border-width: 2px;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+    -fx-pref-height: 36px;
+}
+
+.date-picker:hover {
+    -fx-background-color: rgb(235, 236, 240);
+}
+
+.date-picker:focused {
+    -fx-background-color: rgb(255, 255, 255);
+    -fx-border-color: #6056e8;
+}
+
+.date-picker > .text-field {
+    -fx-background-insets: 0;
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-pref-height: 36px;
+
+}
+
+.date-picker .arrow-button {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 0 3px 3px 0;
+    -fx-border-radius: 0 3px 3px 0;
+    -fx-padding: 4px 8px;
+    -fx-alignment: center;
+}
+
+.date-picker .arrow-button:hover {
+    -fx-background-color: #ffffff;
+}
+
+.date-picker .arrow-button .arrow {
+    -fx-background-color: #3d4247;
+    -fx-min-width: 16px;
+    -fx-min-height: 16px;
+    -fx-max-width: 16px;
+    -fx-max-height: 16px;
+}
+/* Calendar Styling Improvements */
+/* Estilo do calendário pop-up */
+.date-picker-popup {
+    -fx-background-color: white;
+    -fx-border-color: rgb(223, 225, 230);
+    -fx-border-width: 1px;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+}
+
+.date-picker-popup .month-year-pane {
+    -fx-background-color: white;
+    -fx-padding: 10px;
+}
+
+.date-picker-popup .month-year-pane .label {
+    -fx-text-fill: #495057;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.date-picker-popup .spinner .button {
+    -fx-background-color: transparent;
+    -fx-padding: 4px 8px;
+}
+
+.date-picker-popup .spinner .button:hover {
+    -fx-background-color: #cbe5ff;
+}
+
+.date-picker-popup .calendar-grid {
+    -fx-background-color: white;
+    -fx-padding: 5px;
+}
+
+.date-picker-popup .calendar-grid .day-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #495057;
+    -fx-font-size: 13px;
+    -fx-padding: 8px;
+    -fx-border-color: transparent;
+    -fx-background-radius: 3px;
+    -fx-border-radius: 3px;
+}
+
+.date-picker-popup .calendar-grid .day-cell:hover {
+    -fx-background-color: rgba(0, 119, 255, 0.06);
+    -fx-text-fill: #495057;
+}
+
+.date-picker-popup .calendar-grid .day-cell.selected {
+    -fx-background-color: #6056e8;
+    -fx-text-fill: white;
+}
+
+.date-picker-popup .calendar-grid .previous-month,
+.date-picker-popup .calendar-grid .next-month {
+    -fx-text-fill: #a0a5b1;
+}
+
+.date-picker-popup .calendar-grid .day-name-cell {
+    -fx-font-weight: bold;
+    -fx-text-fill: #495057;
+    -fx-font-size: 12px;
+    -fx-padding: 5px;
+}
+
+/* Common button styling */
+
+
+/* If you want to keep secondary buttons visually distinct */
+.secondary-button {
+    -fx-background-color: #757575; /* Different color for secondary buttons */
+}
+
+.secondary-button:hover {
+    -fx-background-color: #616161;
+}
+
+.secondary-button:pressed {
+    -fx-background-color: #424242;
+}
+
+/* Table Menu Button (column chooser) styling - flat design version */
+.table-view .column-header .show-hide-columns-button {
+    -fx-background-color: white;
+    -fx-background-radius: 3px;
+    -fx-border-color: #dee2e6;
+    -fx-border-width: 1px;
+    -fx-border-radius: 3px;
+    -fx-padding: 3px;
+    -fx-scale-x: 1.2;
+    -fx-scale-y: 1.2;
+    -fx-effect: none;
+}
+
+.table-view .column-header .show-hide-columns-button:hover {
+    -fx-background-color: #f8f9fa;
+    -fx-border-color: #c5c9cc;
+}
+
+/* Style for the plus icon - dark gray */
+.show-hide-column-image {
+    -fx-background-color: #495057;
+    -fx-padding: 0.25em;
+    -fx-opacity: 1.0;
+}
+
+.table-view .column-header .show-hide-columns-button:hover .show-hide-column-image {
+    -fx-background-color: #212529;
+}
+
+/* Menu styling */
+.context-menu {
+    -fx-background-color: white;
+    -fx-border-color: #dee2e6;
+    -fx-border-width: 1px;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+    -fx-padding: 5px;
+}
+
+.menu-item {
+    -fx-padding: 5px 10px;
+    -fx-background-radius: 3px;
+    -fx-border-radius: 3px;
+}
+
+.menu-item:focused {
+    -fx-background-color: #e3edfb;
+}
+
+.menu-item > .label {
+    -fx-text-fill: #212529;
+    -fx-font-size: 13px;
+}
+
+.menu-item:focused > .label {
+    -fx-text-fill: #212529;
+}
+
+.check-menu-item:checked > .left-container > .check {
+    -fx-background-color: #6056e8;
+    -fx-scale-x: 1.0;
+    -fx-scale-y: 1.0;
+}
+
+.check-menu-item > .left-container {
+    -fx-padding: 0.333em 0.5em 0.333em 0.5em; /* Adjust checkbox position */
+}
