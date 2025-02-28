@@ -257,6 +257,107 @@ class HistoricoPedidosController {
         }
     }
 
+
+
+    fun getCompleteOrderDetails(orderId: Long): Map<String, Any> {
+        val result = mutableMapOf<String, Any>()
+
+        DatabaseHelper().getConnection().use { conn ->
+            // Fetch basic order info
+            conn.prepareStatement("""
+            SELECT p.*, strftime('%d/%m/%Y', p.data_pedido) as data_formatada
+            FROM pedidos p 
+            WHERE p.id = ?
+        """).use { stmt ->
+                stmt.setLong(1, orderId)
+                val rs = stmt.executeQuery()
+                if (rs.next()) {
+                    result["id"] = rs.getLong("id")
+                    result["numero"] = rs.getString("numero")
+                    result["data_pedido"] = rs.getString("data_formatada")
+                    result["status"] = rs.getString("status")
+
+                    // Client info
+                    val clienteInfo = mutableListOf(
+                        Pair("Telefone", rs.getString("telefone_contato") ?: ""),
+                        Pair("Observação", rs.getString("observacao") ?: "")
+                    )
+                    result["cliente"] = clienteInfo
+
+                    // Payment info
+                    val pagamentoInfo = mutableListOf(
+                        Pair("Forma de Pagamento", rs.getString("forma_pagamento") ?: ""),
+                        Pair("Status", rs.getString("status") ?: ""),
+                        Pair("Valor Total", "R$ ${String.format("%.2f", rs.getDouble("valor_total")).replace(".", ",")}"),
+                        Pair("Desconto", "R$ ${String.format("%.2f", rs.getDouble("valor_desconto")).replace(".", ",")}")
+                    )
+
+                    // Add troco info if payment is "Dinheiro"
+                    if (rs.getString("forma_pagamento") == "Dinheiro" && rs.getDouble("valor_troco_para") > 0) {
+                        pagamentoInfo.add(Pair("Troco Para", "R$ ${String.format("%.2f", rs.getDouble("valor_troco_para")).replace(".", ",")}"))
+                        pagamentoInfo.add(Pair("Troco", "R$ ${String.format("%.2f", rs.getDouble("valor_troco")).replace(".", ",")}"))
+                    }
+
+                    // Add retirada info if not "Entrega"
+                    if (rs.getString("data_retirada") != "Entrega") {
+                        pagamentoInfo.add(Pair("Data de Retirada", rs.getString("data_retirada") ?: ""))
+                        pagamentoInfo.add(Pair("Hora de Retirada", rs.getString("hora_retirada") ?: ""))
+                    }
+
+                    result["pagamento"] = pagamentoInfo
+                }
+            }
+
+            // Fetch product items
+            val produtos = mutableListOf<Pair<String, String>>()
+            conn.prepareStatement("""
+            SELECT * FROM itens_pedido WHERE pedido_id = ? ORDER BY id
+        """).use { stmt ->
+                stmt.setLong(1, orderId)
+                val rs = stmt.executeQuery()
+                while (rs.next()) {
+                    val quantidade = rs.getInt("quantidade")
+                    val nomeProduto = rs.getString("nome_produto")
+                    val valorUnitario = String.format("%.2f", rs.getDouble("valor_unitario")).replace(".", ",")
+                    val subtotal = String.format("%.2f", rs.getDouble("subtotal")).replace(".", ",")
+
+                    produtos.add(Pair(
+                        "Item ${produtos.size + 1}",
+                        "${quantidade}x $nomeProduto (R$ $valorUnitario) = R$ $subtotal"
+                    ))
+                }
+            }
+            result["produtos"] = produtos
+
+            // Check if has delivery
+            val entregaInfo = mutableListOf<Pair<String, String>>()
+            conn.prepareStatement("""
+            SELECT * FROM entregas WHERE pedido_id = ?
+        """).use { stmt ->
+                stmt.setLong(1, orderId)
+                val rs = stmt.executeQuery()
+                if (rs.next()) {
+                    entregaInfo.add(Pair("Entrega", "Sim"))
+                    entregaInfo.add(Pair("Nome", rs.getString("nome_destinatario") ?: ""))
+                    entregaInfo.add(Pair("Telefone", rs.getString("telefone_destinatario") ?: ""))
+                    entregaInfo.add(Pair("Endereço", rs.getString("endereco") ?: ""))
+                    entregaInfo.add(Pair("Referência", rs.getString("referencia") ?: ""))
+                    entregaInfo.add(Pair("Cidade", rs.getString("cidade") ?: ""))
+                    entregaInfo.add(Pair("Bairro", rs.getString("bairro") ?: ""))
+                    entregaInfo.add(Pair("CEP", rs.getString("cep") ?: ""))
+                    entregaInfo.add(Pair("Valor", "R$ ${String.format("%.2f", rs.getDouble("valor_entrega")).replace(".", ",")}"))
+                    entregaInfo.add(Pair("Data", rs.getString("data_entrega") ?: ""))
+                    entregaInfo.add(Pair("Hora", rs.getString("hora_entrega") ?: ""))
+                } else {
+                    entregaInfo.add(Pair("Entrega", "Não"))
+                }
+            }
+            result["entrega"] = entregaInfo
+        }
+
+        return result
+    }
+
     private fun criarSecaoDetalhesPedido(
         pedido: Map<String, Any>,
         detalhes: Map<String, Any>

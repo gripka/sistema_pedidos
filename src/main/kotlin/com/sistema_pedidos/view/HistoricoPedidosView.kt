@@ -7,6 +7,7 @@ import javafx.geometry.Pos
 import javafx.scene.control.*
 import javafx.scene.layout.*
 import javafx.scene.paint.Color
+import javafx.stage.StageStyle
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -134,7 +135,114 @@ class HistoricoPedidosView : VBox(10.0) {
         }
     }
 
+    private fun showOrderDetailsDialog(pedido: Map<String, Any>) {
+        // Fetch complete order data
+        val orderDetails = controller.getCompleteOrderDetails(pedido["id"] as Long)
 
+        // Create content sections
+        val content = VBox(10.0).apply {
+            padding = Insets(20.0)
+            prefWidth = 500.0
+            style = """
+            -fx-background-color: white;
+            -fx-background-radius: 0;
+        """
+
+            // Add order header with number and date
+            children.add(
+                HBox(10.0).apply {
+                    alignment = Pos.CENTER
+                    children.addAll(
+                        Label("PEDIDO ${orderDetails["numero"]}").apply {
+                            style = "-fx-font-size: 16px; -fx-font-weight: bold;"
+                        },
+                        Label("Data: ${orderDetails["data_pedido"]}").apply {
+                            style = "-fx-font-size: 14px;"
+                        }
+                    )
+                }
+            )
+
+            children.addAll(
+                createDetailsSection("Cliente", orderDetails["cliente"] as List<Pair<String, String>>),
+                createDetailsSection("Produtos", orderDetails["produtos"] as List<Pair<String, String>>),
+                createDetailsSection("Pagamento", orderDetails["pagamento"] as List<Pair<String, String>>)
+            )
+
+            // Show entrega details only if there is delivery
+            val entregaDetails = orderDetails["entrega"] as List<Pair<String, String>>
+            if (entregaDetails.isNotEmpty() && entregaDetails.first().second != "Não") {
+                children.add(createDetailsSection("Entrega", entregaDetails))
+            }
+        }
+
+        val dialog = Dialog<ButtonType>().apply {
+            initStyle(StageStyle.UNDECORATED)
+            title = "Detalhes do Pedido"
+            headerText = "Detalhes do Pedido ${orderDetails["numero"]}"
+
+            dialogPane.content = ScrollPane(content).apply {
+                isFitToWidth = true
+                prefViewportHeight = 400.0
+                vbarPolicy = ScrollPane.ScrollBarPolicy.AS_NEEDED
+                style = "-fx-background: white; -fx-background-color: white;"
+            }
+
+            dialogPane.buttonTypes.add(ButtonType.CLOSE)
+            dialogPane.lookupButton(ButtonType.CLOSE).style = "-fx-pref-width: 100px;"
+
+            (dialogPane.lookup(".button-bar") as ButtonBar).buttonOrder = "C:0"
+
+            dialogPane.stylesheets.addAll(this@HistoricoPedidosView.stylesheets)
+            dialogPane.style = """
+            -fx-background-color: white;
+            -fx-border-color: #D3D3D3;
+            -fx-border-width: 1px;
+            -fx-focus-color: transparent;
+            -fx-faint-focus-color: transparent;
+        """
+
+            // Set additional styles to remove blue focus border
+            dialogPane.lookup(".content").style = "-fx-background-color: white;"
+            dialogPane.lookup(".button-bar").style = "-fx-background-color: white;"
+
+            // Add a style for the header panel to maintain gray color
+            dialogPane.lookup(".header-panel").style = """
+            -fx-background-color: #2B2D30;
+            -fx-background-radius: 0;
+        """
+        }
+
+        dialog.showAndWait()
+    }
+
+    private fun createDetailsSection(title: String, items: List<Pair<String, String>>): VBox {
+        return VBox(5.0).apply {
+            children.add(Label(title).apply {
+                styleClass.add("section-label")
+            })
+
+            items.forEach { (label, value) ->
+                children.add(
+                    HBox(10.0).apply {
+                        children.addAll(
+                            Label("$label:").apply {
+                                styleClass.add("field-label")
+                                prefWidth = 150.0
+                            },
+                            Label(value).apply {
+                                styleClass.add("field-label")
+                            }
+                        )
+                    }
+                )
+            }
+
+            children.add(Separator().apply {
+                padding = Insets(10.0, 0.0, 10.0, 0.0)
+            })
+        }
+    }
 
     private fun setupTableView() {
         VBox.setVgrow(tableView, Priority.ALWAYS)
@@ -203,9 +311,10 @@ class HistoricoPedidosView : VBox(10.0) {
                     prefWidth = 70.0
                     setOnAction {
                         val pedido = tableView.items[index]
-                        controller.mostrarDetalhesPedido(pedido)
+                        showOrderDetailsDialog(pedido)
                     }
                 }
+
 
                 private val printButton = Button("Imprimir").apply {
                     styleClass.add("small-button")

@@ -134,8 +134,6 @@
 .field-label {
     -fx-font-size: 14px;
     -fx-text-fill: #2B2D31;
-    -fx-min-height: 50px;
-    -fx-max-height: 50px;
 }
 
 .text-field {
