@@ -43,3 +43,9 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+### SQLite Database Files ###
+*.db
+*.sqlite
+*.sqlite3
+pedidos.db
