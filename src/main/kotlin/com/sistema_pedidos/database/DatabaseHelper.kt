@@ -3,8 +3,16 @@ package com.sistema_pedidos.database
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
+import java.util.*
 
 class DatabaseHelper {
+    companion object {
+        init {
+            TimeZone.setDefault(TimeZone.getTimeZone("America/Sao_Paulo"))
+            System.setProperty("user.timezone", "America/Sao_Paulo")
+        }
+    }
+
     private val dbPath = "jdbc:sqlite:pedidos.db"
     private var connection: Connection? = null
 
@@ -41,8 +49,8 @@ class DatabaseHelper {
                 estoque_minimo INTEGER DEFAULT 0,
                 estoque_atual INTEGER DEFAULT 0,
                 status TEXT CHECK (status IN ('Ativo', 'Inativo')) DEFAULT 'Ativo',
-                data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            data_cadastro TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+            data_atualizacao TIMESTAMP DEFAULT (datetime('now', 'localtime'))
             )""",
 
             """CREATE TABLE IF NOT EXISTS pedidos (
@@ -50,7 +58,7 @@ class DatabaseHelper {
                 numero TEXT UNIQUE NOT NULL,
                 cliente_id INTEGER NULL,
                 telefone_contato TEXT NOT NULL,
-                data_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                data_pedido TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                 observacao TEXT,
                 status TEXT CHECK (status IN ('Pendente', 'Pago', 'Cancelado')) DEFAULT 'Pendente',
                 valor_total DECIMAL(10,2) DEFAULT 0.00,
@@ -116,7 +124,7 @@ class DatabaseHelper {
                 AFTER UPDATE ON produtos
                 BEGIN
                     UPDATE produtos
-                    SET data_atualizacao = CURRENT_TIMESTAMP
+                    SET data_atualizacao = datetime('now', 'localtime')
                     WHERE id = NEW.id;
                 END
             """,
