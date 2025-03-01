@@ -549,12 +549,66 @@ class HistoricoPedidosView : VBox(10.0) {
             val exportButton = Button("Exportar").apply {
                 styleClass.add("secondary-button")
                 setOnAction {
-                    controller.exportarPedidos(
-                        dataInicial.value,
-                        dataFinal.value,
-                        searchField.text,
-                        statusComboBox.selectionModel.selectedItem
-                    )
+                    // Get the selected items in the table
+                    val selectedPedido = tableView.selectionModel.selectedItem
+
+                    if (selectedPedido == null) {
+                        // No order selected, show alert to user
+                        Alert(Alert.AlertType.INFORMATION).apply {
+                            title = "Informação"
+                            headerText = null
+                            contentText = "Selecione um pedido para exportar como PDF"
+                            showAndWait()
+                        }
+                    } else {
+                        // Fetch complete order details
+                        val orderId = selectedPedido["id"] as Long
+                        val orderDetails = controller.getCompleteOrderDetails(orderId)
+
+                        // Create a PDF export controller/service
+                        try {
+                            // Create a file chooser dialog for saving the PDF
+                            val fileChooser = javafx.stage.FileChooser().apply {
+                                title = "Salvar PDF"
+                                extensionFilters.add(
+                                    javafx.stage.FileChooser.ExtensionFilter("PDF Files", "*.pdf")
+                                )
+                                initialFileName = "Pedido_${orderDetails["numero"]}.pdf"
+                            }
+
+                            // Show save dialog
+                            val file = fileChooser.showSaveDialog(scene.window)
+
+                            if (file != null) {
+                                // Export order to PDF
+                                val success = controller.exportarPedidoParaPDF(orderDetails, file.absolutePath)
+
+                                if (success) {
+                                    Alert(Alert.AlertType.INFORMATION).apply {
+                                        title = "Sucesso"
+                                        headerText = null
+                                        contentText = "Pedido exportado com sucesso para: ${file.absolutePath}"
+                                        showAndWait()
+                                    }
+                                } else {
+                                    Alert(Alert.AlertType.ERROR).apply {
+                                        title = "Erro"
+                                        headerText = null
+                                        contentText = "Erro ao exportar o pedido para PDF"
+                                        showAndWait()
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            Alert(Alert.AlertType.ERROR).apply {
+                                title = "Erro"
+                                headerText = null
+                                contentText = "Erro ao exportar o pedido: ${e.message}"
+                                showAndWait()
+                            }
+                        }
+                    }
                 }
             }
 

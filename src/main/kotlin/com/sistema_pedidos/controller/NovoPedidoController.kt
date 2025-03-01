@@ -684,10 +684,18 @@ class NovoPedidoController {
 
             val valorTotal = parseMoneyValue(pagamentoInfo.find { it.first == "Total do Pedido" }?.second ?: "0,00")
 
-            val descontoInfo = pagamentoInfo.find { it.first.startsWith("Desconto") }
-            val valorDesconto = parseMoneyValue(descontoInfo?.second ?: "0,00")
-            val tipoDesconto = if (descontoInfo?.first?.contains("Percentual") == true) "percentual" else "valor"
-
+            // Improved discount detection - search with more flexible criteria
+            val valorDescontoStr = descontoField.text
+            val valorDesconto = if (descontoToggleGroup.selectedToggle.toString().contains("percentual")) {
+                // Handle percentage discount
+                val percentual = valorDescontoStr.replace(",", ".").toDoubleOrNull() ?: 0.0
+                (valorTotal * percentual / 100)
+            } else {
+                // Handle flat discount value
+                parseMoneyValue(valorDescontoStr)
+            }
+            val tipoDesconto = if (descontoToggleGroup.selectedToggle.toString().contains("percentual"))
+                "percentual" else "valor"
             val formaPagamento = pagamentoInfo.find { it.first == "Forma de Pagamento" }?.second
             val valorTrocoPara = parseMoneyValue(trocoParaField.text)
             val valorTroco = parseMoneyValue(trocoCalculadoLabel.text)

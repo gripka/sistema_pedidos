@@ -12,6 +12,20 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+import com.itextpdf.kernel.colors.ColorConstants
+import com.itextpdf.kernel.pdf.PdfDocument
+import com.itextpdf.kernel.pdf.PdfWriter
+import com.itextpdf.kernel.pdf.canvas.draw.SolidLine
+import com.itextpdf.layout.Document
+import com.itextpdf.layout.element.Cell
+import com.itextpdf.layout.element.LineSeparator
+import com.itextpdf.layout.element.Paragraph
+import com.itextpdf.layout.element.Table
+import com.itextpdf.layout.properties.HorizontalAlignment
+import com.itextpdf.layout.properties.TextAlignment
+import com.itextpdf.layout.properties.UnitValue
+
+
 class HistoricoPedidosController {
     private val database = DatabaseHelper()
     private val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
@@ -276,7 +290,212 @@ class HistoricoPedidosController {
         }
     }
 
+    fun exportarPedidoParaPDF(orderDetails: Map<String, Any>, filePath: String): Boolean {
+        try {
+            // Create PDF document with margins
+            val writer = PdfWriter(filePath)
+            val pdf = PdfDocument(writer)
+            val document = Document(pdf)
+            document.setMargins(36f, 36f, 36f, 36f)
 
+            // Add title
+            val title = Paragraph("PEDIDO ${orderDetails["numero"]}")
+            title.setFontSize(14f)
+            title.setBold()
+            title.setTextAlignment(TextAlignment.CENTER)
+            document.add(title)
+
+            // Add date
+            val date = Paragraph("Data: ${orderDetails["data_pedido"]}")
+            date.setFontSize(10f)
+            date.setTextAlignment(TextAlignment.CENTER)
+            document.add(date)
+
+            val solidLine = SolidLine(1f)
+            val lineSeparator = LineSeparator(solidLine)
+            lineSeparator.setMarginTop(10f)
+            lineSeparator.setMarginBottom(10f)
+            document.add(lineSeparator)
+
+            // Add customer details
+            addSectionToPDF(document, "Cliente", orderDetails["cliente"] as List<Pair<String, String>>)
+
+            // Add products as table
+            addProductsTable(document, orderDetails["produtos"] as List<Pair<String, String>>)
+
+            // Add payment info
+            addSectionToPDF(document, "Pagamento", orderDetails["pagamento"] as List<Pair<String, String>>)
+
+            // Add delivery info if available
+            val entregaDetails = orderDetails["entrega"] as List<Pair<String, String>>
+            if (entregaDetails.isNotEmpty() && entregaDetails.first().second != "Não") {
+                addSectionToPDF(document, "Entrega", entregaDetails)
+            }
+
+            // Add footer
+            val footer = Paragraph("Documento gerado em: ${java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))}")
+            footer.setFontSize(8f)
+            footer.setItalic()
+            footer.setTextAlignment(TextAlignment.CENTER)
+            footer.setMarginTop(20f)
+            document.add(footer)
+
+            // Close document
+            document.close()
+            return true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
+    }
+
+    private fun addSectionToPDF(document: Document, title: String, items: List<Pair<String, String>>) {
+        // Add section title
+        val sectionTitle = Paragraph(title)
+        sectionTitle.setFontSize(12f)
+        sectionTitle.setBold()
+        sectionTitle.setMarginTop(10f)
+        document.add(sectionTitle)
+
+// Add separator
+        val solidLine = SolidLine(1f)
+        val lineSeparator = LineSeparator(solidLine)
+        lineSeparator.setMarginTop(10f)
+        lineSeparator.setMarginBottom(10f)
+        document.add(lineSeparator)
+
+        // Create a 2-column table for label:value pairs
+        val columnWidths = floatArrayOf(30f, 70f)
+        val table = Table(UnitValue.createPercentArray(columnWidths))
+        table.setWidth(UnitValue.createPercentValue(100f))
+
+        // Add items as table rows
+        items.forEach { (label, value) ->
+            val labelCell = Cell()
+            val labelParagraph = Paragraph(label)
+            labelParagraph.setFontSize(9f)
+            labelParagraph.setBold()
+            labelCell.add(labelParagraph)
+            table.addCell(labelCell)
+
+            val valueCell = Cell()
+            val valueParagraph = Paragraph(value)
+            valueParagraph.setFontSize(9f)
+            valueCell.add(valueParagraph)
+            table.addCell(valueCell)
+        }
+
+        document.add(table)
+        document.add(Paragraph("\n").setFontSize(5f))
+    }
+
+    private fun addProductsTable(document: Document, products: List<Pair<String, String>>) {
+        // Add section title
+        val sectionTitle = Paragraph("Produtos")
+        sectionTitle.setFontSize(12f)
+        sectionTitle.setBold()
+        sectionTitle.setMarginTop(10f)
+        document.add(sectionTitle)
+
+        // Add a subtle line under the section title
+        val solidLine = SolidLine(0.5f)
+        val lineSeparator = LineSeparator(solidLine)
+        lineSeparator.setMarginBottom(5f)
+        lineSeparator.setWidth(UnitValue.createPercentValue(100f))
+        document.add(lineSeparator)
+
+        // Create table for products - updated column widths for 5 columns
+        val columnWidths = floatArrayOf(12f, 36f, 12f, 20f, 20f)
+        val table = Table(UnitValue.createPercentArray(columnWidths))
+        table.setWidth(UnitValue.createPercentValue(100f))
+
+        // Add header
+        val headerCell1 = Cell()
+        val headerParagraph1 = Paragraph("Código")
+        headerParagraph1.setFontSize(9f)
+        headerParagraph1.setBold()
+        headerCell1.add(headerParagraph1)
+        table.addCell(headerCell1)
+
+        val headerCell2 = Cell()
+        val headerParagraph2 = Paragraph("Produto")
+        headerParagraph2.setFontSize(9f)
+        headerParagraph2.setBold()
+        headerCell2.add(headerParagraph2)
+        table.addCell(headerCell2)
+
+        val headerCell3 = Cell()
+        val headerParagraph3 = Paragraph("Qtd")
+        headerParagraph3.setFontSize(9f)
+        headerParagraph3.setBold()
+        headerCell3.add(headerParagraph3)
+        table.addCell(headerCell3)
+
+        val headerCell4 = Cell()
+        val headerParagraph4 = Paragraph("Unitário")
+        headerParagraph4.setFontSize(9f)
+        headerParagraph4.setBold()
+        headerCell4.add(headerParagraph4)
+        table.addCell(headerCell4)
+
+        val headerCell5 = Cell()
+        val headerParagraph5 = Paragraph("Subtotal")
+        headerParagraph5.setFontSize(9f)
+        headerParagraph5.setBold()
+        headerCell5.add(headerParagraph5)
+        table.addCell(headerCell5)
+
+        // Process the raw product data into columns
+        var codigo = ""
+        var nome = ""
+        var quantidade = ""
+        var unitario = ""
+        var subtotal = ""
+
+        // Updated to process in groups of 5
+        for (i in products.indices step 5) {
+            if (i+4 < products.size) {
+                codigo = products[i].second
+                nome = products[i+1].second
+                quantidade = products[i+2].second
+                unitario = products[i+3].second
+                subtotal = products[i+4].second
+
+                val cell1 = Cell()
+                val para1 = Paragraph(codigo)
+                para1.setFontSize(9f)
+                cell1.add(para1)
+                table.addCell(cell1)
+
+                val cell2 = Cell()
+                val para2 = Paragraph(nome)
+                para2.setFontSize(9f)
+                cell2.add(para2)
+                table.addCell(cell2)
+
+                val cell3 = Cell()
+                val para3 = Paragraph(quantidade)
+                para3.setFontSize(9f)
+                cell3.add(para3)
+                table.addCell(cell3)
+
+                val cell4 = Cell()
+                val para4 = Paragraph(unitario)
+                para4.setFontSize(9f)
+                cell4.add(para4)
+                table.addCell(cell4)
+
+                val cell5 = Cell()
+                val para5 = Paragraph(subtotal)
+                para5.setFontSize(9f)
+                cell5.add(para5)
+                table.addCell(cell5)
+            }
+        }
+
+        document.add(table)
+        document.add(Paragraph("\n").setFontSize(5f))
+    }
 
     fun getCompleteOrderDetails(orderId: Long): Map<String, Any> {
         val result = mutableMapOf<String, Any>()
@@ -284,10 +503,12 @@ class HistoricoPedidosController {
         DatabaseHelper().getConnection().use { conn ->
             // Fetch basic order info
             conn.prepareStatement("""
-            SELECT p.*, strftime('%d/%m/%Y', p.data_pedido) as data_formatada
-            FROM pedidos p 
-            WHERE p.id = ?
-        """).use { stmt ->
+    SELECT p.*, strftime('%d/%m/%Y', p.data_pedido) as data_formatada,
+           c.nome, c.sobrenome
+    FROM pedidos p
+    LEFT JOIN clientes c ON p.cliente_id = c.id
+    WHERE p.id = ?
+""").use { stmt ->
                 stmt.setLong(1, orderId)
                 val rs = stmt.executeQuery()
                 if (rs.next()) {
@@ -296,8 +517,11 @@ class HistoricoPedidosController {
                     result["data_pedido"] = rs.getString("data_formatada")
                     result["status"] = rs.getString("status")
 
-                    // Client info
+                    // Client info with name and last name
+                    val nome = rs.getString("nome") ?: ""
+                    val sobrenome = rs.getString("sobrenome") ?: ""
                     val clienteInfo = mutableListOf(
+                        Pair("Nome", "$nome $sobrenome".trim()),
                         Pair("Telefone", rs.getString("telefone_contato") ?: ""),
                         Pair("Observação", rs.getString("observacao") ?: "")
                     )
@@ -328,22 +552,31 @@ class HistoricoPedidosController {
             }
 
             // Fetch product items
+// Fetch product items
             val produtos = mutableListOf<Pair<String, String>>()
             conn.prepareStatement("""
-            SELECT * FROM itens_pedido WHERE pedido_id = ? ORDER BY id
-        """).use { stmt ->
+    SELECT ip.*, p.codigo as produto_codigo
+    FROM itens_pedido ip
+    LEFT JOIN produtos p ON p.id = ip.produto_id
+    WHERE ip.pedido_id = ?
+    ORDER BY ip.id
+""").use { stmt ->
                 stmt.setLong(1, orderId)
                 val rs = stmt.executeQuery()
                 while (rs.next()) {
-                    val quantidade = rs.getInt("quantidade")
+                    // Get product code (use item ID if code is null)
+                    val codigo = rs.getString("produto_codigo") ?: rs.getString("id") ?: "N/A"
                     val nomeProduto = rs.getString("nome_produto")
-                    val valorUnitario = String.format("%.2f", rs.getDouble("valor_unitario")).replace(".", ",")
-                    val subtotal = String.format("%.2f", rs.getDouble("subtotal")).replace(".", ",")
+                    val quantidade = rs.getInt("quantidade").toString()
+                    val valorUnitario = "R$ " + String.format("%.2f", rs.getDouble("valor_unitario")).replace(".", ",")
+                    val subtotal = "R$ " + String.format("%.2f", rs.getDouble("subtotal")).replace(".", ",")
 
-                    produtos.add(Pair(
-                        "Item ${produtos.size + 1}",
-                        "${quantidade}x $nomeProduto (R$ $valorUnitario) = R$ $subtotal"
-                    ))
+                    // Add each product's data as 5 consecutive pairs
+                    produtos.add(Pair("Codigo", codigo))
+                    produtos.add(Pair("Nome", nomeProduto))
+                    produtos.add(Pair("Quantidade", quantidade))
+                    produtos.add(Pair("Unitário", valorUnitario))
+                    produtos.add(Pair("Subtotal", subtotal))
                 }
             }
             result["produtos"] = produtos

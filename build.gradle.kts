@@ -16,6 +16,7 @@ dependencies {
     implementation("org.slf4j:slf4j-simple:1.7.36")
     implementation("com.jfoenix:jfoenix:9.0.10")
     implementation("com.github.anastaciocintra:escpos-coffee:4.1.0")
+    implementation("com.itextpdf:itext7-core:7.2.3")
 }
 
 application {
