@@ -25,7 +25,7 @@ class HistoricoPedidosController {
     ): List<Map<String, Any>> {
         val queryParts = mutableListOf(
             """
-        SELECT p.id, p.numero, p.data_pedido, p.telefone_contato, p.status, 
+        SELECT p.id, p.numero, p.data_pedido, p.telefone_contato, p.status, p.status_pedido,
                p.valor_total, p.data_retirada, p.hora_retirada, 
                c.nome, c.sobrenome,
                e.endereco, e.bairro, e.cidade, e.data_entrega, e.hora_entrega
@@ -122,6 +122,7 @@ class HistoricoPedidosController {
                             "produtos" to produtos,
                             "valor_total" to valorTotal,
                             "status" to rs.getString("status"),
+                            "status_pedido" to rs.getString("status_pedido"),
                             "retirada" to retiradaTexto
                         )
 
@@ -132,6 +133,24 @@ class HistoricoPedidosController {
         }
 
         return resultados
+    }
+
+    fun atualizarStatusPagamentoPedido(pedidoId: Long, novoStatus: String): Boolean {
+        try {
+            DatabaseHelper().getConnection().use { connection ->
+                connection.prepareStatement(
+                    "UPDATE pedidos SET status = ? WHERE id = ?"
+                ).use { statement ->
+                    statement.setString(1, novoStatus)
+                    statement.setLong(2, pedidoId)
+                    statement.executeUpdate()
+                }
+            }
+            return true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
     }
 
     private fun formatarDataHoraRetirada(data: String, hora: String): String {
@@ -411,6 +430,24 @@ class HistoricoPedidosController {
         }
 
         return itens
+    }
+
+    fun atualizarStatusPedido(pedidoId: Long, novoStatus: String): Boolean {
+        try {
+            DatabaseHelper().getConnection().use { connection ->
+                connection.prepareStatement(
+                    "UPDATE pedidos SET status_pedido = ? WHERE id = ?"
+                ).use { statement ->
+                    statement.setString(1, novoStatus)
+                    statement.setLong(2, pedidoId)
+                    statement.executeUpdate()
+                }
+            }
+            return true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
     }
 
     fun imprimirPedido(pedido: Map<String, Any>) {

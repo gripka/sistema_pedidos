@@ -268,12 +268,39 @@ class HistoricoPedidosView : VBox(10.0) {
 
         val produtosCol = TableColumn<Map<String, Any>, String>("Produtos")
         produtosCol.setCellValueFactory { data -> javafx.beans.property.SimpleStringProperty(data.value["produtos"] as? String ?: "") }
-        produtosCol.prefWidth = 200.0
+        produtosCol.prefWidth = 300.0
 
         val totalCol = TableColumn<Map<String, Any>, String>("Total")
         totalCol.setCellValueFactory { data -> javafx.beans.property.SimpleStringProperty(data.value["valor_total"] as String) }
         totalCol.style = "-fx-alignment: CENTER-RIGHT;"
         totalCol.prefWidth = 100.0
+
+        val statusPedidoCol = TableColumn<Map<String, Any>, String>("Status do pedido")
+        statusPedidoCol.setCellValueFactory { data ->
+            javafx.beans.property.SimpleStringProperty(data.value["status_pedido"] as? String ?: "Pendente")
+        }
+        statusPedidoCol.prefWidth = 140.0
+        statusPedidoCol.setCellFactory { column ->
+            object : TableCell<Map<String, Any>, String>() {
+                override fun updateItem(item: String?, empty: Boolean) {
+                    super.updateItem(item, empty)
+                    if (empty || item == null) {
+                        text = null
+                        style = ""
+                    } else {
+                        text = item
+                        style = when (item) {
+                            "Pendente" -> "-fx-text-fill: orange; -fx-font-weight: bold;"
+                            "Concluido" -> "-fx-text-fill: green; -fx-font-weight: bold;"
+                            "Preparando" -> "-fx-text-fill: blue; -fx-font-weight: bold;"
+                            "Em Entrega" -> "-fx-text-fill: purple; -fx-font-weight: bold;"
+                            "Cancelado" -> "-fx-text-fill: red; -fx-font-weight: bold;"
+                            else -> ""
+                        }
+                    }
+                }
+            }
+        }
 
         val statusCol = TableColumn<Map<String, Any>, String>("Pagamento")
         statusCol.setCellValueFactory { data -> javafx.beans.property.SimpleStringProperty(data.value["status"] as String) }
@@ -303,7 +330,7 @@ class HistoricoPedidosView : VBox(10.0) {
         retiradaCol.prefWidth = 200.0
 
         val acoesCol = TableColumn<Map<String, Any>, Void>("Ações")
-        acoesCol.prefWidth = 180.0
+        acoesCol.prefWidth = 420.0  // Aumentei para acomodar o novo botão
         acoesCol.setCellFactory {
             object : TableCell<Map<String, Any>, Void>() {
                 private val viewButton = Button("Ver").apply {
@@ -315,32 +342,195 @@ class HistoricoPedidosView : VBox(10.0) {
                     }
                 }
 
+                // Instead of setting inline styles on buttons, apply CSS classes
+                private val pagamentoButton = Button("Pagamento").apply {
+                    styleClass.add("small-button")
+                    prefWidth = 100.0
+
+                    setOnAction {
+                        val pedido = tableView.items[index]
+                        val pedidoId = pedido["id"] as Long
+                        val currentStatus = pedido["status"] as String
+
+                        val dialog = Dialog<String>()
+                        dialog.title = "Atualizar Status de Pagamento"
+                        dialog.headerText = "Selecione o novo status de pagamento"
+                        dialog.initStyle(StageStyle.UNDECORATED)
+
+                        val buttonTypeOk = ButtonType("Confirmar", ButtonBar.ButtonData.OK_DONE)
+                        val buttonTypeCancel = ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE)
+                        dialog.dialogPane.buttonTypes.addAll(buttonTypeOk, buttonTypeCancel)
+
+                        // Apply styles directly to the button bar
+                        val buttonBar = dialog.dialogPane.lookup(".button-bar") as ButtonBar
+                        buttonBar.apply {
+                            buttonOrder = ""
+                            buttonMinWidth = 100.0
+                            alignment = Pos.CENTER
+                            styleClass.add("dialog-button-bar")
+                            stylesheets.addAll(this@HistoricoPedidosView.stylesheets) // Ensure CSS is applied
+                        }
+
+                        val statusOptions = listOf("Pendente", "Pago", "Cancelado")
+                        val comboBox = ComboBox<String>().apply {
+                            items.addAll(statusOptions)
+                            value = currentStatus
+                            prefHeight = 36.0
+                            prefWidth = 200.0
+                        }
+
+                        val content = VBox(10.0).apply {
+                            padding = Insets(20.0)
+                            spacing = 10.0
+                            prefWidth = 400.0
+                            styleClass.add("dialog-content")
+                            children.addAll(
+                                Label("Novo status de pagamento:").apply {
+                                    styleClass.add("field-label")
+                                },
+                                comboBox
+                            )
+                        }
+
+                        dialog.dialogPane.stylesheets.addAll(this@HistoricoPedidosView.stylesheets)
+                        dialog.dialogPane.content = content
+                        dialog.dialogPane.styleClass.add("custom-dialog")
+
+                        dialog.setResultConverter { buttonType ->
+                            if (buttonType == buttonTypeOk) comboBox.value else null
+                        }
+
+                        val result = dialog.showAndWait()
+
+                        result.ifPresent { novoStatus ->
+                            if (controller.atualizarStatusPagamentoPedido(pedidoId, novoStatus)) {
+                                (pedido as MutableMap<String, Any>)["status"] = novoStatus
+                                tableView.refresh()
+                            } else {
+                                Alert(Alert.AlertType.ERROR).apply {
+                                    title = "Erro"
+                                    headerText = null
+                                    contentText = "Erro ao atualizar o status de pagamento"
+                                    showAndWait()
+                                }
+                            }
+                        }
+                    }
+                }
 
                 private val printButton = Button("Imprimir").apply {
                     styleClass.add("small-button")
-                    prefWidth = 70.0
+                    prefWidth = 120.0
                     setOnAction {
                         val pedido = tableView.items[index]
                         controller.imprimirPedido(pedido)
                     }
                 }
 
-                private val box = HBox(5.0).apply {
-                    children.addAll(viewButton, printButton)
-                    alignment = Pos.CENTER
+
+
+                private val statusButton = Button("Status do pedido").apply {
+                    styleClass.add("small-button")
+                    prefWidth = 140.0
+
+                    setOnAction {
+                        val pedido = tableView.items[index]
+                        val pedidoId = pedido["id"] as Long
+                        val currentStatus = pedido["status_pedido"] as? String ?: "Pendente"
+
+                        val dialog = Dialog<String>()
+                        dialog.title = "Atualizar Status do Pedido"
+                        dialog.headerText = "Selecione o novo status do pedido"
+                        dialog.initStyle(StageStyle.UNDECORATED)
+
+                        val buttonTypeOk = ButtonType("Confirmar", ButtonBar.ButtonData.OK_DONE)
+                        val buttonTypeCancel = ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE)
+                        dialog.dialogPane.buttonTypes.addAll(buttonTypeOk, buttonTypeCancel)
+
+                        (dialog.dialogPane.lookup(".button-bar") as ButtonBar).apply {
+                            buttonOrder = ""
+                            buttonMinWidth = 100.0
+                            alignment = Pos.CENTER
+                            styleClass.add("dialog-button-bar")
+                        }
+
+                        val statusOptions = listOf("Concluido", "Preparando", "Pendente", "Em Entrega", "Cancelado")
+                        val comboBox = ComboBox<String>().apply {
+                            items.addAll(statusOptions)
+                            value = currentStatus
+                            prefHeight = 36.0
+                            prefWidth = 200.0
+                        }
+
+                        val content = VBox(10.0).apply {
+                            padding = Insets(20.0)
+                            spacing = 10.0
+                            prefWidth = 400.0
+                            styleClass.add("dialog-content")
+                            children.addAll(
+                                Label("Novo status:").apply {
+                                    styleClass.add("field-label")
+                                },
+                                comboBox
+                            )
+                        }
+
+                        dialog.dialogPane.stylesheets.addAll(this@HistoricoPedidosView.stylesheets)
+                        dialog.dialogPane.content = content
+                        dialog.dialogPane.styleClass.add("custom-dialog")
+
+                        dialog.setResultConverter { buttonType ->
+                            if (buttonType == buttonTypeOk) comboBox.value else null
+                        }
+
+                        val result = dialog.showAndWait()
+
+                        result.ifPresent { novoStatus ->
+                            if (controller.atualizarStatusPedido(pedidoId, novoStatus)) {
+                                (pedido as MutableMap<String, Any>)["status_pedido"] = novoStatus
+                                tableView.refresh()
+                            } else {
+                                Alert(Alert.AlertType.ERROR).apply {
+                                    title = "Erro"
+                                    headerText = null
+                                    contentText = "Erro ao atualizar o status do pedido"
+                                    showAndWait()
+                                }
+                            }
+                        }
+                    }
                 }
 
                 override fun updateItem(item: Void?, empty: Boolean) {
                     super.updateItem(item, empty)
-                    graphic = if (empty) null else box
+                    if (empty) {
+                        graphic = null
+                    } else {
+                        // Removed the line that was changing the button text
+                        graphic = box
+                    }
+                }
+
+                private val box = HBox(5.0).apply {
+                    children.addAll(viewButton, pagamentoButton, printButton, statusButton)
+                    alignment = Pos.CENTER
                 }
             }
         }
 
-        // Add columns in correct order
-        tableView.columns.addAll(numeroCol, dataCol, clienteCol, telefoneCol, produtosCol, totalCol, statusCol, retiradaCol, acoesCol)
+        tableView.columns.addAll(
+            numeroCol,
+            dataCol,
+            statusPedidoCol,
+            clienteCol,
+            telefoneCol,
+            produtosCol,
+            totalCol,
+            statusCol,
+            retiradaCol,
+            acoesCol
+        )
 
-        // Use unconstrained resize policy for horizontal scrolling
         tableView.columnResizePolicy = TableView.UNCONSTRAINED_RESIZE_POLICY
 
         // Set placeholder text

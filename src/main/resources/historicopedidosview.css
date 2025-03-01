@@ -1,4 +1,26 @@
-/* General Style */
+/* Red buttons for dialogs */
+.botao-cancel {
+    -fx-background-color: #dc3545; /* Red background */
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 8px 16px;
+    -fx-background-radius: 4px;
+    -fx-cursor: hand;
+    -fx-border-width: 0;
+}
+
+.botao-cancel:hover {
+    -fx-background-color: #c82333; /* Darker red on hover */
+}
+
+.botao-cancel:pressed {
+    -fx-background-color: #bd2130; /* Even darker when pressed */
+    -fx-translate-y: 1px;
+}
+
+
+
 .root {
     -fx-font-family: system;
     -fx-font-size: 14px;
@@ -349,6 +371,7 @@
     -fx-font-size: 12px;
     -fx-padding: 5px 10px;
     -fx-min-width: 70px;
+    -fx-alignment: CENTER;
 }
 
 /* Scrollbar Styling */
@@ -585,5 +608,88 @@
 }
 
 .check-menu-item > .left-container {
-    -fx-padding: 0.333em 0.5em 0.333em 0.5em; /* Adjust checkbox position */
+    -fx-padding: 0.333em 0.5em 0.333em 0.5em;
 }
+
+.custom-dialog {
+    -fx-background-color: white;
+    -fx-border-color: #D3D3D3;
+    -fx-border-width: 1px;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.dialog-header {
+    -fx-background-color: #2B2D30;
+    -fx-background-radius: 0;
+}
+
+.dialog-content {
+    -fx-background-color: white;
+}
+
+.dialog-button-bar {
+    -fx-alignment: center; /* Center align the buttons */
+    -fx-spacing: 10px; /* Add spacing between buttons if needed */
+    -fx-padding: -20px 75px 00px 00px; /* Add padding around the button bar */
+}
+
+.dialog-button {
+    -fx-background-color: #F0F0F0;
+    -fx-text-fill: black;
+    -fx-min-width: 100px;
+}
+
+.dialog-button:hover {
+    -fx-background-color: #DADADA;
+    -fx-text-fill: black;
+}
+
+.dialog-button:pressed {
+    -fx-background-color: #BEBEBE;
+    -fx-text-fill: black;
+}
+
+/* ComboBox dropdown items styling */
+.combo-box-popup .list-view {
+    -fx-background-color: white;
+    -fx-border-color: #D3D3D3;
+    -fx-border-width: 1px;
+}
+
+.combo-box-popup .list-cell {
+    -fx-background-color: white;
+    -fx-text-fill: black;
+    -fx-padding: 8px 12px;
+}
+
+.combo-box-popup .list-cell:hover {
+    -fx-background-color: #DADADA;
+    -fx-text-fill: black;
+}
+
+.combo-box-popup .list-cell:filled:selected,
+.combo-box-popup .list-cell:filled:selected:hover {
+    -fx-background-color: #6056e8;
+    -fx-text-fill: white;
+}
+
+/* Make the arrow button consistent with the styling */
+.combo-box .arrow-button {
+    -fx-background-color: transparent;
+}
+
+.combo-box .arrow {
+    -fx-background-color: #495057;
+}
+
+/* Add this to your CSS if not already there */
+.button-bar > .container {
+    -fx-spacing: 20px;  /* Increased from 10px for more space */
+}
+
+.dialog-button {
+    -fx-min-width: 100px;
+    -fx-pref-width: 100px;
+}
+

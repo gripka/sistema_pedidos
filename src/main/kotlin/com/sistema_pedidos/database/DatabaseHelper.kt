@@ -61,6 +61,7 @@ class DatabaseHelper {
                 data_pedido TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                 observacao TEXT,
                 status TEXT CHECK (status IN ('Pendente', 'Pago', 'Cancelado')) DEFAULT 'Pendente',
+                status_pedido TEXT CHECK (status_pedido IN ('Concluido', 'Preparando', 'Pendente', 'Em Entrega', 'Cancelado')) DEFAULT 'Pendente',
                 valor_total DECIMAL(10,2) DEFAULT 0.00,
                 valor_desconto DECIMAL(10,2) DEFAULT 0.00,
                 tipo_desconto TEXT CHECK (tipo_desconto IN ('valor', 'percentual')),
