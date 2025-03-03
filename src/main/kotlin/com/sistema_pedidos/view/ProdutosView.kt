@@ -939,10 +939,10 @@ class ProdutosView : BorderPane() {
                     }
 
                     conn.commit()
-                    showAlert("Sucesso",
+                    mostrarMensagemSucesso("Operação realizada com sucesso",
                         if (produtoSelecionado == null) "Produto cadastrado com sucesso!"
-                        else "Produto atualizado com sucesso!",
-                        Alert.AlertType.INFORMATION)
+                        else "Produto atualizado com sucesso!"
+                    )
 
                 } catch (e: Exception) {
                     conn.rollback()
@@ -962,6 +962,67 @@ class ProdutosView : BorderPane() {
             e.printStackTrace()
             showAlert("Erro ao salvar", e.message ?: "Erro ao acessar banco de dados")
         }
+    }
+
+
+
+    private fun mostrarMensagemSucesso(titulo: String, mensagem: String) {
+        val dialog = Dialog<ButtonType>()
+        dialog.title = "Sucesso"
+        dialog.headerText = titulo
+        dialog.initStyle(StageStyle.UNDECORATED)
+
+        val buttonTypeOk = ButtonType("OK", ButtonBar.ButtonData.OK_DONE)
+        dialog.dialogPane.buttonTypes.add(buttonTypeOk)
+
+        // Apply CSS
+        dialog.dialogPane.stylesheets.addAll(this.stylesheets)
+
+        // Create styled content
+        val content = VBox(10.0).apply {
+            padding = Insets(20.0)
+
+            children.add(Label(mensagem).apply {
+                style = "-fx-font-size: 14px;"
+            })
+        }
+
+        // Style the dialog
+        dialog.dialogPane.style = """
+        -fx-background-color: white;
+        -fx-border-color: #D3D3D3;
+        -fx-border-width: 1px;
+    """
+
+        dialog.dialogPane.content = content
+
+        // Style header with success color
+        dialog.dialogPane.lookup(".header-panel")?.style = """
+        -fx-background-color: #4CAF50;
+        -fx-background-radius: 0;
+    """
+
+        // Style header text
+        val headerLabel = dialog.dialogPane.lookup(".header-panel .label") as? Label
+        headerLabel?.style = "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"
+
+        // Style the button
+        val okButton = dialog.dialogPane.lookupButton(buttonTypeOk)
+        okButton.styleClass.add("primary-button")
+
+        // Configure button bar
+        val buttonBar = dialog.dialogPane.lookup(".button-bar") as ButtonBar
+        buttonBar.apply {
+            buttonOrder = ButtonBar.BUTTON_ORDER_NONE
+            buttonMinWidth = 100.0
+            style = """
+            -fx-background-color: white;
+            -fx-alignment: center;
+        """
+            padding = Insets(0.0, 80.0, 0.0, 0.0)
+        }
+
+        dialog.showAndWait()
     }
 
     private fun validarCampos(): Boolean {
@@ -996,11 +1057,77 @@ class ProdutosView : BorderPane() {
         }
 
         if (mensagensErro.isNotEmpty()) {
-            showAlert("Erro de validação", mensagensErro.joinToString("\n"))
+            mostrarErrosValidacao(mensagensErro)
             return false
         }
 
         return true
+    }
+
+    private fun mostrarErrosValidacao(mensagens: List<String>) {
+        val dialog = Dialog<ButtonType>()
+        dialog.title = "Erro de validação"
+        dialog.headerText = "Corrija os seguintes erros:"
+        dialog.initStyle(StageStyle.UNDECORATED)
+
+        val buttonTypeOk = ButtonType("OK", ButtonBar.ButtonData.OK_DONE)
+        dialog.dialogPane.buttonTypes.add(buttonTypeOk)
+
+        // Apply CSS
+        dialog.dialogPane.stylesheets.addAll(this.stylesheets)
+
+        // Create styled error messages
+        val content = VBox(10.0).apply {
+            padding = Insets(20.0)
+
+            children.add(Label("Por favor, corrija os campos destacados:").apply {
+                style = "-fx-font-weight: bold; -fx-font-size: 14px;"
+            })
+
+            // Add each error with bullet point and red text
+            mensagens.forEach { mensagem ->
+                children.add(Label("• $mensagem").apply {
+                    style = "-fx-text-fill: #dc3545;"
+                })
+            }
+        }
+
+        // Style the dialog
+        dialog.dialogPane.style = """
+        -fx-background-color: white;
+        -fx-border-color: #D3D3D3;
+        -fx-border-width: 1px;
+    """
+
+        dialog.dialogPane.content = content
+
+        // Style header
+        dialog.dialogPane.lookup(".header-panel")?.style = """
+        -fx-background-color: #2B2D30;
+        -fx-background-radius: 0;
+    """
+
+        // Style header text
+        val headerLabel = dialog.dialogPane.lookup(".header-panel .label") as? Label
+        headerLabel?.style = "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"
+
+        // Style the button
+        val okButton = dialog.dialogPane.lookupButton(buttonTypeOk)
+        okButton.styleClass.add("botao-cancel")
+
+        // Configure button bar
+        val buttonBar = dialog.dialogPane.lookup(".button-bar") as ButtonBar
+        buttonBar.apply {
+            buttonOrder = ButtonBar.BUTTON_ORDER_NONE
+            buttonMinWidth = 100.0
+            padding = Insets(0.0, 90.0, 0.0, 0.0)
+            style = """
+        -fx-background-color: white;
+        -fx-alignment: center; 
+    """
+        }
+
+        dialog.showAndWait()
     }
 
     private fun preencherFormulario(produto: Produto) {
@@ -1353,36 +1480,72 @@ class ProdutosView : BorderPane() {
     }
 
     private fun confirmDelete(produto: Produto) {
-        val alert = Alert(Alert.AlertType.CONFIRMATION).apply {
-            title = "Confirmar Exclusão"
-            headerText = "Excluir Produto"
-            contentText = "Tem certeza que deseja excluir o produto: ${produto.nome}?"
+        val dialog = Dialog<ButtonType>()
+        dialog.title = "Confirmar Exclusão"
+        dialog.headerText = "Excluir Produto"
+        dialog.initStyle(StageStyle.UNDECORATED)
+
+        val buttonTypeConfirm = ButtonType("Excluir", ButtonBar.ButtonData.OK_DONE)
+        val buttonTypeCancel = ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE)
+        dialog.dialogPane.buttonTypes.addAll(buttonTypeConfirm, buttonTypeCancel)
+
+        dialog.dialogPane.stylesheets.addAll(this.stylesheets)
+
+        val content = VBox(10.0).apply {
+            padding = Insets(20.0)
+            children.add(Label("Tem certeza que deseja excluir o produto: ${produto.nome}?").apply {
+                style = "-fx-font-size: 14px;"
+            })
         }
 
-        val result = alert.showAndWait()
-        if (result.isPresent && result.get() == ButtonType.OK) {
+        dialog.dialogPane.style = """
+        -fx-background-color: white;
+        -fx-border-color: #D3D3D3;
+        -fx-border-width: 1px;
+    """
+
+        dialog.dialogPane.content = content
+
+        dialog.dialogPane.lookup(".header-panel")?.style = """
+        -fx-background-color: #dc3545;
+        -fx-background-radius: 0;
+    """
+
+
+        val headerLabel = dialog.dialogPane.lookup(".header-panel .label") as? Label
+        headerLabel?.style = "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"
+
+
+        val cancelButton = dialog.dialogPane.lookupButton(buttonTypeCancel)
+        cancelButton.styleClass.add("secondary-button")
+
+        val confirmButton = dialog.dialogPane.lookupButton(buttonTypeConfirm)
+        confirmButton.styleClass.add("botao-cancel")
+// Add inline style to ensure red color
+        confirmButton.style = """
+    -fx-background-color: #dc3545;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+"""
+
+
+
+        // Configure button bar
+        val buttonBar = dialog.dialogPane.lookup(".button-bar") as ButtonBar
+        buttonBar.apply {
+            buttonOrder = ButtonBar.BUTTON_ORDER_NONE
+            buttonMinWidth = 100.0
+            style = """
+            -fx-background-color: white;
+            -fx-alignment: center;
+        """
+            padding = Insets(0.0, 55.0, 0.0, 0.0)
+        }
+
+        val result = dialog.showAndWait()
+        if (result.isPresent && result.get() == buttonTypeConfirm) {
             deleteProduct(produto)
         }
-    }
-
-    // No método que finaliza o pedido
-    fun finalizarPedido(pedidoId: Long) {
-        // Obter itens do pedido
-        val itens = buscarItensPedido(pedidoId)
-
-        // Para cada item, processar redução de estoque
-        for (item in itens) {
-            val produtoId = item["id"] as Long
-            val quantidade = item["quantidade"] as Int
-
-            // Reduz o estoque do próprio produto
-            atualizarEstoqueProduto(produtoId, quantidade)
-
-            // Reduz o estoque dos insumos usados por este produto
-            processarEstoqueInsumos(produtoId, quantidade)
-        }
-
-        // Continuar com o processamento do pedido...
     }
 
     private fun atualizarEstoqueProduto(produtoId: Long, quantidade: Int) {
@@ -1434,14 +1597,78 @@ class ProdutosView : BorderPane() {
             }
 
             loadProducts()
-            showAlert("Sucesso", "Produto excluído com sucesso", Alert.AlertType.INFORMATION)
+            mostrarMensagemEstilizada("Produto excluído com sucesso", "O produto foi removido com sucesso do sistema.", "success")
         } catch (e: SQLException) {
             if (e.message?.contains("foreign key constraint") == true) {
-                showAlert("Erro ao excluir", "Este produto não pode ser excluído pois está sendo usado em pedidos.")
+                mostrarMensagemEstilizada("Erro ao excluir", "Este produto não pode ser excluído pois está sendo usado em pedidos.")
             } else {
-                showAlert("Erro ao excluir", e.message ?: "Erro ao acessar banco de dados")
+                mostrarMensagemEstilizada("Erro ao excluir", e.message ?: "Erro ao acessar banco de dados")
             }
         }
+    }
+
+    private fun mostrarMensagemEstilizada(titulo: String, mensagem: String, tipo: String = "error") {
+        val dialog = Dialog<ButtonType>()
+        dialog.title = if (tipo == "success") "Sucesso" else "Erro"
+        dialog.headerText = titulo
+        dialog.initStyle(StageStyle.UNDECORATED)
+
+        val buttonTypeOk = ButtonType("OK", ButtonBar.ButtonData.OK_DONE)
+        dialog.dialogPane.buttonTypes.add(buttonTypeOk)
+
+        // Apply CSS
+        dialog.dialogPane.stylesheets.addAll(this.stylesheets)
+
+        // Create styled content
+        val content = VBox(10.0).apply {
+            padding = Insets(20.0)
+            children.add(Label(mensagem).apply {
+                style = "-fx-font-size: 14px;"
+                isWrapText = true
+            })
+        }
+
+        // Style the dialog
+        dialog.dialogPane.style = """
+        -fx-background-color: white;
+        -fx-border-color: #D3D3D3;
+        -fx-border-width: 1px;
+    """
+
+        dialog.dialogPane.content = content
+
+        // Set header color based on type
+        val headerColor = when (tipo) {
+            "success" -> "#4CAF50" // Green for success
+            else -> "#dc3545" // Red for errors
+        }
+
+        dialog.dialogPane.lookup(".header-panel")?.style = """
+        -fx-background-color: $headerColor;
+        -fx-background-radius: 0;
+    """
+
+        // Style header text
+        val headerLabel = dialog.dialogPane.lookup(".header-panel .label") as? Label
+        headerLabel?.style = "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"
+
+        // Style the button
+        val okButton = dialog.dialogPane.lookupButton(buttonTypeOk)
+        okButton.styleClass.add(if (tipo == "success") "primary-button" else "botao-cancel")
+
+        // Configure button bar
+        val buttonBar = dialog.dialogPane.lookup(".button-bar") as ButtonBar
+        buttonBar.apply {
+            buttonOrder = ButtonBar.BUTTON_ORDER_NONE
+            buttonMinWidth = 100.0
+            style = """
+            -fx-background-color: white;
+            -fx-alignment: center;
+        """
+            padding = Insets(0.0, 80.0, 0.0, 0.0)
+        }
+
+        dialog.showAndWait()
     }
 
     private fun showAlert(title: String, message: String, type: Alert.AlertType = Alert.AlertType.ERROR) {
