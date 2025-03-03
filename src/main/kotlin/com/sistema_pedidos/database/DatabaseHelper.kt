@@ -49,6 +49,7 @@ class DatabaseHelper {
                 estoque_minimo INTEGER DEFAULT 0,
                 estoque_atual INTEGER DEFAULT 0,
                 status TEXT CHECK (status IN ('Ativo', 'Inativo')) DEFAULT 'Ativo',
+                eh_insumo INTEGER DEFAULT 0 CHECK (eh_insumo IN (0, 1)),
                 data_cadastro TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                 data_atualizacao TIMESTAMP DEFAULT (datetime('now', 'localtime'))
             )""",
@@ -99,6 +100,16 @@ class DatabaseHelper {
                 data_entrega DATE NOT NULL,
                 hora_entrega TIME NOT NULL,
                 FOREIGN KEY (pedido_id) REFERENCES pedidos(id)
+            )""",
+
+            """CREATE TABLE IF NOT EXISTS produto_insumos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                produto_id INTEGER NOT NULL,
+                insumo_id INTEGER NOT NULL,
+                quantidade DECIMAL(10,2) NOT NULL,
+                FOREIGN KEY (produto_id) REFERENCES produtos(id),
+                FOREIGN KEY (insumo_id) REFERENCES produtos(id),
+                UNIQUE(produto_id, insumo_id)
             )""",
 
             """CREATE TRIGGER IF NOT EXISTS gerar_numero_pedido
@@ -168,7 +179,9 @@ class DatabaseHelper {
             """CREATE INDEX IF NOT EXISTS idx_pedido_cliente ON pedidos(cliente_id)""",
             """CREATE INDEX IF NOT EXISTS idx_item_pedido ON itens_pedido(pedido_id)""",
             """CREATE INDEX IF NOT EXISTS idx_item_produto ON itens_pedido(produto_id)""",
-            """CREATE INDEX IF NOT EXISTS idx_entrega_pedido ON entregas(pedido_id)"""
+            """CREATE INDEX IF NOT EXISTS idx_entrega_pedido ON entregas(pedido_id)""",
+            """CREATE INDEX IF NOT EXISTS idx_produto_insumos_produto ON produto_insumos(produto_id)""",
+            """CREATE INDEX IF NOT EXISTS idx_produto_insumos_insumo ON produto_insumos(insumo_id)"""
         )
 
         getConnection().use { conn ->

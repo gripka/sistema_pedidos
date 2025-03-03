@@ -7,17 +7,28 @@ import javafx.geometry.Insets
 import javafx.geometry.Pos
 import javafx.scene.control.*
 import javafx.scene.control.cell.PropertyValueFactory
+import javafx.scene.image.Image
+import javafx.scene.image.ImageView
 import javafx.scene.layout.*
 import javafx.scene.paint.Color
+import javafx.stage.StageStyle
 import javafx.util.Callback
 import java.awt.event.ActionEvent
 import java.sql.SQLException
 import java.text.NumberFormat
 import java.util.*
+import java.sql.Connection
 
 data class UnidadeMedida(val codigo: String, val descricao: String) {
     override fun toString() = "$codigo - $descricao"
 }
+
+data class InsumoQuantidade(
+    val insumoId: Long,
+    val nome: String,
+    val quantidade: Double,
+    val unidadeMedida: String
+)
 
 class ProdutosView : BorderPane() {
     private val tableView = TableView<Produto>()
@@ -26,6 +37,11 @@ class ProdutosView : BorderPane() {
     private val formPanel = VBox(10.0)
     private var produtoSelecionado: Produto? = null
     private val db = DatabaseHelper()
+    private lateinit var cbEhInsumo: CheckBox
+    private lateinit var tableInsumos: TableView<InsumoQuantidade>
+    private lateinit var cbInsumoDisponivel: ComboBox<Produto>
+    private lateinit var tfQuantidadeInsumo: TextField
+    private val insumosDosProdutos = FXCollections.observableArrayList<InsumoQuantidade>()
 
     init {
         styleClass.add("main-container")
@@ -56,14 +72,24 @@ class ProdutosView : BorderPane() {
 
         val searchButton = Button("Buscar").apply {
             styleClass.add("primary-button")
-            prefHeight = 36.0  // Match HistoricoPedidosView height
+            prefHeight = 36.0
             setOnAction { searchProducts(searchField.text) }
+        }
+
+        val refreshButton = Button("Atualizar").apply {
+            styleClass.add("primary-button")  // Changed from "action-button"
+            prefHeight = 36.0  // Added to match other buttons
+            setOnAction {
+                loadProducts()
+            }
         }
 
         val newButton = Button("Novo Produto").apply {
             styleClass.add("primary-button")
             prefHeight = 36.0  // Match HistoricoPedidosView height
             setOnAction {
+                insumosDosProdutos.clear()
+                carregarInsumosDisponiveis()
                 limparFormulario()
                 produtoSelecionado = null
             }
@@ -74,11 +100,109 @@ class ProdutosView : BorderPane() {
             styleClass.add("primary-button")
             prefHeight = 36.0
             setOnAction {
-                // Reuse the same dialog logic from the category context menu
-                val dialog = TextInputDialog()
+                val dialog = Dialog<String>()
                 dialog.title = "Nova Categoria"
                 dialog.headerText = "Adicionar Nova Categoria"
-                dialog.contentText = "Nome da categoria:"
+                dialog.initStyle(StageStyle.UNDECORATED)
+
+                val buttonTypeOk = ButtonType("Confirmar", ButtonBar.ButtonData.OK_DONE)
+                val buttonTypeCancel = ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE)
+                dialog.dialogPane.buttonTypes.addAll(buttonTypeOk, buttonTypeCancel)
+
+                // Apply CSS to dialog
+                dialog.dialogPane.stylesheets.addAll(this@ProdutosView.stylesheets)
+
+                // Dialog content setup
+                val textField = TextField().apply {
+                    prefHeight = 36.0
+                    prefWidth = 300.0
+                    promptText = "Digite o nome da nova categoria"
+                    styleClass.add("text-field")
+                }
+
+                val content = VBox(10.0).apply {
+                    padding = Insets(20.0)
+                    spacing = 10.0
+                    prefWidth = 400.0
+                    children.addAll(
+                        Label("Nome da categoria:").apply {
+                            style = "-fx-font-size: 14px; -fx-text-fill: #2B2D31;"
+                        },
+                        textField
+                    )
+                }
+
+                dialog.dialogPane.style = """
+            -fx-background-color: white;
+            -fx-border-color: #D3D3D3;
+            -fx-border-width: 1px;
+        """
+
+                dialog.dialogPane.content = content
+
+                // Apply header style
+                dialog.dialogPane.lookup(".header-panel")?.style = """
+            -fx-background-color: #2B2D30;
+            -fx-background-radius: 0;
+        """
+
+                // Style header text
+                val headerLabel = dialog.dialogPane.lookup(".header-panel .label") as? Label
+                headerLabel?.style = "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"
+
+                // Important: Get button references before the dialog is shown
+                val confirmButton = dialog.dialogPane.lookupButton(buttonTypeOk)
+                val cancelButton = dialog.dialogPane.lookupButton(buttonTypeCancel)
+
+                // Apply styles to buttons directly
+                confirmButton.styleClass.add("primary-button")
+                cancelButton.styleClass.add("secondary-button")
+
+                // Apply inline styles to ensure visual consistency
+                confirmButton.style = """
+            -fx-background-color: #6056e8;
+            -fx-text-fill: white;
+            -fx-font-size: 14px;
+            -fx-font-weight: bold;
+            -fx-background-radius: 5px;
+            -fx-min-width: 100px;
+            -fx-padding: 8px 16px;
+            -fx-cursor: hand;
+        """
+
+                cancelButton.style = """
+            -fx-background-color: #f0f0f0;
+            -fx-text-fill: #333333;
+            -fx-font-size: 14px;
+            -fx-font-weight: bold;
+            -fx-background-radius: 5px;
+            -fx-min-width: 100px;
+            -fx-padding: 8px 16px;
+            -fx-cursor: hand;
+        """
+
+                // Configure button bar to center buttons
+                val buttonBar = dialog.dialogPane.lookup(".button-bar") as ButtonBar
+                buttonBar.apply {
+                    buttonOrder = ""
+                    buttonMinWidth = 100.0
+                    alignment = Pos.CENTER
+                    padding = Insets(0.0, 75.0, 0.0, 0.0)
+                    style = "-fx-background-color: white;"
+                }
+
+                dialog.setResultConverter { buttonType ->
+                    if (buttonType == buttonTypeOk) textField.text else null
+                }
+
+                // Add hover effects after getting button references
+                confirmButton.setOnMouseEntered {
+                    confirmButton.style += "-fx-background-color: #433a94;"
+                }
+
+                confirmButton.setOnMouseExited {
+                    confirmButton.style += "-fx-background-color: #6056e8;"
+                }
 
                 dialog.showAndWait().ifPresent { newCategory ->
                     val trimmed = newCategory.trim()
@@ -92,7 +216,7 @@ class ProdutosView : BorderPane() {
             }
         }
 
-        val topControls = HBox(10.0, searchField, searchButton, newButton, newCategoryButton).apply {
+        val topControls = HBox(10.0, searchField, searchButton, refreshButton, newButton, newCategoryButton).apply {
             alignment = Pos.CENTER_LEFT
         }
 
@@ -145,7 +269,6 @@ class ProdutosView : BorderPane() {
             """
         }
 
-        // Call setupTableView to add columns
         setupTableView()
 
         // Set growth properties
@@ -162,11 +285,10 @@ class ProdutosView : BorderPane() {
             promptText = "Gerado automaticamente"
             styleFormField(this)
             style = """${style ?: ""}
-                -fx-background-color: #f0f0f0;
-                -fx-opacity: 0.9;
-                -fx-border-color: #cccccc;
-            """
-            // Optional: add a tooltip
+            -fx-background-color: #f0f0f0;
+            -fx-opacity: 0.9;
+            -fx-border-color: #cccccc;
+        """
             tooltip = Tooltip("Código gerado automaticamente pelo sistema")
         }
 
@@ -179,21 +301,25 @@ class ProdutosView : BorderPane() {
             promptText = "Descrição detalhada"
             prefHeight = 60.0
             maxHeight = 60.0
-            setWrapText(true) // Use method instead of direct property access
+            setWrapText(true)
             style = """
-        -fx-control-inner-background: white;
-        -fx-background-color: white;
-        -fx-background-radius: 4px;
-        -fx-border-color: #cccccc;
-        -fx-border-radius: 4px;
-        /* Show vertical scrollbar as needed */
-        -fx-scroll-bar-policy: as-needed;
-    """
+            -fx-control-inner-background: white;
+            -fx-background-color: white;
+            -fx-background-radius: 4px;
+            -fx-border-color: #cccccc;
+            -fx-border-radius: 4px;
+            -fx-scroll-bar-policy: as-needed;
+        """
         }
 
         tfValorUnitario = TextField().apply {
             promptText = "0.00"
             styleFormField(this)
+        }
+
+        // Move cbEhInsumo declaration outside of the cbCategoria block
+        cbEhInsumo = CheckBox("Este produto também pode ser usado como insumo").apply {
+            isSelected = false
         }
 
         cbCategoria = ComboBox<String>().apply {
@@ -282,18 +408,11 @@ class ProdutosView : BorderPane() {
             children.addAll(addButton, deleteButton)
         }
 
-// Then in the formPanel.children.addAll(), replace the cbCategoria line with:
-        Label("Categoria:"); VBox(5.0, cbCategoria, categoryButtonsBox)
-
         cbUnidadeMedida = ComboBox<String>().apply {
             items = FXCollections.observableArrayList(
-                "UN",  // Exact values as per database constraint
-                "KG",
-                "L",
-                "M",
-                "CX"
+                "UN", "KG", "L", "M", "CX"
             )
-            value = "UN"  // Default value
+            value = "UN"
             prefWidth = Double.MAX_VALUE
         }
 
@@ -315,7 +434,6 @@ class ProdutosView : BorderPane() {
             prefWidth = Double.MAX_VALUE
         }
 
-        // Buttons
         btnSalvar = Button("Salvar").apply {
             styleClass.add("primary-button")
             prefWidth = 120.0
@@ -331,6 +449,8 @@ class ProdutosView : BorderPane() {
             }
         }
 
+        val insumosPanel = createInsumosPanel()
+
         val scrollPane = ScrollPane().apply {
             isFitToWidth = true
             hbarPolicy = ScrollPane.ScrollBarPolicy.NEVER
@@ -341,14 +461,14 @@ class ProdutosView : BorderPane() {
         formPanel.apply {
             padding = Insets(15.0)
             spacing = 10.0
-            prefWidth = 320.0
-            maxWidth = 320.0
+            prefWidth = 450.0
+            maxWidth = 450.0
             style = """
-                -fx-background-color: white;
-                -fx-border-color: rgb(223, 225, 230);
-                -fx-border-width: 2px;
-                -fx-border-radius: 3px;
-            """
+            -fx-background-color: white;
+            -fx-border-color: rgb(223, 225, 230);
+            -fx-border-width: 2px;
+            -fx-border-radius: 3px;
+        """
 
             children.addAll(
                 Label("Código:"), tfCodigo,
@@ -356,10 +476,13 @@ class ProdutosView : BorderPane() {
                 Label("Descrição:"), taDescricao,
                 Label("Valor Unitário:"), tfValorUnitario,
                 Label("Categoria:"), cbCategoria,
+                Label("Insumo:"), cbEhInsumo,
                 Label("Unidade Medida:"), cbUnidadeMedida,
                 Label("Estoque Mínimo:"), tfEstoqueMinimo,
                 Label("Estoque Atual:"), tfEstoqueAtual,
                 Label("Status:"), cbStatus,
+                Separator().apply { padding = Insets(5.0, 0.0, 5.0, 0.0) },
+                insumosPanel,
                 Separator().apply { padding = Insets(5.0, 0.0, 5.0, 0.0) },
                 HBox(10.0, btnSalvar, btnCancelar).apply {
                     alignment = Pos.CENTER
@@ -368,13 +491,239 @@ class ProdutosView : BorderPane() {
             )
         }
 
-        // Put the form in a scroll pane
         scrollPane.content = formPanel
 
-        // Return a container with the scroll pane
         return VBox(scrollPane).apply {
             HBox.setHgrow(this, Priority.NEVER)
         }
+    }
+
+    private fun createInsumosPanel(): VBox {
+        val insumosPanel = VBox(10.0).apply {
+            padding = Insets(10.0)
+            style = """
+        -fx-background-color: white;
+        -fx-border-color: #dfe1e6;
+        -fx-border-width: 1px;
+        -fx-border-radius: 3px;
+    """
+        }
+
+        val title = Label("Composição do Produto (Insumos)").apply {
+            style = "-fx-font-weight: bold; -fx-font-size: 14px;"
+        }
+
+        tableInsumos = TableView<InsumoQuantidade>().apply {
+            columnResizePolicy = TableView.CONSTRAINED_RESIZE_POLICY
+            prefHeight = 150.0
+
+            val insumoColumn = TableColumn<InsumoQuantidade, String>("Insumo").apply {
+                cellValueFactory = PropertyValueFactory("nome")
+                prefWidth = 150.0
+            }
+
+            val quantidadeColumn = TableColumn<InsumoQuantidade, Double>("Quantidade").apply {
+                cellValueFactory = PropertyValueFactory("quantidade")
+                prefWidth = 80.0
+            }
+
+            val unidadeColumn = TableColumn<InsumoQuantidade, String>("Unidade").apply {
+                cellValueFactory = PropertyValueFactory("unidadeMedida")
+                prefWidth = 60.0
+            }
+
+            val acoesColumn = TableColumn<InsumoQuantidade, Void>("Ações").apply {
+                prefWidth = 80.0
+                minWidth = 80.0
+                maxWidth = 80.0
+                style = "-fx-alignment: CENTER;"
+                cellFactory = Callback {
+                    object : TableCell<InsumoQuantidade, Void>() {
+                        // Existing code for actions column
+                    }
+                }
+            }
+
+            columns.addAll(insumoColumn, quantidadeColumn, unidadeColumn, acoesColumn)
+            items = insumosDosProdutos
+        }
+
+        cbInsumoDisponivel = ComboBox<Produto>().apply {
+            prefWidth = 160.0
+            promptText = "Selecione um insumo"
+
+            // Custom cell factory to display only product name
+            buttonCell = createProductCell()
+            cellFactory = Callback { createProductCell() }
+
+            // Converter for string representation
+            converter = object : javafx.util.StringConverter<Produto>() {
+                override fun toString(produto: Produto?): String {
+                    return produto?.nome ?: ""
+                }
+
+                override fun fromString(string: String): Produto? {
+                    return items.find { it.nome == string }
+                }
+            }
+        }
+
+        // Hidden reference for compatibility
+        tfQuantidadeInsumo = TextField("1").apply {
+            prefWidth = 50.0
+            maxWidth = 50.0
+            alignment = Pos.CENTER
+            text = "1"
+            textProperty().addListener { _, _, newValue ->
+                if (!newValue.matches(Regex("\\d*"))) {
+                    text = newValue.replace(Regex("[^\\d]"), "")
+                }
+                if (text.isEmpty()) text = "1"
+                val num = text.toIntOrNull() ?: 1
+                if (num < 1) text = "1"
+                if (num > 9999) text = "9999"
+            }
+        }
+
+        val decrementBtn = createImageButton("menos").apply {
+            setOnAction {
+                val currentValue = tfQuantidadeInsumo.text.toIntOrNull() ?: 1
+                if (currentValue > 1) tfQuantidadeInsumo.text = (currentValue - 1).toString()
+            }
+        }
+
+        val incrementBtn = createImageButton("mais").apply {
+            setOnAction {
+                val currentValue = tfQuantidadeInsumo.text.toIntOrNull() ?: 1
+                if (currentValue < 9999) tfQuantidadeInsumo.text = (currentValue + 1).toString()
+            }
+        }
+
+        val quantidadeBox = HBox(5.0, decrementBtn, tfQuantidadeInsumo, incrementBtn).apply {
+            alignment = Pos.CENTER_LEFT
+        }
+
+        val btnAdicionarInsumo = Button("Adicionar").apply {
+            styleClass.add("small-button")
+            setOnAction { adicionarInsumoAoProduto() }
+        }
+
+        val controlsBox = HBox(10.0, cbInsumoDisponivel, quantidadeBox, btnAdicionarInsumo).apply {
+            alignment = Pos.CENTER_LEFT
+        }
+
+        insumosPanel.children.addAll(title, tableInsumos, controlsBox)
+        return insumosPanel
+    }
+
+    private fun createImageButton(tipo: String): Button {
+        return Button().apply {
+            style = """
+            -fx-background-color: transparent;
+            -fx-padding: 0;
+            -fx-border-color: transparent;
+            -fx-focus-color: transparent;
+            -fx-faint-focus-color: transparent;
+        """
+
+            ProdutosView::class.java.getResourceAsStream("/icons/${tipo}p.png")?.let {
+                graphic = ImageView(Image(it)).apply {
+                    fitHeight = 30.0
+                    fitWidth = 30.0
+                    isPreserveRatio = true
+                }
+            }
+
+            // Override hover effect to show cursor pointer
+            setOnMouseEntered {
+                style += "-fx-cursor: hand;"
+            }
+        }
+    }
+
+    private fun createProductCell(): ListCell<Produto> {
+        return object : ListCell<Produto>() {
+            override fun updateItem(item: Produto?, empty: Boolean) {
+                super.updateItem(item, empty)
+                text = if (empty || item == null) null else item.nome
+            }
+        }
+    }
+
+    private fun carregarInsumosDisponiveis() {
+        try {
+            db.getConnection().use { conn ->
+                val stmt = conn.prepareStatement(
+                    """SELECT * FROM produtos 
+                   WHERE eh_insumo = 1 AND status = 'Ativo'
+                   ORDER BY nome"""
+                )
+                val rs = stmt.executeQuery()
+                val insumos = FXCollections.observableArrayList<Produto>()
+
+                while (rs.next()) {
+                    insumos.add(
+                        Produto(
+                            id = rs.getLong("id"),
+                            codigo = rs.getString("codigo"),
+                            nome = rs.getString("nome"),
+                            descricao = rs.getString("descricao") ?: "",
+                            valorUnitario = rs.getDouble("valor_unitario"),
+                            categoria = rs.getString("categoria") ?: "",
+                            unidadeMedida = rs.getString("unidade_medida"),
+                            estoqueMinimo = rs.getInt("estoque_minimo"),
+                            estoqueAtual = rs.getInt("estoque_atual"),
+                            status = rs.getString("status"),
+                            dataCadastro = rs.getString("data_cadastro"),
+                            dataAtualizacao = rs.getString("data_atualizacao"),
+                            ehInsumo = rs.getInt("eh_insumo") == 1
+                        )
+                    )
+                }
+                cbInsumoDisponivel.items = insumos
+            }
+        } catch (e: SQLException) {
+            showAlert("Erro ao carregar insumos", e.message ?: "Erro desconhecido")
+        }
+    }
+
+    private fun adicionarInsumoAoProduto() {
+        val insumoSelecionado = cbInsumoDisponivel.value
+        // Find the spinner by traversing the hierarchy
+        val quantidadeSpinner = formPanel.lookupAll(".spinner").firstOrNull() as? Spinner<Int>
+
+        if (insumoSelecionado == null) {
+            showAlert("Insumo não selecionado", "Por favor, selecione um insumo.", Alert.AlertType.WARNING)
+            return
+        }
+
+        if (quantidadeSpinner == null) {
+            showAlert("Erro", "Não foi possível encontrar o campo de quantidade.", Alert.AlertType.ERROR)
+            return
+        }
+
+        val quantidade = quantidadeSpinner.value
+
+        // Check if this insumo is already added to the product
+        val existingInsumo = insumosDosProdutos.find { it.insumoId == insumoSelecionado.id }
+        if (existingInsumo != null) {
+            showAlert("Insumo duplicado", "Este insumo já foi adicionado ao produto.", Alert.AlertType.WARNING)
+            return
+        }
+
+        // Add the insumo to the product
+        insumosDosProdutos.add(
+            InsumoQuantidade(
+                insumoId = insumoSelecionado.id,
+                nome = insumoSelecionado.nome,
+                quantidade = quantidade.toDouble(),
+                unidadeMedida = insumoSelecionado.unidadeMedida
+            )
+        )
+
+        // Reset the selection
+        cbInsumoDisponivel.selectionModel.clearSelection()
+        quantidadeSpinner.valueFactory.value = 1
     }
 
     private fun styleFormField(field: TextField) {
@@ -500,61 +849,117 @@ class ProdutosView : BorderPane() {
             val valorUnitario = tfValorUnitario.text.replace(",", ".").toDoubleOrNull() ?: 0.0
             val estoqueMinimo = tfEstoqueMinimo.text.toIntOrNull() ?: 0
             val estoqueAtual = tfEstoqueAtual.text.toIntOrNull() ?: 0
+            val ehInsumo = if (cbEhInsumo.isSelected) 1 else 0
+
+            // First, try to add the column if it doesn't exist
+            try {
+                db.getConnection().use { conn ->
+                    conn.createStatement().execute(
+                        "ALTER TABLE produtos ADD COLUMN eh_insumo INTEGER DEFAULT 0 CHECK (eh_insumo IN (0, 1))"
+                    )
+                }
+            } catch (e: SQLException) {
+                // Column might already exist, ignore the error
+            }
 
             db.getConnection().use { conn ->
-                if (produtoSelecionado == null) {
-                    // Insert new product
-                    val sql = """
+                conn.autoCommit = false
+                try {
+                    var produtoId = produtoSelecionado?.id
+
+                    if (produtoId == null) {
+                        // Insert new product
+                        val sql = """
                     INSERT INTO produtos (codigo, nome, descricao, valor_unitario, categoria,
-                    unidade_medida, estoque_minimo, estoque_atual, status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    unidade_medida, estoque_minimo, estoque_atual, status, eh_insumo)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """
 
-                    val stmt = conn.prepareStatement(sql)
-                    stmt.setString(1, gerarCodigo())
-                    stmt.setString(2, tfNome.text.trim())
-                    stmt.setString(3, taDescricao.text.trim())
-                    stmt.setDouble(4, valorUnitario)
-                    stmt.setString(5, cbCategoria.value ?: "")
-                    stmt.setString(6, cbUnidadeMedida.value)  // This was the issue
-                    stmt.setInt(7, estoqueMinimo)
-                    stmt.setInt(8, estoqueAtual)
-                    stmt.setString(9, cbStatus.value)
+                        val stmt = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)
+                        stmt.setString(1, gerarCodigo())
+                        stmt.setString(2, tfNome.text.trim())
+                        stmt.setString(3, taDescricao.text.trim())
+                        stmt.setDouble(4, valorUnitario)
+                        stmt.setString(5, cbCategoria.value ?: "")
+                        stmt.setString(6, cbUnidadeMedida.value)
+                        stmt.setInt(7, estoqueMinimo)
+                        stmt.setInt(8, estoqueAtual)
+                        stmt.setString(9, cbStatus.value)
+                        stmt.setInt(10, ehInsumo)
 
-                    stmt.executeUpdate()
-                    showAlert("Sucesso", "Produto cadastrado com sucesso!", Alert.AlertType.INFORMATION)
-                } else {
-                    // Update existing product
-                    val sql = """
-                    UPDATE produtos 
-                    SET nome = ?, descricao = ?, valor_unitario = ?, categoria = ?, 
-                    unidade_medida = ?, estoque_minimo = ?, estoque_atual = ?, status = ?,
-                    data_atualizacao = CURRENT_TIMESTAMP
-                    WHERE id = ?
-                """
+                        stmt.executeUpdate()
 
-                    val stmt = conn.prepareStatement(sql)
-                    stmt.setString(1, tfNome.text.trim())
-                    stmt.setString(2, taDescricao.text.trim())
-                    stmt.setDouble(3, valorUnitario)
-                    stmt.setString(4, cbCategoria.value ?: "")
-                    stmt.setString(5, cbUnidadeMedida.value)
-                    stmt.setInt(6, estoqueMinimo)
-                    stmt.setInt(7, estoqueAtual)
-                    stmt.setString(8, cbStatus.value)
-                    stmt.setLong(9, produtoSelecionado!!.id)
+                        val rs = stmt.generatedKeys
+                        if (rs.next()) {
+                            produtoId = rs.getLong(1)
+                        }
+                    } else {
+                        // Update existing product
+                        val sql = """
+                        UPDATE produtos
+                        SET nome = ?, descricao = ?, valor_unitario = ?, categoria = ?,
+                        unidade_medida = ?, estoque_minimo = ?, estoque_atual = ?, status = ?,
+                        eh_insumo = ?, data_atualizacao = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                        """
 
-                    stmt.executeUpdate()
-                    showAlert("Sucesso", "Produto atualizado com sucesso!", Alert.AlertType.INFORMATION)
+                        val stmt = conn.prepareStatement(sql)
+                        stmt.setString(1, tfNome.text.trim())
+                        stmt.setString(2, taDescricao.text.trim())
+                        stmt.setDouble(3, valorUnitario)
+                        stmt.setString(4, cbCategoria.value ?: "")
+                        stmt.setString(5, cbUnidadeMedida.value)
+                        stmt.setInt(6, estoqueMinimo)
+                        stmt.setInt(7, estoqueAtual)
+                        stmt.setString(8, cbStatus.value)
+                        stmt.setInt(9, ehInsumo)
+                        stmt.setLong(10, produtoId)
+
+                        stmt.executeUpdate()
+
+                        // Remove insumos existentes
+                        val deleteStmt = conn.prepareStatement("DELETE FROM produto_insumos WHERE produto_id = ?")
+                        deleteStmt.setLong(1, produtoId)
+                        deleteStmt.executeUpdate()
+                    }
+
+                    // Salvar os insumos do produto
+                    if (produtoId != null && insumosDosProdutos.isNotEmpty()) {
+                        val insumosSql = "INSERT INTO produto_insumos (produto_id, insumo_id, quantidade) VALUES (?, ?, ?)"
+                        val insumoStmt = conn.prepareStatement(insumosSql)
+
+                        for (insumo in insumosDosProdutos) {
+                            insumoStmt.setLong(1, produtoId)
+                            insumoStmt.setLong(2, insumo.insumoId)
+                            insumoStmt.setDouble(3, insumo.quantidade)
+                            insumoStmt.addBatch()
+                        }
+
+                        insumoStmt.executeBatch()
+                    }
+
+                    conn.commit()
+                    showAlert("Sucesso",
+                        if (produtoSelecionado == null) "Produto cadastrado com sucesso!"
+                        else "Produto atualizado com sucesso!",
+                        Alert.AlertType.INFORMATION)
+
+                } catch (e: Exception) {
+                    conn.rollback()
+                    throw e
+                } finally {
+                    conn.autoCommit = true
                 }
             }
 
             // Reload products and clear form
             loadProducts()
             limparFormulario()
+            insumosDosProdutos.clear()
             produtoSelecionado = null
 
         } catch (e: SQLException) {
+            e.printStackTrace()
             showAlert("Erro ao salvar", e.message ?: "Erro ao acessar banco de dados")
         }
     }
@@ -618,9 +1023,48 @@ class ProdutosView : BorderPane() {
         tfEstoqueMinimo.text = produto.estoqueMinimo.toString()
         tfEstoqueAtual.text = produto.estoqueAtual.toString()
         cbStatus.value = produto.status
+        cbEhInsumo.isSelected = produto.ehInsumo
+
+        // Carregar insumos do produto
+        carregarInsumosDoProduto(produto.id)
+        carregarInsumosDisponiveis()
 
         btnSalvar.text = "Atualizar"
         btnCancelar.isDisable = false
+    }
+
+    private fun carregarInsumosDoProduto(produtoId: Long) {
+        insumosDosProdutos.clear()
+
+        try {
+            db.getConnection().use { conn ->
+                val sql = """
+                SELECT pi.insumo_id, p.nome, pi.quantidade, p.unidade_medida
+                FROM produto_insumos pi
+                JOIN produtos p ON pi.insumo_id = p.id
+                WHERE pi.produto_id = ?
+            """
+
+                conn.prepareStatement(sql).use { stmt ->
+                    stmt.setLong(1, produtoId)
+                    val rs = stmt.executeQuery()
+
+                    while (rs.next()) {
+                        insumosDosProdutos.add(
+                            InsumoQuantidade(
+                                insumoId = rs.getLong("insumo_id"),
+                                nome = rs.getString("nome"),
+                                quantidade = rs.getDouble("quantidade"),
+                                unidadeMedida = rs.getString("unidade_medida")
+                            )
+                        )
+                    }
+                }
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
+            showAlert("Erro ao carregar insumos", e.message ?: "Erro desconhecido")
+        }
     }
 
     private fun gerarCodigo(): String {
@@ -701,20 +1145,26 @@ class ProdutosView : BorderPane() {
             }
 
             val acoesColumn = TableColumn<Produto, Void>("Ações").apply {
-                prefWidth = 150.0
+                prefWidth = 160.0  // Reduced from 180.0
+                minWidth = 150.0   // Adjusted to be closer to actual content width
+                maxWidth = 160.0   // Added max width to prevent column from growing too large
+
                 cellFactory = Callback {
                     object : TableCell<Produto, Void>() {
                         private val editBtn = Button("Editar").apply {
                             styleClass.add("small-button")
+                            prefWidth = 70.0  // Slightly smaller buttons
                         }
 
                         private val deleteBtn = Button("Excluir").apply {
                             styleClass.add("small-button")
                             style = "-fx-background-color: #ff5252;"
+                            prefWidth = 70.0  // Fixed width for button
                         }
 
-                        private val box = HBox(5.0, editBtn, deleteBtn).apply {
+                        private val box = HBox(5.0, editBtn, deleteBtn).apply {  // Increased spacing
                             alignment = Pos.CENTER
+                            padding = Insets(2.0)  // Added padding around buttons
                         }
 
                         init {
@@ -722,6 +1172,7 @@ class ProdutosView : BorderPane() {
                                 val produto = tableRow.item
                                 if (produto != null) {
                                     preencherFormulario(produto)
+                                    carregarInsumosDoProduto(produto.id)
                                 }
                             }
 
@@ -739,12 +1190,90 @@ class ProdutosView : BorderPane() {
                         }
                     }
                 }
+
+                // Make this column have a higher growth priority
+                style = "-fx-pref-width: 180px;"
             }
 
             columns.addAll(
                 codigoColumn, nomeColumn, categoriaColumn, valorColumn,
                 estoqueColumn, statusColumn, acoesColumn
             )
+
+            // Add selection listener to load insumos when a product is selected
+            selectionModel.selectedItemProperty().addListener { _, _, newSelection ->
+                if (newSelection != null) {
+                    produtoSelecionado = newSelection
+                    preencherFormulario(newSelection)
+                    carregarInsumosDoProduto(newSelection.id)
+                }
+            }
+        }
+    }
+
+    fun processarEstoqueInsumos(produtoId: Long, quantidade: Int) {
+        try {
+            DatabaseHelper().getConnection().use { conn ->
+                // Buscar todos os insumos utilizados pelo produto
+                val stmtInsumos = conn.prepareStatement("""
+                SELECT pi.insumo_id, pi.quantidade, p.nome 
+                FROM produto_insumos pi
+                JOIN produtos p ON p.id = pi.insumo_id
+                WHERE pi.produto_id = ?
+            """)
+                stmtInsumos.setLong(1, produtoId)
+                val rsInsumos = stmtInsumos.executeQuery()
+
+                // Para cada insumo, calcular a quantidade total usada
+                while (rsInsumos.next()) {
+                    val insumoId = rsInsumos.getLong("insumo_id")
+                    val qtdPorProduto = rsInsumos.getDouble("quantidade")
+                    val insumoNome = rsInsumos.getString("nome")
+
+                    // Calcular quantidade total a ser reduzida
+                    val qtdTotalReduzir = qtdPorProduto * quantidade
+
+                    // Atualizar estoque do insumo
+                    val updateStmt = conn.prepareStatement(
+                        "UPDATE produtos SET estoque_atual = estoque_atual - ? WHERE id = ?"
+                    )
+                    updateStmt.setDouble(1, qtdTotalReduzir)
+                    updateStmt.setLong(2, insumoId)
+                    val rowsUpdated = updateStmt.executeUpdate()
+
+                    if (rowsUpdated > 0) {
+                        println("Estoque do insumo $insumoNome reduzido em $qtdTotalReduzir unidades")
+                    }
+
+                    // Verificar se estoque ficou negativo ou abaixo do mínimo
+                    verificarEstoque(insumoId, conn)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // Tratar erro conforme necessário
+        }
+    }
+
+    private fun verificarEstoque(produtoId: Long, conn: Connection) {
+        val stmt = conn.prepareStatement(
+            "SELECT nome, estoque_atual, estoque_minimo FROM produtos WHERE id = ?"
+        )
+        stmt.setLong(1, produtoId)
+        val rs = stmt.executeQuery()
+
+        if (rs.next()) {
+            val nome = rs.getString("nome")
+            val estoqueAtual = rs.getInt("estoque_atual")
+            val estoqueMinimo = rs.getInt("estoque_minimo")
+
+            if (estoqueAtual < 0) {
+                println("ALERTA: Estoque do produto $nome está negativo: $estoqueAtual")
+                // Implementar notificação ao usuário
+            } else if (estoqueAtual < estoqueMinimo) {
+                println("ALERTA: Estoque do produto $nome está abaixo do mínimo: $estoqueAtual (mínimo: $estoqueMinimo)")
+                // Implementar notificação ao usuário
+            }
         }
     }
 
@@ -766,6 +1295,7 @@ class ProdutosView : BorderPane() {
                             descricao = rs.getString("descricao") ?: "",
                             valorUnitario = rs.getDouble("valor_unitario"),
                             categoria = rs.getString("categoria") ?: "",
+                            ehInsumo = rs.getInt("eh_insumo") == 1,
                             unidadeMedida = rs.getString("unidade_medida"),
                             estoqueMinimo = rs.getInt("estoque_minimo"),
                             estoqueAtual = rs.getInt("estoque_atual"),
@@ -833,6 +1363,66 @@ class ProdutosView : BorderPane() {
         if (result.isPresent && result.get() == ButtonType.OK) {
             deleteProduct(produto)
         }
+    }
+
+    // No método que finaliza o pedido
+    fun finalizarPedido(pedidoId: Long) {
+        // Obter itens do pedido
+        val itens = buscarItensPedido(pedidoId)
+
+        // Para cada item, processar redução de estoque
+        for (item in itens) {
+            val produtoId = item["id"] as Long
+            val quantidade = item["quantidade"] as Int
+
+            // Reduz o estoque do próprio produto
+            atualizarEstoqueProduto(produtoId, quantidade)
+
+            // Reduz o estoque dos insumos usados por este produto
+            processarEstoqueInsumos(produtoId, quantidade)
+        }
+
+        // Continuar com o processamento do pedido...
+    }
+
+    private fun atualizarEstoqueProduto(produtoId: Long, quantidade: Int) {
+        try {
+            DatabaseHelper().getConnection().use { conn ->
+                val stmt = conn.prepareStatement(
+                    "UPDATE produtos SET estoque_atual = estoque_atual - ? WHERE id = ?"
+                )
+                stmt.setInt(1, quantidade)
+                stmt.setLong(2, produtoId)
+                stmt.executeUpdate()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun buscarItensPedido(pedidoId: Long): List<Map<String, Any>> {
+        val itens = mutableListOf<Map<String, Any>>()
+        try {
+            db.getConnection().use { conn ->
+                val stmt = conn.prepareStatement(
+                    """SELECT ip.produto_id, ip.quantidade 
+                   FROM itens_pedido ip 
+                   WHERE ip.pedido_id = ?"""
+                )
+                stmt.setLong(1, pedidoId)
+                val rs = stmt.executeQuery()
+
+                while (rs.next()) {
+                    val item = mutableMapOf<String, Any>()
+                    item["id"] = rs.getLong("produto_id")
+                    item["quantidade"] = rs.getInt("quantidade")
+                    itens.add(item)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return itens
     }
 
     private fun deleteProduct(produto: Produto) {

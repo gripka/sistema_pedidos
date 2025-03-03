@@ -18,6 +18,7 @@ import javafx.scene.control.ContextMenu
 import javafx.scene.control.MenuItem
 import javafx.geometry.Side
 import javafx.scene.input.KeyCode
+import java.sql.Connection
 
 class NovoPedidoController {
     private val produtosContainer = VBox(10.0)
@@ -798,6 +799,52 @@ class NovoPedidoController {
         }
     }
 
+    private fun atualizarEstoqueInsumos(connection: Connection, produtoNome: String, quantidade: Int) {
+        try {
+            // Find the product ID by name
+            val findProdutoSql = "SELECT id FROM produtos WHERE nome = ?"
+            connection.prepareStatement(findProdutoSql).use { stmt ->
+                stmt.setString(1, produtoNome)
+                val rs = stmt.executeQuery()
+                if (rs.next()) {
+                    val produtoId = rs.getLong("id")
+
+                    // Get insumos for this product
+                    val insumosSql = """
+                    SELECT pi.insumo_id, pi.quantidade, p.estoque_atual 
+                    FROM produto_insumos pi
+                    JOIN produtos p ON p.id = pi.insumo_id
+                    WHERE pi.produto_id = ?
+                """
+                    connection.prepareStatement(insumosSql).use { insumoStmt ->
+                        insumoStmt.setLong(1, produtoId)
+                        val insumosRs = insumoStmt.executeQuery()
+
+                        while (insumosRs.next()) {
+                            val insumoId = insumosRs.getLong("insumo_id")
+                            val quantidadePorProduto = insumosRs.getDouble("quantidade")
+                            val estoqueAtual = insumosRs.getInt("estoque_atual")
+
+                            // Calculate total quantity to reduce
+                            val quantidadeTotal = quantidadePorProduto * quantidade
+                            val novoEstoque = Math.max(0, estoqueAtual - quantidadeTotal.toInt())
+
+                            // Update insumo inventory
+                            val updateSql = "UPDATE produtos SET estoque_atual = ? WHERE id = ?"
+                            connection.prepareStatement(updateSql).use { updateStmt ->
+                                updateStmt.setInt(1, novoEstoque)
+                                updateStmt.setLong(2, insumoId)
+                                updateStmt.executeUpdate()
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     fun salvarPedido(
         clienteInfo: List<Pair<String, String>>,
         pagamentoInfo: List<Pair<String, String>>,
@@ -899,6 +946,8 @@ class NovoPedidoController {
                             stmt.setDouble(6, subtotal)
                             stmt.executeUpdate()
                         }
+
+                        atualizarEstoqueInsumos(connection, nomeProduto, quantidade)
                     }
 
                     if (entregaInfo.first().second == "Sim") {

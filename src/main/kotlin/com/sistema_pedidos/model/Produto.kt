@@ -13,5 +13,5 @@ data class Produto(
     val status: String = "Ativo",
     val dataCadastro: String = "",
     val dataAtualizacao: String = "",
-    val isInsumo: Boolean = false
+    val ehInsumo: Boolean = false
 )
