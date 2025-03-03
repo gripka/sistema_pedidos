@@ -14,6 +14,11 @@ import javafx.scene.layout.*
 import java.sql.SQLException
 import java.sql.Statement
 
+import javafx.scene.control.ContextMenu
+import javafx.scene.control.MenuItem
+import javafx.geometry.Side
+import javafx.scene.input.KeyCode
+
 class NovoPedidoController {
     private val produtosContainer = VBox(10.0)
     private val listaProdutos: ObservableList<Produto> = FXCollections.observableArrayList()
@@ -265,15 +270,15 @@ class NovoPedidoController {
             id = (listaProdutos.size + 1).toLong(),
             codigo = "",
             nome = "Produto ${listaProdutos.size + 1}",
-            descricao = null,
+            descricao = null.toString(),
             valorUnitario = 0.0,
-            categoria = null,
+            categoria = null.toString(),
             unidadeMedida = "UN",
             estoqueMinimo = 0,
             estoqueAtual = 0,
             status = "Ativo",
-            dataCadastro = null,
-            dataAtualizacao = null
+            dataCadastro = null.toString(),
+            dataAtualizacao = null.toString()
         )
         listaProdutos.add(novoProduto)
         produtosContainer.children.add(createProdutosHBox(novoProduto))
@@ -336,8 +341,8 @@ class NovoPedidoController {
                 },
                 TextField().apply {
                     styleClass.add("text-field")
-                    prefWidth = 100.0
-                    maxWidth = 100.0
+                    prefWidth = 95.0
+                    maxWidth = 95.0
                     text = "R$ ${String.format("%.2f", produto.valorUnitario).replace(".", ",")}"
                     alignment = Pos.CENTER_RIGHT
                     formatarMoeda(this)
@@ -376,19 +381,140 @@ class NovoPedidoController {
     }
 
     private fun createProdutoSection(): VBox {
+        val productField = TextField().apply {
+            styleClass.add("text-field")
+            maxWidth = Double.POSITIVE_INFINITY
+            HBox.setHgrow(this, Priority.ALWAYS)
+
+            val suggestionsMenu = ContextMenu().apply {
+                styleClass.add("product-suggestions")
+                style = """
+                -fx-background-color: white;
+                -fx-border-color: rgb(223, 225, 230);
+                -fx-border-width: 1px;
+                -fx-border-radius: 3px;
+                -fx-background-radius: 3px;
+                -fx-effect: dropshadow(gaussian, rgba(9, 30, 66, 0.15), 8, 0, 0, 2);
+                -fx-padding: 4px;
+            """
+            }
+
+            textProperty().addListener { _, _, newValue ->
+                if (newValue.length >= 2) {
+                    val produtos = searchProducts(newValue)
+                    suggestionsMenu.items.clear()
+
+                    if (produtos.isNotEmpty()) {
+                        // Add suggestions to menu with hover effects
+                        val maxToShow = 6
+                        val limitedProdutos = if (produtos.size > maxToShow) produtos.take(maxToShow) else produtos
+
+                        limitedProdutos.forEach { produto ->
+                            val menuItem = MenuItem(produto.nome)
+                            menuItem.style = """
+                            -fx-padding: 5px 8px;
+                            -fx-font-size: 13px;
+                            -fx-pref-width: ${this.width - 20}px; 
+
+                        """
+
+                            menuItem.setOnAction {
+                                text = produto.nome
+                                // Get the parent product row
+                                val produtoHBox = this.parent?.parent as? HBox
+                                // Get the valor field in the same row
+                                val valorField = ((produtoHBox?.children?.get(3) as? VBox)?.children?.get(1) as? TextField)
+                                valorField?.text = "R$ ${String.format("%.2f", produto.valorUnitario).replace('.', ',')}"
+                                suggestionsMenu.hide()
+                            }
+
+                            suggestionsMenu.items.add(menuItem)
+                        }
+
+                        // Show menu before setting width to ensure proper sizing
+                        suggestionsMenu.show(this, Side.BOTTOM, 0.0, 0.0)
+
+                        // Force the menu width to exactly match the field width
+                        Platform.runLater {
+                            suggestionsMenu.prefWidth = this.width
+                            suggestionsMenu.minWidth = this.width
+                            suggestionsMenu.maxWidth = this.width
+                        }
+                    }
+                } else {
+                    suggestionsMenu.hide()
+                }
+            }
+
+            setOnKeyPressed { event ->
+                if (event.code == KeyCode.ESCAPE) {
+                    suggestionsMenu.hide()
+                }
+            }
+
+            focusedProperty().addListener { _, _, focused ->
+                if (!focused) {
+                    Platform.runLater { suggestionsMenu.hide() }
+                }
+            }
+        }
+
         return VBox(10.0).apply {
             HBox.setHgrow(this, Priority.ALWAYS)
             children.addAll(
-                Label("Produto").apply {
-                    styleClass.add("field-label")
-                },
-                TextField().apply {
-                    styleClass.add("text-field")
-                    maxWidth = Double.POSITIVE_INFINITY
-                    HBox.setHgrow(this, Priority.ALWAYS)
-                }
+                Label("Produto").apply { styleClass.add("field-label") },
+                productField
             )
         }
+    }
+
+    // Add this method to search for products in the database
+    private fun searchProducts(query: String): List<Produto> {
+        val produtos = mutableListOf<Produto>()
+
+        try {
+            DatabaseHelper().getConnection().use { connection ->
+                val sql = """
+                SELECT id, codigo, nome, descricao, valor_unitario, categoria,
+                       unidade_medida, estoque_minimo, estoque_atual, status,
+                       data_cadastro, data_atualizacao
+                FROM produtos
+                WHERE LOWER(nome) LIKE LOWER(?) OR LOWER(codigo) LIKE LOWER(?)
+                LIMIT 10
+            """.trimIndent()
+
+                connection.prepareStatement(sql).use { stmt ->
+                    val searchPattern = "%$query%"
+                    stmt.setString(1, searchPattern)
+                    stmt.setString(2, searchPattern)
+
+                    stmt.executeQuery().use { rs ->
+                        while (rs.next()) {
+                            produtos.add(
+                                Produto(
+                                    id = rs.getLong("id"),
+                                    codigo = rs.getString("codigo"),
+                                    nome = rs.getString("nome"),
+                                    descricao = rs.getString("descricao"),
+                                    valorUnitario = rs.getDouble("valor_unitario"),
+                                    categoria = rs.getString("categoria"),
+                                    unidadeMedida = rs.getString("unidade_medida"),
+                                    estoqueMinimo = rs.getInt("estoque_minimo"),
+                                    estoqueAtual = rs.getInt("estoque_atual"),
+                                    status = rs.getString("status"),
+                                    dataCadastro = rs.getString("data_cadastro"),
+                                    dataAtualizacao = rs.getString("data_atualizacao")
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
+        }
+
+        return produtos
     }
 
     private fun createQuantityButton(tipo: String): Button {

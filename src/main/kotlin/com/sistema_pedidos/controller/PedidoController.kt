@@ -10,17 +10,17 @@ class PedidoController {
     fun adicionarProduto(id: Long, nome: String, valorUnitario: Double, quantidade: Int) {
         val produto = Produto(
             id = id,
-            codigo = null,
+            codigo = null.toString(),
             nome = nome,
-            descricao = null,
+            descricao = null.toString(),
             valorUnitario = valorUnitario,
-            categoria = null,
+            categoria = null.toString(),
             unidadeMedida = "UN",
             estoqueMinimo = 0,
             estoqueAtual = 0,
             status = "Ativo",
-            dataCadastro = null,
-            dataAtualizacao = null
+            dataCadastro = null.toString(),
+            dataAtualizacao = null.toString()
         )
         itensPedido.add(produto)
     }

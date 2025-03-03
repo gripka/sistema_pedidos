@@ -49,8 +49,8 @@ class DatabaseHelper {
                 estoque_minimo INTEGER DEFAULT 0,
                 estoque_atual INTEGER DEFAULT 0,
                 status TEXT CHECK (status IN ('Ativo', 'Inativo')) DEFAULT 'Ativo',
-            data_cadastro TIMESTAMP DEFAULT (datetime('now', 'localtime')),
-            data_atualizacao TIMESTAMP DEFAULT (datetime('now', 'localtime'))
+                data_cadastro TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                data_atualizacao TIMESTAMP DEFAULT (datetime('now', 'localtime'))
             )""",
 
             """CREATE TABLE IF NOT EXISTS pedidos (
