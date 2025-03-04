@@ -59,7 +59,6 @@ class ProdutosView : BorderPane() {
     }
 
     private fun setupUI() {
-        // Top Section
         val title = Label("Gerenciamento de Produtos").apply {
             style = "-fx-font-size: 24px; -fx-font-weight: bold;"
         }
@@ -196,7 +195,6 @@ class ProdutosView : BorderPane() {
                     if (buttonType == buttonTypeOk) textField.text else null
                 }
 
-                // Add hover effects after getting button references
                 confirmButton.setOnMouseEntered {
                     confirmButton.style += "-fx-background-color: #433a94;"
                 }
@@ -217,7 +215,34 @@ class ProdutosView : BorderPane() {
             }
         }
 
-        val topControls = HBox(10.0, searchField, searchButton, refreshButton, newButton, newCategoryButton).apply {
+        val btnHistorico = Button("Histórico de Movimentações").apply {
+            styleClass.add("secondary-button")
+            setOnAction { mostrarHistoricoMovimentacoes() }
+        }
+
+        val btnFiltrarBaixoEstoque = Button("Filtrar baixo estoque").apply {
+            tooltip = Tooltip("Mostrar apenas itens com estoque baixo")
+            styleClass.add("secondary-button")
+
+            var filtroAtivo = false
+
+            setOnAction {
+                filtroAtivo = !filtroAtivo
+                if (filtroAtivo) {
+                    style = "-fx-background-color: #FFA500; -fx-text-fill: white; -fx-font-weight: bold;"
+                    val produtosBaixoEstoque = produtos.filtered {
+                        it.estoqueAtual <= it.estoqueMinimo && it.estoqueMinimo > 0
+                    }
+                    tableView.items = produtosBaixoEstoque
+                } else {
+                    style = ""
+                    tableView.items = produtos
+                }
+            }
+        }
+
+
+        val topControls = HBox(10.0, searchField, searchButton, refreshButton, newButton, newCategoryButton, btnHistorico, btnFiltrarBaixoEstoque).apply {
             alignment = Pos.CENTER_LEFT
         }
 
@@ -229,13 +254,25 @@ class ProdutosView : BorderPane() {
 
         setTop(headerBox)
 
-        // Center - Table and Form side by side
+        // Center - Split in three sections
         val splitPane = HBox(20.0).apply {
-            children.addAll(createTableView(), createFormPanel())
+            children.addAll(
+                createTableView(),
+                VBox(20.0).apply {
+                    children.addAll(
+                        createFormPanel(),
+                        createStockDashboard()
+                    )
+                },
+            )
             HBox.setHgrow(tableView, Priority.ALWAYS)
         }
 
         setCenter(splitPane)
+
+        Platform.runLater {
+            verificarAlertasEstoque()
+        }
     }
 
     private fun limparFormulario() {
@@ -272,7 +309,6 @@ class ProdutosView : BorderPane() {
 
         setupTableView()
 
-        // Set growth properties
         VBox.setVgrow(tableView, Priority.ALWAYS)
         HBox.setHgrow(tableView, Priority.ALWAYS)
 
@@ -342,6 +378,12 @@ class ProdutosView : BorderPane() {
 
         cbEhInsumo = CheckBox("Este produto também pode ser usado como insumo").apply {
             isSelected = false
+            style = """
+        -fx-background-color: transparent;
+        -fx-border-radius: 3px;
+        -fx-background-radius: 3px;
+    """
+            styleClass.add("custom-checkbox")
         }
 
         cbCategoria = ComboBox<String>().apply {
@@ -350,7 +392,6 @@ class ProdutosView : BorderPane() {
             promptText = "Selecione ou digite uma categoria"
             prefWidth = Double.MAX_VALUE
 
-            // Add listener to save new categories when focus is lost
             editor.focusedProperty().addListener { _, wasFocused, isFocused ->
                 if (wasFocused && !isFocused) {
                     val newValue = editor.text.trim()
@@ -1341,22 +1382,30 @@ class ProdutosView : BorderPane() {
 
             val codigoColumn = TableColumn<Produto, String>("Código").apply {
                 cellValueFactory = PropertyValueFactory("codigo")
-                prefWidth = 120.0
+                prefWidth = 100.0
+                minWidth = 100.0
+                maxWidth = 100.0
             }
 
             val nomeColumn = TableColumn<Produto, String>("Nome").apply {
                 cellValueFactory = PropertyValueFactory("nome")
                 prefWidth = 250.0
+                minWidth = 250.0
+                maxWidth = 250.0
             }
 
             val categoriaColumn = TableColumn<Produto, String>("Categoria").apply {
                 cellValueFactory = PropertyValueFactory("categoria")
                 prefWidth = 150.0
+                minWidth = 150.0
+                maxWidth = 150.0
             }
 
             val valorColumn = TableColumn<Produto, Double>("Valor").apply {
                 cellValueFactory = PropertyValueFactory("valorUnitario")
                 prefWidth = 100.0
+                minWidth = 100.0
+                maxWidth = 100.0
                 cellFactory = Callback {
                     object : TableCell<Produto, Double>() {
                         override fun updateItem(item: Double?, empty: Boolean) {
@@ -1375,11 +1424,34 @@ class ProdutosView : BorderPane() {
             val estoqueColumn = TableColumn<Produto, Int>("Estoque").apply {
                 cellValueFactory = PropertyValueFactory("estoqueAtual")
                 prefWidth = 80.0
+                minWidth = 80.0
+                maxWidth = 80.0
+                cellFactory = Callback {
+                    object : TableCell<Produto, Int>() {
+                        override fun updateItem(item: Int?, empty: Boolean) {
+                            super.updateItem(item, empty)
+                            if (empty || item == null) {
+                                text = null
+                                style = ""
+                            } else {
+                                val row = tableRow.item
+                                text = item.toString()
+                                style = if (row != null && item <= row.estoqueMinimo && row.estoqueMinimo > 0) {
+                                    "-fx-text-fill: white; -fx-background-color: #ff5252; -fx-font-weight: bold;"
+                                } else {
+                                    ""
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             val statusColumn = TableColumn<Produto, String>("Status").apply {
                 cellValueFactory = PropertyValueFactory("status")
                 prefWidth = 80.0
+                minWidth = 80.0
+                maxWidth = 80.0
                 cellFactory = Callback {
                     object : TableCell<Produto, String>() {
                         override fun updateItem(item: String?, empty: Boolean) {
@@ -1395,6 +1467,66 @@ class ProdutosView : BorderPane() {
                                     else -> ""
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            val gerenciarEstoqueColumn = TableColumn<Produto, Void>("Gerenciar Estoque").apply {
+                prefWidth = 250.0
+                minWidth = 250.0
+                maxWidth = 300.0
+
+                cellFactory = Callback {
+                    object : TableCell<Produto, Void>() {
+                        private val btnEntrada = Button("Entrada").apply {
+                            styleClass.add("small-button")
+                            style = "-fx-background-color: #4CAF50; -fx-text-fill: white;"
+                            prefWidth = 70.0
+                        }
+
+                        private val btnSaida = Button("Saída").apply {
+                            styleClass.add("small-button")
+                            style = "-fx-background-color: #FF9800; -fx-text-fill: white;"
+                            prefWidth = 60.0
+                        }
+
+                        private val btnAjuste = Button("Ajuste").apply {
+                            styleClass.add("small-button")
+                            style = "-fx-background-color: #6056e8; -fx-text-fill: white;"
+                            prefWidth = 60.0
+                        }
+
+                        private val box = HBox(5.0, btnEntrada, btnSaida, btnAjuste).apply {
+                            alignment = Pos.CENTER
+                        }
+
+                        init {
+                            btnEntrada.setOnAction {
+                                val produto = tableRow.item
+                                if (produto != null) {
+                                    registrarMovimentacaoEstoqueProduto(produto, "entrada")
+                                }
+                            }
+
+                            btnSaida.setOnAction {
+                                val produto = tableRow.item
+                                if (produto != null) {
+                                    registrarMovimentacaoEstoqueProduto(produto, "saida")
+                                }
+                            }
+
+                            btnAjuste.setOnAction {
+                                val produto = tableRow.item
+                                if (produto != null) {
+                                    registrarMovimentacaoEstoqueProduto(produto, "ajuste")
+                                }
+                            }
+                        }
+
+                        override fun updateItem(item: Void?, empty: Boolean) {
+                            super.updateItem(item, empty)
+                            graphic = if (empty) null else box
                         }
                     }
                 }
@@ -1452,7 +1584,7 @@ class ProdutosView : BorderPane() {
 
             columns.addAll(
                 codigoColumn, nomeColumn, categoriaColumn, valorColumn,
-                estoqueColumn, statusColumn, acoesColumn
+                estoqueColumn, gerenciarEstoqueColumn, statusColumn, acoesColumn
             )
 
             selectionModel.selectedItemProperty().addListener { _, _, newSelection ->
@@ -1462,6 +1594,668 @@ class ProdutosView : BorderPane() {
             }
         }
     }
+
+    private fun registrarMovimentacaoEstoqueProduto(produto: Produto, tipo: String) {
+        val dialog = Dialog<Map<String, Any>>()
+        dialog.title = "Movimentação de Estoque"
+        dialog.headerText = when(tipo) {
+            "entrada" -> "Entrada de Estoque: ${produto.nome}"
+            "saida" -> "Saída de Estoque: ${produto.nome}"
+            else -> "Ajuste de Estoque: ${produto.nome}"
+        }
+        dialog.initStyle(StageStyle.UNDECORATED)
+
+        val buttonTypeOk = ButtonType("Confirmar", ButtonBar.ButtonData.OK_DONE)
+        val buttonTypeCancel = ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE)
+        dialog.dialogPane.buttonTypes.addAll(buttonTypeOk, buttonTypeCancel)
+        dialog.dialogPane.stylesheets.addAll(this.stylesheets)
+
+        val tfQuantidade = TextField("1").apply {
+            prefWidth = 80.0
+            textProperty().addListener { _, _, newValue ->
+                if (!newValue.matches(Regex("\\d*"))) {
+                    text = newValue.replace(Regex("[^\\d]"), "")
+                }
+                if (text.isEmpty()) text = "1"
+            }
+        }
+
+        val tfMotivo = TextField().apply {
+            prefWidth = 300.0
+            promptText = "Motivo da movimentação"
+        }
+
+        val content = VBox(10.0).apply {
+            padding = Insets(20.0)
+            prefWidth = 400.0
+
+            children.addAll(
+                Label("Quantidade:"),
+                tfQuantidade,
+                Label("Motivo:"),
+                tfMotivo
+            )
+        }
+
+        dialog.dialogPane.content = content
+        dialog.dialogPane.style = """
+        -fx-background-color: white;
+        -fx-border-color: #D3D3D3;
+        -fx-border-width: 1px;
+    """
+
+        dialog.dialogPane.lookup(".header-panel")?.style = """
+        -fx-background-color: #2B2D30;
+        -fx-background-radius: 0;
+    """
+
+        val headerLabel = dialog.dialogPane.lookup(".header-panel .label") as? Label
+        headerLabel?.style = "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"
+
+        val okButton = dialog.dialogPane.lookupButton(buttonTypeOk)
+        val cancelButton = dialog.dialogPane.lookupButton(buttonTypeCancel)
+
+        okButton.styleClass.add("primary-button")
+        cancelButton.styleClass.add("secondary-button")
+
+        val buttonBar = dialog.dialogPane.lookup(".button-bar") as ButtonBar
+        buttonBar.apply {
+            buttonOrder = ""
+            buttonMinWidth = 100.0
+            padding = Insets(0.0, 0.0, 0.0, 0.0)
+            style = "-fx-background-color: white; -fx-alignment: center;"
+        }
+
+        dialog.setResultConverter {
+            if (it == buttonTypeOk) {
+                val quantidade = tfQuantidade.text.toIntOrNull() ?: 0
+                val motivo = tfMotivo.text
+
+                if (quantidade > 0) {
+                    mapOf(
+                        "produto" to produto,
+                        "quantidade" to quantidade,
+                        "motivo" to motivo,
+                        "tipo" to tipo
+                    )
+                } else null
+            } else null
+        }
+
+        val result = dialog.showAndWait()
+        result.ifPresent { data ->
+            processarMovimentacaoEstoque(
+                data["produto"] as Produto,
+                data["quantidade"] as Int,
+                data["tipo"] as String,
+                data["motivo"] as String
+            )
+        }
+    }
+
+
+    private fun processarMovimentacaoEstoque(produto: Produto, quantidade: Int, tipo: String, motivo: String) {
+        try {
+            db.getConnection().use { conn ->
+                conn.autoCommit = false
+                try {
+                    // Get current stock
+                    val stmtSelect = conn.prepareStatement("SELECT estoque_atual FROM produtos WHERE id = ?")
+                    stmtSelect.setLong(1, produto.id)
+                    val rs = stmtSelect.executeQuery()
+
+                    if (rs.next()) {
+                        val estoqueAtual = rs.getInt("estoque_atual")
+                        var novoEstoque = estoqueAtual
+
+                        // Calculate new stock based on movement type
+                        when (tipo) {
+                            "entrada" -> novoEstoque += quantidade
+                            "saida" -> {
+                                if (estoqueAtual < quantidade) {
+                                    throw Exception("Estoque insuficiente para saída. Disponível: $estoqueAtual")
+                                }
+                                novoEstoque -= quantidade
+                            }
+                            "ajuste" -> novoEstoque = quantidade
+                        }
+
+                        // Update stock
+                        val stmtUpdate = conn.prepareStatement(
+                            "UPDATE produtos SET estoque_atual = ? WHERE id = ?"
+                        )
+                        stmtUpdate.setInt(1, novoEstoque)
+                        stmtUpdate.setLong(2, produto.id)
+                        stmtUpdate.executeUpdate()
+
+                        // Register movement in history
+                        criarTabelaMovimentacoes(conn)
+
+                        val stmtMovimento = conn.prepareStatement("""
+                        INSERT INTO movimentacao_estoque (
+                            produto_id, quantidade_anterior, quantidade_nova, 
+                            quantidade_movimentada, tipo_movimentacao, motivo, usuario
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """)
+                        stmtMovimento.setLong(1, produto.id)
+                        stmtMovimento.setInt(2, estoqueAtual)
+                        stmtMovimento.setInt(3, novoEstoque)
+                        stmtMovimento.setInt(4, quantidade)
+                        stmtMovimento.setString(5, tipo)
+                        stmtMovimento.setString(6, motivo)
+                        stmtMovimento.setString(7, "Sistema") // In a real app, use logged user name
+                        stmtMovimento.executeUpdate()
+
+                        conn.commit()
+
+                        // Update the local list
+                        val index = produtos.indexOfFirst { it.id == produto.id }
+                        if (index != -1) {
+                            val updatedProduto = produto.copy(estoqueAtual = novoEstoque)
+                            produtos[index] = updatedProduto
+                            tableView.refresh()
+                        }
+
+                        mostrarMensagemSucesso(
+                            "Movimentação Registrada",
+                            "Movimentação de estoque registrada com sucesso!"
+                        )
+                    }
+                } catch (e: Exception) {
+                    conn.rollback()
+                    throw e
+                } finally {
+                    conn.autoCommit = true
+                }
+            }
+        } catch (e: SQLException) {
+            showAlert("Erro na movimentação", e.message ?: "Erro ao processar movimentação de estoque")
+        } catch (e: Exception) {
+            showAlert("Erro na movimentação", e.message ?: "Erro ao processar movimentação de estoque")
+        }
+    }
+
+    private fun criarTabelaMovimentacoes(conn: Connection) {
+        val stmt = conn.createStatement()
+        stmt.execute("""
+        CREATE TABLE IF NOT EXISTS movimentacao_estoque (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            produto_id INTEGER NOT NULL,
+            quantidade_anterior INTEGER NOT NULL,
+            quantidade_nova INTEGER NOT NULL,
+            quantidade_movimentada INTEGER NOT NULL,
+            tipo_movimentacao TEXT NOT NULL,
+            motivo TEXT,
+            usuario TEXT,
+            data_movimentacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (produto_id) REFERENCES produtos(id)
+        )
+    """)
+    }
+
+    private fun mostrarHistoricoMovimentacoes() {
+        val dialog = Dialog<Void>()
+        dialog.title = "Histórico de Movimentações"
+        dialog.headerText = "Histórico de Movimentações de Estoque"
+        dialog.initStyle(StageStyle.UNDECORATED)
+
+        val buttonTypeClose = ButtonType("Fechar", ButtonBar.ButtonData.CANCEL_CLOSE)
+        dialog.dialogPane.buttonTypes.add(buttonTypeClose)
+        dialog.dialogPane.stylesheets.addAll(this.stylesheets)
+
+        val tableMovimentacoes = TableView<Map<String, Any>>()
+
+        val colunas = listOf(
+            TableColumn<Map<String, Any>, String>("Data/Hora").apply {
+                cellValueFactory = Callback { param ->
+                    javafx.beans.property.SimpleStringProperty(param.value["data"].toString())
+                }
+                prefWidth = 150.0
+            },
+            TableColumn<Map<String, Any>, String>("Produto").apply {
+                cellValueFactory = Callback { param ->
+                    javafx.beans.property.SimpleStringProperty(param.value["produto"].toString())
+                }
+                prefWidth = 200.0
+            },
+            TableColumn<Map<String, Any>, String>("Tipo").apply {
+                cellValueFactory = Callback { param ->
+                    javafx.beans.property.SimpleStringProperty(
+                        when(param.value["tipo"]) {
+                            "entrada" -> "Entrada"
+                            "saida" -> "Saída"
+                            "ajuste" -> "Ajuste"
+                            else -> param.value["tipo"].toString()
+                        }
+                    )
+                }
+                prefWidth = 100.0
+            },
+            TableColumn<Map<String, Any>, Int>("Qtd. Anterior").apply {
+                cellValueFactory = Callback { param ->
+                    javafx.beans.property.SimpleIntegerProperty(param.value["anterior"] as Int).asObject()
+                }
+                prefWidth = 100.0
+                style = "-fx-alignment: CENTER-RIGHT;"
+            },
+            TableColumn<Map<String, Any>, Int>("Qtd. Nova").apply {
+                cellValueFactory = Callback { param ->
+                    javafx.beans.property.SimpleIntegerProperty(param.value["nova"] as Int).asObject()
+                }
+                prefWidth = 100.0
+                style = "-fx-alignment: CENTER-RIGHT;"
+            },
+            TableColumn<Map<String, Any>, String>("Motivo").apply {
+                cellValueFactory = Callback { param ->
+                    javafx.beans.property.SimpleStringProperty(param.value["motivo"].toString())
+                }
+                prefWidth = 200.0
+            }
+        )
+
+        tableMovimentacoes.columns.addAll(colunas)
+        tableMovimentacoes.prefHeight = 400.0
+        tableMovimentacoes.prefWidth = 850.0
+
+        // Load data
+        val movimentacoes = carregarHistoricoMovimentacoes()
+        tableMovimentacoes.items = FXCollections.observableArrayList(movimentacoes)
+
+        val content = VBox(10.0).apply {
+            padding = Insets(20.0)
+            children.add(tableMovimentacoes)
+        }
+
+        dialog.dialogPane.content = content
+        dialog.dialogPane.style = """
+        -fx-background-color: white;
+        -fx-border-color: #D3D3D3;
+        -fx-border-width: 1px;
+    """
+
+        dialog.dialogPane.lookup(".header-panel")?.style = """
+        -fx-background-color: #2B2D30;
+        -fx-background-radius: 0;
+    """
+
+        val headerLabel = dialog.dialogPane.lookup(".header-panel .label") as? Label
+        headerLabel?.style = "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"
+
+        val closeButton = dialog.dialogPane.lookupButton(buttonTypeClose)
+        closeButton.styleClass.add("secondary-button")
+
+        // Fix the button bar alignment
+        val buttonBar = dialog.dialogPane.lookup(".button-bar") as ButtonBar
+        buttonBar.apply {
+            buttonOrder = ""
+            buttonMinWidth = 100.0
+            padding = Insets(0.0, 0.0, 0.0, 0.0)
+            style = "-fx-background-color: white; -fx-alignment: center;"
+        }
+
+        dialog.showAndWait()
+    }
+
+
+    private fun carregarHistoricoMovimentacoes(): List<Map<String, Any>> {
+        val movimentacoes = mutableListOf<Map<String, Any>>()
+
+        try {
+            db.getConnection().use { conn ->
+                // Create table if not exists
+                criarTabelaMovimentacoes(conn)
+
+                val stmt = conn.prepareStatement("""
+                SELECT m.*, p.nome as nome_produto
+                FROM movimentacao_estoque m
+                JOIN produtos p ON m.produto_id = p.id
+                ORDER BY m.data_movimentacao DESC
+                LIMIT 100
+            """)
+
+                val rs = stmt.executeQuery()
+                while (rs.next()) {
+                    movimentacoes.add(mapOf(
+                        "id" to rs.getLong("id"),
+                        "produto" to rs.getString("nome_produto"),
+                        "anterior" to rs.getInt("quantidade_anterior"),
+                        "nova" to rs.getInt("quantidade_nova"),
+                        "movimentada" to rs.getInt("quantidade_movimentada"),
+                        "tipo" to rs.getString("tipo_movimentacao"),
+                        "motivo" to (rs.getString("motivo") ?: ""),
+                        "usuario" to (rs.getString("usuario") ?: ""),
+                        "data" to rs.getString("data_movimentacao")
+                    ))
+                }
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
+        }
+
+        return movimentacoes
+    }
+
+    private fun verificarAlertasEstoque() {
+        val produtosBaixoEstoque = mutableListOf<Produto>()
+
+        try {
+            db.getConnection().use { conn ->
+                val stmt = conn.prepareStatement(
+                    "SELECT * FROM produtos WHERE estoque_atual <= estoque_minimo AND estoque_minimo > 0 AND status = 'Ativo'"
+                )
+                val rs = stmt.executeQuery()
+
+                while (rs.next()) {
+                    produtosBaixoEstoque.add(
+                        Produto(
+                            id = rs.getLong("id"),
+                            codigo = rs.getString("codigo"),
+                            nome = rs.getString("nome"),
+                            descricao = rs.getString("descricao"),
+                            valorUnitario = rs.getDouble("valor_unitario"),
+                            categoria = rs.getString("categoria"),
+                            unidadeMedida = rs.getString("unidade_medida"),
+                            estoqueMinimo = rs.getInt("estoque_minimo"),
+                            estoqueAtual = rs.getInt("estoque_atual"),
+                            status = rs.getString("status"),
+                            ehInsumo = rs.getInt("eh_insumo") == 1
+                        )
+                    )
+                }
+            }
+
+            if (produtosBaixoEstoque.isNotEmpty()) {
+                showLowStockAlert(produtosBaixoEstoque)
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun showLowStockAlert(produtos: List<Produto>) {
+        val dialog = Dialog<ButtonType>()
+        dialog.title = "Alerta de Estoque"
+        dialog.headerText = "Produtos com Estoque Baixo"
+        dialog.initStyle(StageStyle.UNDECORATED)
+
+        val buttonTypeOk = ButtonType("OK", ButtonBar.ButtonData.OK_DONE)
+        dialog.dialogPane.buttonTypes.add(buttonTypeOk)
+        dialog.dialogPane.stylesheets.addAll(this.stylesheets)
+
+        val content = VBox(10.0).apply {
+            padding = Insets(20.0)
+            prefWidth = 500.0
+
+            children.add(Label("Os seguintes produtos estão com estoque abaixo do mínimo:").apply {
+                style = "-fx-font-size: 14px; -fx-font-weight: bold;"
+            })
+
+            val table = TableView<Produto>().apply {
+                items = FXCollections.observableArrayList(produtos)
+                columnResizePolicy = TableView.CONSTRAINED_RESIZE_POLICY
+                prefHeight = 250.0
+
+                columns.addAll(
+                    TableColumn<Produto, String>("Código").apply {
+                        cellValueFactory = PropertyValueFactory("codigo")
+                        prefWidth = 80.0
+                    },
+                    TableColumn<Produto, String>("Nome").apply {
+                        cellValueFactory = PropertyValueFactory("nome")
+                        prefWidth = 150.0
+                    },
+                    TableColumn<Produto, Int>("Estoque Atual").apply {
+                        cellValueFactory = PropertyValueFactory("estoqueAtual")
+                        prefWidth = 100.0
+                        style = "-fx-alignment: CENTER-RIGHT;"
+                    },
+                    TableColumn<Produto, Int>("Estoque Mínimo").apply {
+                        cellValueFactory = PropertyValueFactory("estoqueMinimo")
+                        prefWidth = 100.0
+                        style = "-fx-alignment: CENTER-RIGHT;"
+                    }
+                )
+            }
+
+            children.add(table)
+        }
+
+        dialog.dialogPane.style = """
+        -fx-background-color: white;
+        -fx-border-color: #D3D3D3;
+        -fx-border-width: 1px;
+    """
+
+        dialog.dialogPane.content = content
+        dialog.dialogPane.lookup(".header-panel")?.style = """
+        -fx-background-color: #FFA500;
+        -fx-background-radius: 0;
+    """
+
+        val headerLabel = dialog.dialogPane.lookup(".header-panel .label") as? Label
+        headerLabel?.style = "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"
+
+        val okButton = dialog.dialogPane.lookupButton(buttonTypeOk)
+        okButton.styleClass.add("primary-button")
+
+        val buttonBar = dialog.dialogPane.lookup(".button-bar") as ButtonBar
+        buttonBar.apply {
+            buttonOrder = ""
+            buttonMinWidth = 100.0
+            style = "-fx-background-color: white; -fx-alignment: center;"
+            padding = Insets(0.0, 0.0, 0.0, 0.0)
+        }
+
+        dialog.showAndWait()
+    }
+
+    private lateinit var imgProduto: ImageView
+    private var produtoImagePath: String? = null
+
+    private fun setupImageUpload(): HBox {
+        imgProduto = ImageView().apply {
+            fitHeight = 100.0
+            fitWidth = 100.0
+            isPreserveRatio = true
+            style = """
+            -fx-border-color: #dfe1e6;
+            -fx-border-width: 1px;
+            -fx-border-radius: 3px;
+            -fx-background-color: #f4f5f7;
+        """
+
+            // Default image if no product image is selected
+            image = Image(javaClass.getResourceAsStream("/icons/no_image.png") ?: return@apply)
+        }
+
+        val btnSelecionarImagem = Button("Selecionar Imagem").apply {
+            styleClass.add("secondary-button")
+            setOnAction {
+                val fileChooser = javafx.stage.FileChooser()
+                fileChooser.title = "Selecionar Imagem do Produto"
+                fileChooser.extensionFilters.addAll(
+                    javafx.stage.FileChooser.ExtensionFilter("Imagens", "*.png", "*.jpg", "*.jpeg")
+                )
+
+                val selectedFile = fileChooser.showOpenDialog(scene.window)
+                if (selectedFile != null) {
+                    try {
+                        val image = Image(selectedFile.toURI().toString())
+                        imgProduto.image = image
+                        produtoImagePath = selectedFile.absolutePath
+                    } catch (e: Exception) {
+                        showAlert("Erro ao carregar imagem", "Não foi possível carregar a imagem selecionada.")
+                    }
+                }
+            }
+        }
+
+        val btnRemoverImagem = Button("Remover").apply {
+            styleClass.add("secondary-button")
+            style = "-fx-background-color: #ff5252; -fx-text-fill: white;"
+            setOnAction {
+                imgProduto.image = Image(javaClass.getResourceAsStream("/icons/no_image.png") ?: return@setOnAction)
+                produtoImagePath = null
+            }
+        }
+
+        return HBox(10.0, imgProduto, VBox(10.0, btnSelecionarImagem, btnRemoverImagem)).apply {
+            alignment = Pos.CENTER_LEFT
+        }
+    }
+
+    private lateinit var tfCodigoBarras: TextField
+
+    private fun setupBarcodeSection(): VBox {
+        val section = VBox(10.0)
+
+        val title = Label("Código de Barras").apply {
+            style = "-fx-font-weight: bold; -fx-font-size: 14px;"
+        }
+
+        tfCodigoBarras = TextField().apply {
+            promptText = "Código de barras"
+            isEditable = true
+            prefHeight = 36.0
+        }
+
+        val btnGerarCodigoBarras = Button("Gerar").apply {
+            styleClass.add("primary-button")
+            setOnAction {
+                // Generate a random EAN-13 barcode
+                val random = Random()
+                val digits = (1..12).map { random.nextInt(10) }
+
+                // Calculate check digit
+                val sum = digits.mapIndexed { index, digit ->
+                    digit * if (index % 2 == 0) 1 else 3
+                }.sum()
+                val checkDigit = (10 - (sum % 10)) % 10
+
+                val digitStr = digits.joinToString("") + checkDigit
+
+                tfCodigoBarras.text = digitStr
+            }
+        }
+
+        val btnValidarCodigo = Button("Validar").apply {
+            styleClass.add("secondary-button")
+            setOnAction {
+                val codigo = tfCodigoBarras.text
+                if (codigo.matches(Regex("\\d{13}"))) {
+                    showAlert("Código Válido", "O código de barras é válido.", Alert.AlertType.INFORMATION)
+                } else {
+                    showAlert("Código Inválido", "O código de barras deve conter 13 dígitos numéricos.")
+                }
+            }
+        }
+
+        val controlsBox = HBox(10.0, tfCodigoBarras, btnGerarCodigoBarras, btnValidarCodigo).apply {
+            alignment = Pos.CENTER_LEFT
+        }
+
+        section.children.addAll(title, controlsBox)
+        return section
+    }
+
+    private lateinit var dashboardContainer: VBox
+    private lateinit var lblTotalProdutos: Label
+    private lateinit var lblBaixoEstoque: Label
+    private lateinit var lblValorEstoque: Label
+    private lateinit var lblSemMovimentacao: Label
+
+    private fun createStockDashboard(): VBox {
+        dashboardContainer = VBox(15.0).apply {
+            padding = Insets(15.0)
+            style = """
+            -fx-background-color: white;
+            -fx-border-color: #dfe1e6;
+            -fx-border-width: 1px;
+            -fx-border-radius: 3px;
+        """
+        }
+
+        val title = Label("Dashboard de Estoque").apply {
+            style = "-fx-font-weight: bold; -fx-font-size: 16px;"
+        }
+
+        lblTotalProdutos = Label("0")
+        lblBaixoEstoque = Label("0")
+        lblValorEstoque = Label("R$ 0,00")
+        lblSemMovimentacao = Label("0")
+
+        dashboardContainer.children.addAll(
+            title,
+            createKpiCard("Total de Produtos", lblTotalProdutos, "#4CAF50"),
+            createKpiCard("Produtos com Estoque Baixo", lblBaixoEstoque, "#FFA500"),
+            createKpiCard("Valor Total em Estoque", lblValorEstoque, "#2196F3"),
+            createKpiCard("Produtos sem Movimentação", lblSemMovimentacao, "#9C27B0")
+        )
+
+        updateDashboard()
+
+        return dashboardContainer
+    }
+
+    private fun updateDashboard() {
+        val totalProdutos = produtos.size
+
+        val baixoEstoque = produtos.count { it.estoqueAtual <= it.estoqueMinimo && it.estoqueMinimo > 0 }
+
+        val valorEstoque = produtos.sumOf { it.valorUnitario * it.estoqueAtual }
+
+        val diasSemMovimentacao = 30 // Define threshold here
+        val dataLimite = java.time.LocalDate.now().minusDays(diasSemMovimentacao.toLong())
+
+        val semMovimentacao = db.getConnection().use { conn ->
+            val stmt = conn.prepareStatement("""
+            SELECT COUNT(DISTINCT p.id) FROM produtos p
+            LEFT JOIN movimentacao_estoque m ON p.id = m.produto_id 
+            AND m.data_movimentacao > ?
+            WHERE p.status = 'Ativo' 
+            AND p.estoque_atual > 0
+            AND m.id IS NULL
+        """)
+            stmt.setString(1, dataLimite.toString())
+            val rs = stmt.executeQuery()
+            if (rs.next()) rs.getInt(1) else 0
+        }
+
+        val format = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
+
+        lblTotalProdutos.text = totalProdutos.toString()
+        lblBaixoEstoque.text = baixoEstoque.toString()
+        lblValorEstoque.text = format.format(valorEstoque)
+        lblSemMovimentacao.text = semMovimentacao.toString()
+    }
+
+    private fun createKpiCard(title: String, valueLabel: Label, color: String): VBox {
+        val card = VBox(5.0).apply {
+            padding = Insets(15.0)
+            style = """
+            -fx-background-color: white;
+            -fx-border-color: $color;
+            -fx-border-width: 0 0 0 5px;
+            -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 1);
+        """
+        }
+
+        card.children.addAll(
+            Label(title).apply {
+                style = "-fx-font-size: 14px; -fx-text-fill: #555;"
+            },
+            valueLabel.apply {
+                style = """
+                -fx-font-size: 24px;
+                -fx-font-weight: bold;
+                -fx-text-fill: $color;
+            """
+            }
+        )
+
+        return card
+    }
+
 
     fun processarEstoqueInsumos(produtoId: Long, quantidade: Int) {
         try {
@@ -1527,8 +2321,8 @@ class ProdutosView : BorderPane() {
         }
     }
 
-    private fun loadProducts() {
-        produtos.clear()
+    private fun loadProductsFromDb(): List<Produto> {
+        val produtosList = mutableListOf<Produto>()
         try {
             db.getConnection().use { conn ->
                 val stmt = conn.createStatement()
@@ -1537,7 +2331,7 @@ class ProdutosView : BorderPane() {
                 var count = 0
                 while (rs.next()) {
                     count++
-                    produtos.add(
+                    produtosList.add(
                         Produto(
                             id = rs.getLong("id"),
                             codigo = rs.getString("codigo"),
@@ -1555,12 +2349,18 @@ class ProdutosView : BorderPane() {
                         )
                     )
                 }
-                println("Loaded $count products from database") // Debug statement
+                println("Loaded $count products from database")
             }
         } catch (e: SQLException) {
-            e.printStackTrace() // Print full stack trace for debugging
+            e.printStackTrace()
             showAlert("Erro ao carregar produtos", e.message ?: "Erro ao acessar banco de dados")
         }
+        return produtosList
+    }
+
+    private fun loadProducts() {
+        produtos.setAll(loadProductsFromDb())
+        updateDashboard()
     }
 
     private fun searchProducts(term: String) {
@@ -1710,6 +2510,7 @@ class ProdutosView : BorderPane() {
         }
         return itens
     }
+
 
     private fun deleteProduct(produto: Produto) {
         try {

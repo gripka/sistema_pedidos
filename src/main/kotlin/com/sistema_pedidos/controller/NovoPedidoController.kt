@@ -469,20 +469,20 @@ class NovoPedidoController {
         }
     }
 
-    // Add this method to search for products in the database
     private fun searchProducts(query: String): List<Produto> {
         val produtos = mutableListOf<Produto>()
 
         try {
             DatabaseHelper().getConnection().use { connection ->
                 val sql = """
-                SELECT id, codigo, nome, descricao, valor_unitario, categoria,
-                       unidade_medida, estoque_minimo, estoque_atual, status,
-                       data_cadastro, data_atualizacao
-                FROM produtos
-                WHERE LOWER(nome) LIKE LOWER(?) OR LOWER(codigo) LIKE LOWER(?)
-                LIMIT 10
-            """.trimIndent()
+                    SELECT id, codigo, nome, descricao, valor_unitario, categoria,
+                           unidade_medida, estoque_minimo, estoque_atual, status,
+                           data_cadastro, data_atualizacao
+                    FROM produtos
+                    WHERE (LOWER(nome) LIKE LOWER(?) OR LOWER(codigo) LIKE LOWER(?))
+                    AND status = 'Ativo'
+                    LIMIT 10
+                """.trimIndent()
 
                 connection.prepareStatement(sql).use { stmt ->
                     val searchPattern = "%$query%"

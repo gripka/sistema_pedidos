@@ -693,3 +693,23 @@
     -fx-pref-width: 100px;
 }
 
+.custom-checkbox .box {
+    -fx-background-color: white;
+    -fx-border-color: #cccccc;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+    -fx-border-width: 1px;
+}
+
+.custom-checkbox:selected .box {
+    -fx-background-color: #6056e8;
+    -fx-border-color: #6056e8;
+}
+
+.custom-checkbox:selected .mark {
+    -fx-background-color: white;
+}
+
+.custom-checkbox:hover .box {
+    -fx-border-color: #6056e8;
+}
