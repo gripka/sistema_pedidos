@@ -845,6 +845,56 @@ class NovoPedidoController {
         }
     }
 
+    private fun findProdutoIdByName(connection: Connection, nomeProduto: String): Long? {
+        connection.prepareStatement("SELECT id FROM produtos WHERE nome = ?").use { stmt ->
+            stmt.setString(1, nomeProduto)
+            val resultSet = stmt.executeQuery()
+            if (resultSet.next()) {
+                return resultSet.getLong("id")
+            }
+        }
+        return null
+    }
+
+    private fun atualizarEstoqueInsumos(connection: Connection, produtoId: Long, quantidade: Int) {
+        // Get all ingredients for this product
+        connection.prepareStatement("""
+        SELECT pi.insumo_id, pi.quantidade 
+        FROM produto_insumos pi
+        WHERE pi.produto_id = ?
+    """).use { stmt ->
+            stmt.setLong(1, produtoId)
+            val rs = stmt.executeQuery()
+
+            while (rs.next()) {
+                val insumoId = rs.getLong("insumo_id")
+                val qtdPorProduto = rs.getDouble("quantidade")
+                val qtdTotal = qtdPorProduto * quantidade
+
+                // Update insumo inventory
+                connection.prepareStatement(
+                    "UPDATE produtos SET estoque_atual = estoque_atual - ? WHERE id = ?"
+                ).use { updateStmt ->
+                    updateStmt.setDouble(1, qtdTotal)
+                    updateStmt.setLong(2, insumoId)
+                    updateStmt.executeUpdate()
+                }
+            }
+        }
+    }
+
+    private fun atualizarEstoqueProduto(connection: Connection, produtoId: Long, quantidade: Int) {
+        connection.prepareStatement(
+            "UPDATE produtos SET estoque_atual = estoque_atual - ? WHERE id = ?"
+        ).use { stmt ->
+            stmt.setInt(1, quantidade)
+            stmt.setLong(2, produtoId)
+            stmt.executeUpdate()
+        }
+    }
+
+
+
     fun salvarPedido(
         clienteInfo: List<Pair<String, String>>,
         pagamentoInfo: List<Pair<String, String>>,
@@ -937,9 +987,11 @@ class NovoPedidoController {
                         val valorUnitario = parseMoneyValue(valorField.text)
                         val subtotal = parseMoneyValue(subtotalField.text)
 
+                        val produtoId = findProdutoIdByName(connection, nomeProduto)
+
                         connection.prepareStatement(itemQuery).use { stmt ->
                             stmt.setLong(1, pedidoId)
-                            stmt.setObject(2, null)
+                            stmt.setObject(2, produtoId)
                             stmt.setString(3, nomeProduto)
                             stmt.setInt(4, quantidade)
                             stmt.setDouble(5, valorUnitario)
@@ -947,7 +999,14 @@ class NovoPedidoController {
                             stmt.executeUpdate()
                         }
 
-                        atualizarEstoqueInsumos(connection, nomeProduto, quantidade)
+                        // If we found a valid product ID, update inventory
+                        if (produtoId != null) {
+                            // Update insumos inventory
+                            atualizarEstoqueInsumos(connection, produtoId, quantidade)
+
+                            // Also update the product's own inventory
+                            atualizarEstoqueProduto(connection, produtoId, quantidade)
+                        }
                     }
 
                     if (entregaInfo.first().second == "Sim") {

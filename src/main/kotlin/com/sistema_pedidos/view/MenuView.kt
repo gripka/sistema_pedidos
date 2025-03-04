@@ -22,7 +22,6 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
         padding = Insets(1.0)
         styleClass.addAll("menu-right-border", "menu-left-bottom-border")
 
-        // Top section (Fixed Button)
         val topButton = createTopButton("/icons/menu.png") { toggleMenu() }
         val topSection = HBox(topButton).apply {
             alignment = Pos.TOP_LEFT
@@ -45,7 +44,6 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
         VBox.setVgrow(sectionsContainer, Priority.ALWAYS)
         children.add(sectionsContainer)
 
-        // Bottom section
         val bottomSection = VBox().apply {
             alignment = Pos.BOTTOM_CENTER
             spacing = 10.0
@@ -121,25 +119,29 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
     }
 
     private fun toggleMenu() {
-        val targetWidth = if (isExpanded) 40.0 else 230.0
+        val startWidth = prefWidth
+        val endWidth = if (isExpanded) 40.0 else 230.0
+
         val transition = object : Transition() {
             init {
                 cycleDuration = Duration.millis(300.0)
             }
 
             override fun interpolate(frac: Double) {
-                prefWidth = 40.0 + (targetWidth - 40.0) * frac
+                prefWidth = startWidth + (endWidth - startWidth) * frac
             }
         }
 
-        children.filterIsInstance<VBox>().forEach { section ->
-            section.children.filterIsInstance<HBox>().forEach { hbox ->
-                val label = hbox.children[1] as Label
-                label.isVisible = !isExpanded
+        transition.setOnFinished {
+            children.filterIsInstance<VBox>().forEach { section ->
+                section.children.filterIsInstance<HBox>().forEach { hbox ->
+                    val label = hbox.children[1] as Label
+                    label.isVisible = !isExpanded
+                }
             }
+            isExpanded = !isExpanded
         }
 
         transition.play()
-        isExpanded = !isExpanded
     }
 }

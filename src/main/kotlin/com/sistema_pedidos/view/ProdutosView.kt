@@ -2,6 +2,7 @@ package com.sistema_pedidos.view
 
 import com.sistema_pedidos.database.DatabaseHelper
 import com.sistema_pedidos.model.Produto
+import javafx.application.Platform
 import javafx.collections.FXCollections
 import javafx.geometry.Insets
 import javafx.geometry.Pos
@@ -295,6 +296,26 @@ class ProdutosView : BorderPane() {
         tfNome = TextField().apply {
             promptText = "Nome do produto"
             styleFormField(this)
+
+            val excecoes = setOf("de", "da", "do", "das", "dos", "e", "com", "para", "a", "o", "em",
+                "por", "sem", "sob", "sobre", "à", "às", "ao", "aos")
+
+            focusedProperty().addListener { _, wasFocused, isFocused ->
+                if (wasFocused && !isFocused && text.isNotEmpty()) {
+                    val words = text.trim().split(" ")
+                    text = words.mapIndexed { index, word ->
+                        if (word.isEmpty()) return@mapIndexed ""
+
+                        // Always capitalize first word or if not in exceptions list
+                        if (index == 0 || !excecoes.contains(word.lowercase())) {
+                            word.first().uppercase() + word.substring(1).lowercase()
+                        } else {
+                            // Keep exception words lowercase
+                            word.lowercase()
+                        }
+                    }.joinToString(" ")
+                }
+            }
         }
 
         taDescricao = TextArea().apply {
@@ -313,11 +334,12 @@ class ProdutosView : BorderPane() {
         }
 
         tfValorUnitario = TextField().apply {
-            promptText = "0.00"
+            promptText = "R$ 0,00"
+            text = "R$ 0,00"
             styleFormField(this)
+            formatarMoeda(this)
         }
 
-        // Move cbEhInsumo declaration outside of the cbCategoria block
         cbEhInsumo = CheckBox("Este produto também pode ser usado como insumo").apply {
             isSelected = false
         }
@@ -420,12 +442,36 @@ class ProdutosView : BorderPane() {
             promptText = "0"
             text = "0"
             styleFormField(this)
+
+            textProperty().addListener { _, _, newValue ->
+                if (newValue.isEmpty()) {
+                    text = "0"
+                } else if (!newValue.matches("\\d*".toRegex())) {
+                    text = newValue.replace("[^\\d]".toRegex(), "")
+                }
+
+                if (text.length > 1 && text.startsWith("0")) {
+                    text = text.replaceFirst("^0+".toRegex(), "")
+                }
+            }
         }
 
         tfEstoqueAtual = TextField().apply {
             promptText = "0"
             text = "0"
             styleFormField(this)
+
+            textProperty().addListener { _, _, newValue ->
+                if (newValue.isEmpty()) {
+                    text = "0"
+                } else if (!newValue.matches("\\d*".toRegex())) {
+                    text = newValue.replace("[^\\d]".toRegex(), "")
+                }
+
+                if (text.length > 1 && text.startsWith("0")) {
+                    text = text.replaceFirst("^0+".toRegex(), "")
+                }
+            }
         }
 
         cbStatus = ComboBox<String>().apply {
@@ -498,6 +544,52 @@ class ProdutosView : BorderPane() {
         }
     }
 
+    private fun formatarMoeda(textField: TextField) {
+        var isUpdating = false
+        textField.text = "R$ 0,00"
+
+        textField.textProperty().addListener { _, _, newValue ->
+            if (isUpdating) return@addListener
+
+            isUpdating = true
+            Platform.runLater {
+                try {
+                    val digits = newValue.replace(Regex("[^\\d]"), "")
+
+                    if (digits.isEmpty()) {
+                        textField.text = "R$ 0,00"
+                    } else {
+                        val value = digits.toDouble() / 100
+                        val formattedValue = String.format("%,.2f", value)
+                            .replace(",", ".")
+                            .replace(".", ",", ignoreCase = true)
+                            .replaceFirst(",", ".")
+                        textField.text = "R$ $formattedValue"
+                    }
+                    textField.positionCaret(textField.text.length)
+                } finally {
+                    isUpdating = false
+                }
+            }
+        }
+
+        // Position caret at the end when focused
+        textField.focusedProperty().addListener { _, _, isFocused ->
+            if (isFocused) {
+                Platform.runLater {
+                    textField.positionCaret(textField.text.length)
+                }
+            }
+        }
+
+        // Always keep caret at the end to prevent editing in the middle
+        textField.caretPositionProperty().addListener { _, _, _ ->
+            Platform.runLater {
+                textField.positionCaret(textField.text.length)
+            }
+        }
+    }
+
     private fun createInsumosPanel(): VBox {
         val insumosPanel = VBox(10.0).apply {
             padding = Insets(10.0)
@@ -539,7 +631,30 @@ class ProdutosView : BorderPane() {
                 style = "-fx-alignment: CENTER;"
                 cellFactory = Callback {
                     object : TableCell<InsumoQuantidade, Void>() {
-                        // Existing code for actions column
+                        private val removeBtn = Button("X").apply {
+                            styleClass.add("small-button")
+                            style = "-fx-background-color: #ff5252; -fx-text-fill: white;"
+                            prefWidth = 70.0
+                        }
+
+                        private val box = HBox().apply {
+                            alignment = Pos.CENTER
+                            children.add(removeBtn)
+                        }
+
+                        init {
+                            removeBtn.setOnAction {
+                                val insumo = tableRow.item
+                                if (insumo != null) {
+                                    insumosDosProdutos.remove(insumo)
+                                }
+                            }
+                        }
+
+                        override fun updateItem(item: Void?, empty: Boolean) {
+                            super.updateItem(item, empty)
+                            graphic = if (empty) null else box
+                        }
                     }
                 }
             }
@@ -689,20 +804,19 @@ class ProdutosView : BorderPane() {
 
     private fun adicionarInsumoAoProduto() {
         val insumoSelecionado = cbInsumoDisponivel.value
-        // Find the spinner by traversing the hierarchy
-        val quantidadeSpinner = formPanel.lookupAll(".spinner").firstOrNull() as? Spinner<Int>
 
         if (insumoSelecionado == null) {
             showAlert("Insumo não selecionado", "Por favor, selecione um insumo.", Alert.AlertType.WARNING)
             return
         }
 
-        if (quantidadeSpinner == null) {
-            showAlert("Erro", "Não foi possível encontrar o campo de quantidade.", Alert.AlertType.ERROR)
+        // Use tfQuantidadeInsumo directly instead of looking for a Spinner
+        val quantidade = tfQuantidadeInsumo.text.toDoubleOrNull()
+
+        if (quantidade == null || quantidade <= 0) {
+            showAlert("Quantidade inválida", "Por favor, informe uma quantidade válida maior que zero.", Alert.AlertType.WARNING)
             return
         }
-
-        val quantidade = quantidadeSpinner.value
 
         // Check if this insumo is already added to the product
         val existingInsumo = insumosDosProdutos.find { it.insumoId == insumoSelecionado.id }
@@ -716,14 +830,14 @@ class ProdutosView : BorderPane() {
             InsumoQuantidade(
                 insumoId = insumoSelecionado.id,
                 nome = insumoSelecionado.nome,
-                quantidade = quantidade.toDouble(),
+                quantidade = quantidade,
                 unidadeMedida = insumoSelecionado.unidadeMedida
             )
         )
 
         // Reset the selection
         cbInsumoDisponivel.selectionModel.clearSelection()
-        quantidadeSpinner.valueFactory.value = 1
+        tfQuantidadeInsumo.text = "1"
     }
 
     private fun styleFormField(field: TextField) {
@@ -826,8 +940,6 @@ class ProdutosView : BorderPane() {
         }
     }
 
-
-    // Form fields
     private lateinit var tfCodigo: TextField
     private lateinit var tfNome: TextField
     private lateinit var taDescricao: TextArea
@@ -846,12 +958,12 @@ class ProdutosView : BorderPane() {
         }
 
         try {
-            val valorUnitario = tfValorUnitario.text.replace(",", ".").toDoubleOrNull() ?: 0.0
+            val valorUnitario = extrairValorMonetario(tfValorUnitario.text)
+
             val estoqueMinimo = tfEstoqueMinimo.text.toIntOrNull() ?: 0
             val estoqueAtual = tfEstoqueAtual.text.toIntOrNull() ?: 0
             val ehInsumo = if (cbEhInsumo.isSelected) 1 else 0
 
-            // First, try to add the column if it doesn't exist
             try {
                 db.getConnection().use { conn ->
                     conn.createStatement().execute(
@@ -859,7 +971,6 @@ class ProdutosView : BorderPane() {
                     )
                 }
             } catch (e: SQLException) {
-                // Column might already exist, ignore the error
             }
 
             db.getConnection().use { conn ->
@@ -868,7 +979,6 @@ class ProdutosView : BorderPane() {
                     var produtoId = produtoSelecionado?.id
 
                     if (produtoId == null) {
-                        // Insert new product
                         val sql = """
                     INSERT INTO produtos (codigo, nome, descricao, valor_unitario, categoria,
                     unidade_medida, estoque_minimo, estoque_atual, status, eh_insumo)
@@ -894,7 +1004,6 @@ class ProdutosView : BorderPane() {
                             produtoId = rs.getLong(1)
                         }
                     } else {
-                        // Update existing product
                         val sql = """
                         UPDATE produtos
                         SET nome = ?, descricao = ?, valor_unitario = ?, categoria = ?,
@@ -964,7 +1073,11 @@ class ProdutosView : BorderPane() {
         }
     }
 
+    private fun extrairValorMonetario(texto: String): Double {
+        val digits = texto.replace(Regex("[^\\d]"), "")
 
+        return if (digits.isEmpty()) 0.0 else digits.toDouble() / 100
+    }
 
     private fun mostrarMensagemSucesso(titulo: String, mensagem: String) {
         val dialog = Dialog<ButtonType>()
@@ -1034,7 +1147,7 @@ class ProdutosView : BorderPane() {
 
         try {
             if (tfValorUnitario.text.isNotEmpty()) {
-                tfValorUnitario.text.replace(",", ".").toDouble()
+                extrairValorMonetario(tfValorUnitario.text)
             }
         } catch (e: NumberFormatException) {
             mensagensErro.add("Valor unitário inválido")
@@ -1136,7 +1249,24 @@ class ProdutosView : BorderPane() {
         tfCodigo.text = produto.codigo
         tfNome.text = produto.nome
         taDescricao.text = produto.descricao
-        tfValorUnitario.text = produto.valorUnitario.toString()
+
+        // Apply currency formatting to the value from the database
+        var isUpdating = false
+        isUpdating = true
+        Platform.runLater {
+            try {
+                // Format the value as currency
+                val value = produto.valorUnitario
+                val formattedValue = String.format("%,.2f", value)
+                    .replace(",", ".")
+                    .replace(".", ",", ignoreCase = true)
+                    .replaceFirst(",", ".")
+                tfValorUnitario.text = "R$ $formattedValue"
+            } finally {
+                isUpdating = false
+            }
+        }
+
         if (produto.categoria.isNotEmpty()) {
             if (!cbCategoria.items.contains(produto.categoria)) {
                 cbCategoria.items.add(produto.categoria)
@@ -1152,7 +1282,6 @@ class ProdutosView : BorderPane() {
         cbStatus.value = produto.status
         cbEhInsumo.isSelected = produto.ehInsumo
 
-        // Carregar insumos do produto
         carregarInsumosDoProduto(produto.id)
         carregarInsumosDisponiveis()
 
@@ -1272,26 +1401,26 @@ class ProdutosView : BorderPane() {
             }
 
             val acoesColumn = TableColumn<Produto, Void>("Ações").apply {
-                prefWidth = 160.0  // Reduced from 180.0
-                minWidth = 150.0   // Adjusted to be closer to actual content width
-                maxWidth = 160.0   // Added max width to prevent column from growing too large
+                prefWidth = 160.0
+                minWidth = 150.0
+                maxWidth = 160.0
 
                 cellFactory = Callback {
                     object : TableCell<Produto, Void>() {
                         private val editBtn = Button("Editar").apply {
                             styleClass.add("small-button")
-                            prefWidth = 70.0  // Slightly smaller buttons
+                            prefWidth = 70.0
                         }
 
                         private val deleteBtn = Button("Excluir").apply {
                             styleClass.add("small-button")
                             style = "-fx-background-color: #ff5252;"
-                            prefWidth = 70.0  // Fixed width for button
+                            prefWidth = 70.0
                         }
 
-                        private val box = HBox(5.0, editBtn, deleteBtn).apply {  // Increased spacing
+                        private val box = HBox(5.0, editBtn, deleteBtn).apply {
                             alignment = Pos.CENTER
-                            padding = Insets(2.0)  // Added padding around buttons
+                            padding = Insets(2.0)
                         }
 
                         init {
@@ -1318,7 +1447,6 @@ class ProdutosView : BorderPane() {
                     }
                 }
 
-                // Make this column have a higher growth priority
                 style = "-fx-pref-width: 180px;"
             }
 
@@ -1327,12 +1455,9 @@ class ProdutosView : BorderPane() {
                 estoqueColumn, statusColumn, acoesColumn
             )
 
-            // Add selection listener to load insumos when a product is selected
             selectionModel.selectedItemProperty().addListener { _, _, newSelection ->
                 if (newSelection != null) {
                     produtoSelecionado = newSelection
-                    preencherFormulario(newSelection)
-                    carregarInsumosDoProduto(newSelection.id)
                 }
             }
         }
@@ -1357,10 +1482,8 @@ class ProdutosView : BorderPane() {
                     val qtdPorProduto = rsInsumos.getDouble("quantidade")
                     val insumoNome = rsInsumos.getString("nome")
 
-                    // Calcular quantidade total a ser reduzida
                     val qtdTotalReduzir = qtdPorProduto * quantidade
 
-                    // Atualizar estoque do insumo
                     val updateStmt = conn.prepareStatement(
                         "UPDATE produtos SET estoque_atual = estoque_atual - ? WHERE id = ?"
                     )
@@ -1597,78 +1720,14 @@ class ProdutosView : BorderPane() {
             }
 
             loadProducts()
-            mostrarMensagemEstilizada("Produto excluído com sucesso", "O produto foi removido com sucesso do sistema.", "success")
+            showAlert("Sucesso", "Produto excluído com sucesso", Alert.AlertType.INFORMATION)
         } catch (e: SQLException) {
             if (e.message?.contains("foreign key constraint") == true) {
-                mostrarMensagemEstilizada("Erro ao excluir", "Este produto não pode ser excluído pois está sendo usado em pedidos.")
+                showAlert("Erro ao excluir", "Este produto não pode ser excluído pois está sendo usado em pedidos.")
             } else {
-                mostrarMensagemEstilizada("Erro ao excluir", e.message ?: "Erro ao acessar banco de dados")
+                showAlert("Erro ao excluir", e.message ?: "Erro ao acessar banco de dados")
             }
         }
-    }
-
-    private fun mostrarMensagemEstilizada(titulo: String, mensagem: String, tipo: String = "error") {
-        val dialog = Dialog<ButtonType>()
-        dialog.title = if (tipo == "success") "Sucesso" else "Erro"
-        dialog.headerText = titulo
-        dialog.initStyle(StageStyle.UNDECORATED)
-
-        val buttonTypeOk = ButtonType("OK", ButtonBar.ButtonData.OK_DONE)
-        dialog.dialogPane.buttonTypes.add(buttonTypeOk)
-
-        // Apply CSS
-        dialog.dialogPane.stylesheets.addAll(this.stylesheets)
-
-        // Create styled content
-        val content = VBox(10.0).apply {
-            padding = Insets(20.0)
-            children.add(Label(mensagem).apply {
-                style = "-fx-font-size: 14px;"
-                isWrapText = true
-            })
-        }
-
-        // Style the dialog
-        dialog.dialogPane.style = """
-        -fx-background-color: white;
-        -fx-border-color: #D3D3D3;
-        -fx-border-width: 1px;
-    """
-
-        dialog.dialogPane.content = content
-
-        // Set header color based on type
-        val headerColor = when (tipo) {
-            "success" -> "#4CAF50" // Green for success
-            else -> "#dc3545" // Red for errors
-        }
-
-        dialog.dialogPane.lookup(".header-panel")?.style = """
-        -fx-background-color: $headerColor;
-        -fx-background-radius: 0;
-    """
-
-        // Style header text
-        val headerLabel = dialog.dialogPane.lookup(".header-panel .label") as? Label
-        headerLabel?.style = "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"
-
-        // Style the button
-        val okButton = dialog.dialogPane.lookupButton(buttonTypeOk)
-        okButton.styleClass.add(if (tipo == "success") "primary-button" else "botao-cancel")
-
-        // Configure button bar
-        val buttonBar = dialog.dialogPane.lookup(".button-bar") as ButtonBar
-        buttonBar.apply {
-            buttonOrder = ButtonBar.BUTTON_ORDER_NONE
-            buttonMinWidth = 100.0
-            style = """
-            -fx-background-color: white;
-            -fx-alignment: center;
-        """
-            padding = Insets(0.0, 80.0, 0.0, 0.0)
-        }
-
-        dialog.showAndWait()
     }
 
     private fun showAlert(title: String, message: String, type: Alert.AlertType = Alert.AlertType.ERROR) {
