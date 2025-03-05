@@ -112,6 +112,19 @@ class DatabaseHelper {
                 UNIQUE(produto_id, insumo_id)
             )""",
 
+            """CREATE TABLE IF NOT EXISTS movimentacao_estoque (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                produto_id INTEGER NOT NULL,
+                quantidade_anterior INTEGER NOT NULL,
+                quantidade_nova INTEGER NOT NULL,
+                quantidade_movimentada INTEGER NOT NULL,
+                tipo_movimentacao TEXT NOT NULL,
+                motivo TEXT,
+                usuario TEXT,
+                data_movimentacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (produto_id) REFERENCES produtos(id)
+            )""",
+
             """CREATE TRIGGER IF NOT EXISTS gerar_numero_pedido
                 AFTER INSERT ON pedidos
                 WHEN NEW.numero IS NULL
@@ -181,7 +194,8 @@ class DatabaseHelper {
             """CREATE INDEX IF NOT EXISTS idx_item_produto ON itens_pedido(produto_id)""",
             """CREATE INDEX IF NOT EXISTS idx_entrega_pedido ON entregas(pedido_id)""",
             """CREATE INDEX IF NOT EXISTS idx_produto_insumos_produto ON produto_insumos(produto_id)""",
-            """CREATE INDEX IF NOT EXISTS idx_produto_insumos_insumo ON produto_insumos(insumo_id)"""
+            """CREATE INDEX IF NOT EXISTS idx_produto_insumos_insumo ON produto_insumos(insumo_id)""",
+            """CREATE INDEX IF NOT EXISTS idx_movimentacao_produto ON movimentacao_estoque(produto_id)"""
         )
 
         getConnection().use { conn ->

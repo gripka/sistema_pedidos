@@ -254,16 +254,18 @@ class ProdutosView : BorderPane() {
 
         setTop(headerBox)
 
-        // Center - Split in three sections
+        val topContainer = VBox(10.0).apply {
+            children.addAll(headerBox, createStockDashboard())
+        }
+
+        setTop(topContainer)
+
         val splitPane = HBox(20.0).apply {
             children.addAll(
                 createTableView(),
                 VBox(20.0).apply {
-                    children.addAll(
-                        createFormPanel(),
-                        createStockDashboard()
-                    )
-                },
+                    children.add(createFormPanel())
+                }
             )
             HBox.setHgrow(tableView, Priority.ALWAYS)
         }
@@ -1731,9 +1733,6 @@ class ProdutosView : BorderPane() {
                         stmtUpdate.setLong(2, produto.id)
                         stmtUpdate.executeUpdate()
 
-                        // Register movement in history
-                        criarTabelaMovimentacoes(conn)
-
                         val stmtMovimento = conn.prepareStatement("""
                         INSERT INTO movimentacao_estoque (
                             produto_id, quantidade_anterior, quantidade_nova, 
@@ -1776,24 +1775,6 @@ class ProdutosView : BorderPane() {
         } catch (e: Exception) {
             showAlert("Erro na movimentação", e.message ?: "Erro ao processar movimentação de estoque")
         }
-    }
-
-    private fun criarTabelaMovimentacoes(conn: Connection) {
-        val stmt = conn.createStatement()
-        stmt.execute("""
-        CREATE TABLE IF NOT EXISTS movimentacao_estoque (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            produto_id INTEGER NOT NULL,
-            quantidade_anterior INTEGER NOT NULL,
-            quantidade_nova INTEGER NOT NULL,
-            quantidade_movimentada INTEGER NOT NULL,
-            tipo_movimentacao TEXT NOT NULL,
-            motivo TEXT,
-            usuario TEXT,
-            data_movimentacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (produto_id) REFERENCES produtos(id)
-        )
-    """)
     }
 
     private fun mostrarHistoricoMovimentacoes() {
@@ -1905,9 +1886,6 @@ class ProdutosView : BorderPane() {
 
         try {
             db.getConnection().use { conn ->
-                // Create table if not exists
-                criarTabelaMovimentacoes(conn)
-
                 val stmt = conn.prepareStatement("""
                 SELECT m.*, p.nome as nome_produto
                 FROM movimentacao_estoque m
@@ -2168,8 +2146,8 @@ class ProdutosView : BorderPane() {
     private lateinit var lblSemMovimentacao: Label
 
     private fun createStockDashboard(): VBox {
-        dashboardContainer = VBox(15.0).apply {
-            padding = Insets(15.0)
+        dashboardContainer = VBox(5.0).apply {
+            padding = Insets(10.0)
             style = """
             -fx-background-color: white;
             -fx-border-color: #dfe1e6;
@@ -2179,7 +2157,7 @@ class ProdutosView : BorderPane() {
         }
 
         val title = Label("Dashboard de Estoque").apply {
-            style = "-fx-font-weight: bold; -fx-font-size: 16px;"
+            style = "-fx-font-weight: bold; -fx-font-size: 14px;"
         }
 
         lblTotalProdutos = Label("0")
@@ -2187,78 +2165,48 @@ class ProdutosView : BorderPane() {
         lblValorEstoque = Label("R$ 0,00")
         lblSemMovimentacao = Label("0")
 
-        dashboardContainer.children.addAll(
-            title,
-            createKpiCard("Total de Produtos", lblTotalProdutos, "#4CAF50"),
-            createKpiCard("Produtos com Estoque Baixo", lblBaixoEstoque, "#FFA500"),
-            createKpiCard("Valor Total em Estoque", lblValorEstoque, "#2196F3"),
-            createKpiCard("Produtos sem Movimentação", lblSemMovimentacao, "#9C27B0")
-        )
+        val cardsContainer = HBox(10.0).apply {
+            alignment = Pos.CENTER_LEFT
+            children.addAll(
+                createKpiCard("Total de Produtos", lblTotalProdutos, "#4CAF50"),
+                createKpiCard("Produtos com Estoque Baixo", lblBaixoEstoque, "#FFA500"),
+                createKpiCard("Valor Total em Estoque", lblValorEstoque, "#2196F3"),
+                createKpiCard("Produtos sem Movimentação", lblSemMovimentacao, "#9C27B0")
+            )
+        }
 
+        dashboardContainer.children.addAll(title, cardsContainer)
         updateDashboard()
 
         return dashboardContainer
     }
 
-    private fun updateDashboard() {
-        val totalProdutos = produtos.size
-
-        val baixoEstoque = produtos.count { it.estoqueAtual <= it.estoqueMinimo && it.estoqueMinimo > 0 }
-
-        val valorEstoque = produtos.sumOf { it.valorUnitario * it.estoqueAtual }
-
-        val diasSemMovimentacao = 30 // Define threshold here
-        val dataLimite = java.time.LocalDate.now().minusDays(diasSemMovimentacao.toLong())
-
-        val semMovimentacao = db.getConnection().use { conn ->
-            val stmt = conn.prepareStatement("""
-            SELECT COUNT(DISTINCT p.id) FROM produtos p
-            LEFT JOIN movimentacao_estoque m ON p.id = m.produto_id 
-            AND m.data_movimentacao > ?
-            WHERE p.status = 'Ativo' 
-            AND p.estoque_atual > 0
-            AND m.id IS NULL
-        """)
-            stmt.setString(1, dataLimite.toString())
-            val rs = stmt.executeQuery()
-            if (rs.next()) rs.getInt(1) else 0
-        }
-
-        val format = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
-
-        lblTotalProdutos.text = totalProdutos.toString()
-        lblBaixoEstoque.text = baixoEstoque.toString()
-        lblValorEstoque.text = format.format(valorEstoque)
-        lblSemMovimentacao.text = semMovimentacao.toString()
-    }
-
-    private fun createKpiCard(title: String, valueLabel: Label, color: String): VBox {
-        val card = VBox(5.0).apply {
-            padding = Insets(15.0)
+    private fun createKpiCard(title: String, valueLabel: Label, color: String): HBox {
+        val card = HBox(8.0).apply {
+            padding = Insets(8.0)
+            prefWidth = 180.0
             style = """
             -fx-background-color: white;
             -fx-border-color: $color;
-            -fx-border-width: 0 0 0 5px;
-            -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 5, 0, 0, 1);
+            -fx-border-width: 0 0 0 3px;
+            -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 3, 0, 0, 1);
         """
         }
 
-        card.children.addAll(
+        val textContainer = VBox(2.0)
+        textContainer.children.addAll(
             Label(title).apply {
-                style = "-fx-font-size: 14px; -fx-text-fill: #555;"
+                style = "-fx-font-size: 11px; -fx-text-fill: #555;"
+                wrapTextProperty().set(true)
             },
             valueLabel.apply {
-                style = """
-                -fx-font-size: 24px;
-                -fx-font-weight: bold;
-                -fx-text-fill: $color;
-            """
+                style = "-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: $color;"
             }
         )
 
+        card.children.add(textContainer)
         return card
     }
-
 
     fun processarEstoqueInsumos(produtoId: Long, quantidade: Int) {
         try {
@@ -2364,6 +2312,58 @@ class ProdutosView : BorderPane() {
     private fun loadProducts() {
         produtos.setAll(loadProductsFromDb())
         updateDashboard()
+    }
+
+    private fun updateDashboard() {
+        try {
+            db.getConnection().use { conn ->
+                // Calculate total products
+                val totalStmt = conn.prepareStatement("SELECT COUNT(*) FROM produtos")
+                totalStmt.executeQuery().use { rs ->
+                    if (rs.next()) {
+                        lblTotalProdutos.text = rs.getInt(1).toString()
+                    }
+                }
+
+                // Calculate low stock products
+                val lowStockStmt = conn.prepareStatement(
+                    "SELECT COUNT(*) FROM produtos WHERE estoque_atual <= estoque_minimo AND estoque_minimo > 0"
+                )
+                lowStockStmt.executeQuery().use { rs ->
+                    if (rs.next()) {
+                        lblBaixoEstoque.text = rs.getInt(1).toString()
+                    }
+                }
+
+                // Calculate total stock value
+                val valueStmt = conn.prepareStatement(
+                    "SELECT SUM(valor_unitario * estoque_atual) FROM produtos"
+                )
+                valueStmt.executeQuery().use { rs ->
+                    if (rs.next()) {
+                        val totalValue = rs.getDouble(1)
+                        val formatter = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
+                        lblValorEstoque.text = formatter.format(totalValue)
+                    }
+                }
+
+                // Products without movement in last 30 days
+                val noMovementStmt = conn.prepareStatement("""
+                SELECT COUNT(*) FROM produtos
+                WHERE id NOT IN (
+                    SELECT DISTINCT produto_id FROM movimentacao_estoque
+                    WHERE data_movimentacao >= datetime('now', '-30 day')
+                )
+            """)
+                noMovementStmt.executeQuery().use { rs ->
+                    if (rs.next()) {
+                        lblSemMovimentacao.text = rs.getInt(1).toString()
+                    }
+                }
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
+        }
     }
 
     private fun searchProducts(term: String) {
