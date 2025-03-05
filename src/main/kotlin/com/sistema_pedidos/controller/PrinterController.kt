@@ -201,8 +201,8 @@ class PrinterController {
 
                     // Formato tabular para os produtos
                     val truncatedName = truncateText(nome, 20)
-                    escpos.writeLF(String.format("%-3d %-20s %-7s %s",
-                        qtd, truncatedName, valorUnit, subtotal))
+                    escpos.writeLF(String.format("%-3s %-20s %-7s %s",
+                        "${qtd}x", truncatedName, valorUnit, subtotal))
 
                     // Se o nome for muito longo, continuar em nova linha
                     if (nome.length > 20) {
