@@ -650,4 +650,54 @@
     -fx-scale-y: 0.98;
 }
 
+/* Estilo para o diálogo de confirmação de estoque insuficiente */
+.warning-dialog {
+    -fx-background-color: white;
+    -fx-border-color: #D3D3D3;
+    -fx-border-width: 1px;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
 
+.warning-dialog .header-panel {
+    -fx-background-color: #FFA500; /* Cor de aviso */
+    -fx-background-radius: 0;
+}
+
+.warning-dialog .header-panel .label {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 16px;
+}
+
+.warning-dialog .content-area {
+    -fx-padding: 15px;
+    -fx-spacing: 10px;
+}
+
+.warning-dialog .button-bar {
+    -fx-background-color: white;
+    -fx-alignment: center;
+    -fx-spacing: 10px;
+    -fx-padding: 0 0 15px 0;
+}
+
+.warning-button {
+    -fx-background-color: #FFA500;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 8px 16px;
+    -fx-background-radius: 4px;
+    -fx-cursor: hand;
+    -fx-border-width: 0;
+}
+
+.warning-button:hover {
+    -fx-background-color: #FF8C00;
+}
+
+.warning-button:pressed {
+    -fx-background-color: #E27B00;
+    -fx-translate-y: 1px;
+}

@@ -184,6 +184,7 @@ class NovoPedidoView : BorderPane() {
                     children.addAll(
                         Label("Nome").apply { styleClass.add("field-label") },
                         TextField().apply {
+                            id = "nomeField"
                             styleClass.add("text-field")
                             maxWidth = Double.POSITIVE_INFINITY
                             HBox.setHgrow(this, Priority.ALWAYS)
@@ -195,6 +196,7 @@ class NovoPedidoView : BorderPane() {
                     children.addAll(
                         Label("Sobrenome").apply { styleClass.add("field-label") },
                         TextField().apply {
+                            id = "sobrenomeField"
                             styleClass.add("text-field")
                             maxWidth = Double.POSITIVE_INFINITY
                             HBox.setHgrow(this, Priority.ALWAYS)
@@ -205,6 +207,9 @@ class NovoPedidoView : BorderPane() {
         }
 
         val contatoHBox = HBox(10.0).apply {
+            // Store references to the fields we need to update later
+            var observacaoField: TextField? = null
+
             children.addAll(
                 VBox(10.0).apply {
                     children.addAll(
@@ -214,6 +219,37 @@ class NovoPedidoView : BorderPane() {
                             maxWidth = 130.0
                             controller.formatarTelefone(this)
                             promptText = "(XX) XXXXX-XXXX"
+
+                            textProperty().addListener { _, _, newValue ->
+                                if (newValue.length >= 8) {
+                                    controller.buscarClientePorTelefone(newValue) { clienteInfo ->
+                                        if (clienteInfo != null) {
+                                            Platform.runLater {
+                                                println("Preenchendo campos com: ${clienteInfo}")
+
+                                                // Find fields using root pane for reliable lookup
+                                                val rootPane = this.scene?.root ?: return@runLater
+                                                val nomeField = rootPane.lookup("#nomeField") as? TextField
+                                                val sobrenomeField = rootPane.lookup("#sobrenomeField") as? TextField
+                                                val obsField = observacaoField
+
+                                                println("Fields found: nome=${nomeField != null}, sobrenome=${sobrenomeField != null}, obs=${obsField != null}")
+
+                                                // Set values from client info
+                                                nomeField?.text = clienteInfo["nome"] ?: ""
+                                                sobrenomeField?.text = clienteInfo["sobrenome"] ?: ""
+                                                obsField?.text = clienteInfo["observacao"] ?: ""
+
+                                                // Visual feedback
+                                                style = "-fx-border-color: #4CAF50;"
+                                                println("Cliente encontrado: ${clienteInfo["nome"]}")
+                                            }
+                                        } else {
+                                            println("Cliente não encontrado")
+                                        }
+                                    }
+                                }
+                            }
                         }
                     )
                 },
@@ -222,9 +258,11 @@ class NovoPedidoView : BorderPane() {
                     children.addAll(
                         Label("Observação").apply { styleClass.add("field-label") },
                         TextField().apply {
+                            id = "obsField"
                             styleClass.add("text-field")
                             maxWidth = Double.POSITIVE_INFINITY
                             HBox.setHgrow(this, Priority.ALWAYS)
+                            observacaoField = this
                         }
                     )
                 }

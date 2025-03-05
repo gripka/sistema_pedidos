@@ -20,14 +20,18 @@ class Main : Application() {
         val mainView = MainView(primaryStage)
         val novoPedidoView = NovoPedidoView()
         val produtosView = ProdutosView()
+        val pedidosEmAndamentoView = PedidosEmAndamentoView()
         val historicoPedidosView = HistoricoPedidosView()
         val configuracoesView = ConfiguracoesView()
+        val clientesView = ClientesView()
         val menuView = MenuView { viewName ->
             when (viewName) {
                 "novoPedido" -> mainView.setCenterView(novoPedidoView)
+                "pedidosAndamento" -> mainView.setCenterView(pedidosEmAndamentoView)
                 "produtos" -> mainView.setCenterView(produtosView)
                 "historicoPedidos" -> mainView.setCenterView(historicoPedidosView)
                 "configuracoes" -> mainView.setCenterView(configuracoesView)
+                "clientes" -> mainView.setCenterView(clientesView)
             }
         }
         val tables = dbHelper.listTables()

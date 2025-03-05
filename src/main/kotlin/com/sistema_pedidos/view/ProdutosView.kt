@@ -222,7 +222,7 @@ class ProdutosView : BorderPane() {
 
         val btnFiltrarBaixoEstoque = Button("Filtrar baixo estoque").apply {
             tooltip = Tooltip("Mostrar apenas itens com estoque baixo")
-            styleClass.add("secondary-button")
+            styleClass.add("primary-button")
 
             var filtroAtivo = false
 
@@ -360,13 +360,13 @@ class ProdutosView : BorderPane() {
             maxHeight = 60.0
             setWrapText(true)
             style = """
-            -fx-control-inner-background: white;
-            -fx-background-color: white;
-            -fx-background-radius: 4px;
-            -fx-border-color: #cccccc;
-            -fx-border-radius: 4px;
-            -fx-scroll-bar-policy: as-needed;
-        """
+                -fx-control-inner-background: white;
+                -fx-background-color: white;
+                -fx-background-radius: 4px;
+                -fx-border-color: #cccccc;
+                -fx-border-radius: 4px;
+                -fx-scroll-bar-policy: as-needed;
+            """
         }
 
         tfValorUnitario = TextField().apply {
@@ -379,11 +379,11 @@ class ProdutosView : BorderPane() {
         cbEhInsumo = CheckBox("Este produto também pode ser usado como insumo").apply {
             isSelected = false
             style = """
-        -fx-background-color: transparent;
-        -fx-border-radius: 3px;
-        -fx-background-radius: 3px;
-    """
-            styleClass.add("custom-checkbox")
+                -fx-background-color: transparent;
+                -fx-border-radius: 3px;
+                -fx-background-radius: 3px;
+            """
+            styleClass.add("primary-button")
         }
 
         cbCategoria = ComboBox<String>().apply {
@@ -1434,9 +1434,12 @@ class ProdutosView : BorderPane() {
                                 text = null
                                 style = ""
                             } else {
-                                val row = tableRow.item
                                 text = item.toString()
-                                style = if (row != null && item <= row.estoqueMinimo && row.estoqueMinimo > 0) {
+
+                                val row = tableRow
+                                val rowItem = row?.item
+
+                                style = if (rowItem != null && item <= rowItem.estoqueMinimo && rowItem.estoqueMinimo > 0) {
                                     "-fx-text-fill: white; -fx-background-color: #ff5252; -fx-font-weight: bold;"
                                 } else {
                                     ""

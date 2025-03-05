@@ -21,17 +21,15 @@ class TitleBarView(private val stage: Stage) : HBox() {
     private val shrinkIcon = ImageView(Image("/icons/shrink.png"))
 
     init {
-        // Set the background color of the title bar
         background = Background(BackgroundFill(Color.web("#2B2D31"), CornerRadii.EMPTY, Insets.EMPTY))
         prefHeight = 35.0
         alignment = Pos.CENTER_LEFT
-        styleClass.add("title-bar") // Adiciona a classe CSS
+        styleClass.add("title-bar")
 
-        // Add a container for the logo icon
         val logoContainer = HBox().apply {
             prefWidth = 40.0
             alignment = Pos.CENTER
-            padding = Insets(0.0, 0.0, 0.0, 22.0) // Add padding to the left of the logo
+            padding = Insets(0.0, 0.0, 0.0, 22.0)
             children.add(ImageView(Image("/icons/logo.png")).apply {
                 fitHeight = 27.0
                 fitWidth = 27.0

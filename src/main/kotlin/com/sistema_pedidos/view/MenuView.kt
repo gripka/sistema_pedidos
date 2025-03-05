@@ -39,8 +39,10 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
 
         val homeButton = createMenuButton("/icons/produtos.png", "Produtos") { onNavigate("produtos") }
         val newOrderButton = createMenuButton("/icons/novopedido.png", "Novo Pedido") { onNavigate("novoPedido") }
+        val pedidosEmAndamentoButton = createMenuButton("/icons/pedidos.png", "Pedidos em Andamento") { onNavigate("pedidosAndamento") }
         val ordersButton = createMenuButton("/icons/historicopedidos.png", "Histórico de Pedidos") { onNavigate("historicoPedidos") }
-        sectionsContainer.children.addAll(newOrderButton, ordersButton, homeButton)
+        val clienteButton = createMenuButton("/icons/cliente.png", "Clientes") { onNavigate("clientes") }
+        sectionsContainer.children.addAll(newOrderButton, pedidosEmAndamentoButton, ordersButton, homeButton, clienteButton)
         VBox.setVgrow(sectionsContainer, Priority.ALWAYS)
         children.add(sectionsContainer)
 

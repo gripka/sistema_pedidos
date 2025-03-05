@@ -9,6 +9,7 @@ import javafx.application.Platform
 import com.sistema_pedidos.model.Produto
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
+import javafx.geometry.Insets
 import javafx.scene.control.*
 import javafx.scene.layout.*
 import java.sql.SQLException
@@ -18,6 +19,7 @@ import javafx.scene.control.ContextMenu
 import javafx.scene.control.MenuItem
 import javafx.geometry.Side
 import javafx.scene.input.KeyCode
+import javafx.stage.StageStyle
 import java.sql.Connection
 
 class NovoPedidoController {
@@ -201,6 +203,69 @@ class NovoPedidoController {
         }
     }
 
+    fun buscarClientePorTelefone(telefone: String, callback: (Map<String, String>?) -> Unit) {
+        val telefoneClean = telefone.replace(Regex("[^0-9]"), "")
+
+        if (telefoneClean.length < 8) return callback(null)
+
+        println("Buscando cliente por telefone: $telefoneClean")
+
+        Thread {
+            try {
+                var clienteInfo: Map<String, String>? = null
+
+                DatabaseHelper().getConnection().use { conn ->
+                    // Get all possible formats of the phone number
+                    val formatosNumero = listOf(
+                        telefoneClean,                                           // 42998222385
+                        "($telefoneClean)",                                      // (42998222385)
+                        telefoneClean.replaceFirst("(\\d{2})(\\d+)".toRegex(), "($1) $2"),  // (42) 998222385
+                        telefoneClean.replaceFirst("(\\d{2})(\\d{5})(\\d+)".toRegex(), "($1) $2-$3") // (42) 99822-2385
+                    )
+
+                    // Query with multiple format options
+                    val sql = """
+                    SELECT * FROM clientes 
+                    WHERE telefone IN (?, ?, ?, ?) 
+                    OR telefone LIKE ?
+                    LIMIT 1
+                """
+
+                    val stmt = conn.prepareStatement(sql)
+                    formatosNumero.forEachIndexed { index, format ->
+                        stmt.setString(index + 1, format)
+                    }
+                    stmt.setString(5, "%${telefoneClean}%")  // Also try partial match
+
+                    val rs = stmt.executeQuery()
+
+                    if (rs.next()) {
+                        clienteInfo = mapOf(
+                            "nome" to rs.getString("nome"),
+                            "sobrenome" to (rs.getString("sobrenome") ?: ""),
+                            "observacao" to (rs.getString("observacao") ?: "")
+                        )
+                        println("Cliente encontrado: ${rs.getString("nome")} - ${rs.getString("telefone")}")
+                    } else {
+                        println("Nenhum cliente encontrado com telefone: $telefoneClean")
+                        // Debug: List all clients to verify data
+                        val allClientsStmt = conn.prepareStatement("SELECT id, nome, telefone FROM clientes")
+                        val clientsRs = allClientsStmt.executeQuery()
+                        println("Clientes disponíveis:")
+                        while (clientsRs.next()) {
+                            println("ID: ${clientsRs.getInt("id")}, Nome: ${clientsRs.getString("nome")}, Telefone: ${clientsRs.getString("telefone")}")
+                        }
+                    }
+                }
+
+                Platform.runLater { callback(clienteInfo) }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Platform.runLater { callback(null) }
+            }
+        }.start()
+    }
+
     fun getDescontoToggleGroup(): ToggleGroup {
         return descontoToggleGroup
     }
@@ -236,7 +301,7 @@ class NovoPedidoController {
                 }
             prefWidth = 25.0
             prefHeight = 25.0
-            translateY = 15.0  // Adjusted to match the quantity buttons position
+            translateY = 15.0
             setOnAction {
                 produtosContainer.children.remove(produtoHBox)
                 listaProdutos.remove(produto)
@@ -254,7 +319,6 @@ class NovoPedidoController {
             labelNumero.text = "${index + 1}. "
         }
 
-        // Create new products with updated IDs
         val updatedProducts = listaProdutos.mapIndexed { index, produto ->
             produto.copy(id = (index + 1).toLong())
         }
@@ -390,14 +454,14 @@ class NovoPedidoController {
             val suggestionsMenu = ContextMenu().apply {
                 styleClass.add("product-suggestions")
                 style = """
-                -fx-background-color: white;
-                -fx-border-color: rgb(223, 225, 230);
-                -fx-border-width: 1px;
-                -fx-border-radius: 3px;
-                -fx-background-radius: 3px;
-                -fx-effect: dropshadow(gaussian, rgba(9, 30, 66, 0.15), 8, 0, 0, 2);
-                -fx-padding: 4px;
-            """
+                    -fx-background-color: white;
+                    -fx-border-color: rgb(223, 225, 230);
+                    -fx-border-width: 1px;
+                    -fx-border-radius: 3px;
+                    -fx-background-radius: 3px;
+                    -fx-effect: dropshadow(gaussian, rgba(9, 30, 66, 0.15), 8, 0, 0, 2);
+                    -fx-padding: 4px;
+                """
             }
 
             textProperty().addListener { _, _, newValue ->
@@ -413,20 +477,87 @@ class NovoPedidoController {
                         limitedProdutos.forEach { produto ->
                             val menuItem = MenuItem(produto.nome)
                             menuItem.style = """
-                            -fx-padding: 5px 8px;
-                            -fx-font-size: 13px;
-                            -fx-pref-width: ${this.width - 20}px; 
-
-                        """
+                                -fx-padding: 5px 8px;
+                                -fx-font-size: 13px;
+                                -fx-pref-width: ${this.width - 20}px; 
+                            """
 
                             menuItem.setOnAction {
-                                text = produto.nome
-                                // Get the parent product row
-                                val produtoHBox = this.parent?.parent as? HBox
-                                // Get the valor field in the same row
-                                val valorField = ((produtoHBox?.children?.get(3) as? VBox)?.children?.get(1) as? TextField)
-                                valorField?.text = "R$ ${String.format("%.2f", produto.valorUnitario).replace('.', ',')}"
-                                suggestionsMenu.hide()
+                                checkInsumosSuficientes(produto.id, 1) { hasSuficientes, insumosEmFalta ->
+                                    if (!hasSuficientes) {
+                                        val dialog = Dialog<ButtonType>()
+                                        dialog.title = "Estoque insuficiente"
+                                        dialog.headerText = "Falta de insumos para o produto ${produto.nome}"
+                                        dialog.initStyle(StageStyle.UNDECORATED)
+
+                                        val buttonTypeProceed = ButtonType("Adicionar mesmo assim", ButtonBar.ButtonData.YES)
+                                        val buttonTypeCancel = ButtonType("Cancelar", ButtonBar.ButtonData.NO)
+                                        dialog.dialogPane.buttonTypes.addAll(buttonTypeProceed, buttonTypeCancel)
+                                        dialog.dialogPane.stylesheets.add(javaClass.getResource("/novopedidoview.css").toExternalForm())
+
+                                        dialog.dialogPane.stylesheets.addAll(this.stylesheets)
+
+                                        val contentText = StringBuilder("Os seguintes insumos não possuem estoque suficiente:\n\n")
+                                        insumosEmFalta.forEach { insumo ->
+                                            contentText.append("- ${insumo.nome}: ")
+                                            contentText.append("Disponível: ${insumo.estoqueAtual}, ")
+                                            contentText.append("Necessário: ${insumo.necessario}\n")
+                                        }
+                                        contentText.append("\nDeseja adicionar o produto mesmo assim?")
+
+                                        val content = VBox(10.0).apply {
+                                            padding = Insets(20.0)
+                                            children.add(Label(contentText.toString()).apply {
+                                                style = "-fx-font-size: 14px;"
+                                                isWrapText = true
+                                                maxWidth = 400.0
+                                            })
+                                        }
+
+                                        dialog.dialogPane.style = """
+        -fx-background-color: white;
+        -fx-border-color: #D3D3D3;
+        -fx-border-width: 1px;
+    """
+
+                                        dialog.dialogPane.content = content
+
+                                        dialog.dialogPane.lookup(".header-panel")?.style = """
+        -fx-background-color: #FFA500;
+        -fx-background-radius: 0;
+    """
+
+                                        val headerLabel = dialog.dialogPane.lookup(".header-panel .label") as? Label
+                                        headerLabel?.style = "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"
+
+                                        // Apply warning style to the proceed button
+                                        val proceedButton = dialog.dialogPane.lookupButton(buttonTypeProceed)
+                                        proceedButton.styleClass.add("primary-button")  // Instead of "warning-button"
+
+                                        val cancelButton = dialog.dialogPane.lookupButton(buttonTypeCancel)
+                                        cancelButton.styleClass.add("secondary-button")
+
+                                        // Configure button bar
+                                        val buttonBar = dialog.dialogPane.lookup(".button-bar") as ButtonBar
+                                        buttonBar.apply {
+                                            buttonOrder = ButtonBar.BUTTON_ORDER_NONE
+                                            buttonMinWidth = 100.0
+                                            style = """
+        -fx-background-color: white;
+        -fx-alignment: center;
+        """
+                                            padding = Insets(0.0, 0.0, 15.0, 0.0)
+                                        }
+
+                                        val result = dialog.showAndWait()
+                                        if (result.isPresent && result.get() == buttonTypeProceed) {
+                                            setProdutoFields(produto, this)
+                                        }
+                                    } else {
+                                        setProdutoFields(produto, this)
+                                    }
+                                    suggestionsMenu.hide()
+                                }
                             }
 
                             suggestionsMenu.items.add(menuItem)
@@ -441,6 +572,8 @@ class NovoPedidoController {
                             suggestionsMenu.minWidth = this.width
                             suggestionsMenu.maxWidth = this.width
                         }
+                    } else {
+                        suggestionsMenu.hide()
                     }
                 } else {
                     suggestionsMenu.hide()
@@ -467,6 +600,74 @@ class NovoPedidoController {
                 productField
             )
         }
+    }
+
+    // Helper method to set product fields
+    private fun setProdutoFields(produto: Produto, textField: TextField) {
+        textField.text = produto.nome
+        // Get the parent product row
+        val produtoHBox = textField.parent?.parent as? HBox
+        // Get the valor field in the same row
+        val valorField = ((produtoHBox?.children?.get(3) as? VBox)?.children?.get(1) as? TextField)
+        valorField?.text = "R$ ${String.format("%.2f", produto.valorUnitario).replace('.', ',')}"
+    }
+
+    // Data class to hold insumo information for missing ingredients
+    data class InsumoEmFalta(val nome: String, val estoqueAtual: Int, val necessario: Double)
+
+    // Method to check if there are enough ingredients for a product
+    private fun checkInsumosSuficientes(produtoId: Long, quantidade: Int, callback: (Boolean, List<InsumoEmFalta>) -> Unit) {
+        Thread {
+            val insumosEmFalta = mutableListOf<InsumoEmFalta>()
+            var temInsumosSuficientes = true
+
+            try {
+                DatabaseHelper().getConnection().use { conn ->
+                    // Check if product has any ingredients
+                    val checkInsumosSql = """
+                    SELECT COUNT(*) as count FROM produto_insumos WHERE produto_id = ?
+                """
+                    conn.prepareStatement(checkInsumosSql).use { stmt ->
+                        stmt.setLong(1, produtoId)
+                        val rs = stmt.executeQuery()
+                        if (rs.next() && rs.getInt("count") == 0) {
+                            // Product has no ingredients, so we're good
+                            Platform.runLater { callback(true, insumosEmFalta) }
+                            return@Thread
+                        }
+                    }
+
+                    // Get all ingredients for this product and check inventory
+                    val insumosSql = """
+                    SELECT pi.insumo_id, pi.quantidade, p.nome, p.estoque_atual 
+                    FROM produto_insumos pi
+                    JOIN produtos p ON p.id = pi.insumo_id
+                    WHERE pi.produto_id = ?
+                """
+                    conn.prepareStatement(insumosSql).use { stmt ->
+                        stmt.setLong(1, produtoId)
+                        val rs = stmt.executeQuery()
+
+                        while (rs.next()) {
+                            val insumoNome = rs.getString("nome")
+                            val quantidadeNecessaria = rs.getDouble("quantidade") * quantidade
+                            val estoqueAtual = rs.getInt("estoque_atual")
+
+                            if (estoqueAtual < quantidadeNecessaria) {
+                                insumosEmFalta.add(InsumoEmFalta(insumoNome, estoqueAtual, quantidadeNecessaria))
+                                temInsumosSuficientes = false
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                // In case of error, we assume there's enough inventory
+                temInsumosSuficientes = true
+            }
+
+            Platform.runLater { callback(temInsumosSuficientes, insumosEmFalta) }
+        }.start()
     }
 
     private fun searchProducts(query: String): List<Produto> {
