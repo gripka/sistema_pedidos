@@ -1085,12 +1085,36 @@ class NovoPedidoController {
     }
 
     private fun atualizarEstoqueProduto(connection: Connection, produtoId: Long, quantidade: Int) {
-        connection.prepareStatement(
-            "UPDATE produtos SET estoque_atual = estoque_atual - ? WHERE id = ?"
-        ).use { stmt ->
-            stmt.setInt(1, quantidade)
-            stmt.setLong(2, produtoId)
-            stmt.executeUpdate()
+        val stmtSelect = connection.prepareStatement("SELECT estoque_atual, nome FROM produtos WHERE id = ?")
+        stmtSelect.setLong(1, produtoId)
+        val rs = stmtSelect.executeQuery()
+
+        if (rs.next()) {
+            val estoqueAnterior = rs.getInt("estoque_atual")
+            val nomeProduto = rs.getString("nome")
+            val estoqueNovo = estoqueAnterior - quantidade
+
+            val stmtUpdate = connection.prepareStatement(
+                "UPDATE produtos SET estoque_atual = ? WHERE id = ?"
+            )
+            stmtUpdate.setInt(1, estoqueNovo)
+            stmtUpdate.setLong(2, produtoId)
+            stmtUpdate.executeUpdate()
+
+            val stmtMovimento = connection.prepareStatement("""
+            INSERT INTO movimentacao_estoque (
+                produto_id, quantidade_anterior, quantidade_nova, 
+                quantidade_movimentada, tipo_movimentacao, motivo, usuario
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """)
+            stmtMovimento.setLong(1, produtoId)
+            stmtMovimento.setInt(2, estoqueAnterior)
+            stmtMovimento.setInt(3, estoqueNovo)
+            stmtMovimento.setInt(4, quantidade)
+            stmtMovimento.setString(5, "saida")
+            stmtMovimento.setString(6, "Venda - Pedido")
+            stmtMovimento.setString(7, "Sistema")
+            stmtMovimento.executeUpdate()
         }
     }
 

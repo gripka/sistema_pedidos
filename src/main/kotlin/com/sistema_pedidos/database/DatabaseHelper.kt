@@ -121,7 +121,7 @@ class DatabaseHelper {
                 tipo_movimentacao TEXT NOT NULL,
                 motivo TEXT,
                 usuario TEXT,
-                data_movimentacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                data_movimentacao TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                 FOREIGN KEY (produto_id) REFERENCES produtos(id)
             )""",
 
