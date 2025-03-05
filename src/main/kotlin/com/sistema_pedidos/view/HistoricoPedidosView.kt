@@ -27,22 +27,16 @@ class HistoricoPedidosView : VBox(10.0) {
         styleClass.add("main-container")
         stylesheets.add(javaClass.getResource("/historicopedidosview.css").toExternalForm())
 
-        // Cabeçalho
         val headerBox = createHeaderBox()
 
-        // Filtros
         val filterBox = createFilterBox()
 
-        // Tabela
         setupTableView()
 
-        // Barra de ações
         val actionBox = createActionBox()
 
-        // Layout principal
         children.addAll(headerBox, filterBox, tableView, actionBox)
 
-        // Carrega os dados
         refreshData()
     }
 

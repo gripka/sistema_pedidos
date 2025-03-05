@@ -12,6 +12,7 @@ import javafx.scene.image.Image
 import javafx.scene.image.ImageView
 import javafx.scene.layout.*
 import javafx.scene.paint.Color
+import javafx.stage.Stage
 import javafx.stage.StageStyle
 import javafx.util.Callback
 import java.awt.event.ActionEvent
@@ -32,7 +33,7 @@ data class InsumoQuantidade(
     val unidadeMedida: String
 )
 
-class ProdutosView : BorderPane() {
+class ProdutosView(private val stage: Stage? = null) : BorderPane() {
     private val tableView = TableView<Produto>()
     private val produtos = FXCollections.observableArrayList<Produto>()
     private val searchField = TextField()
@@ -44,16 +45,36 @@ class ProdutosView : BorderPane() {
     private lateinit var cbInsumoDisponivel: ComboBox<Produto>
     private lateinit var tfQuantidadeInsumo: TextField
     private val insumosDosProdutos = FXCollections.observableArrayList<InsumoQuantidade>()
+    private val mainView: MainView? = stage?.let { MainView(it) }
+
+    // Standard section creation methods to replace direct VBox creation
+    private fun createStandardSection(title: String): VBox {
+        val section = VBox(10.0).apply {
+            padding = Insets(10.0)
+            style = """
+                -fx-background-color: white;
+                -fx-border-color: #dfe1e6;
+                -fx-border-width: 1px;
+                -fx-border-radius: 3px;
+            """
+        }
+
+        val titleLabel = Label(title).apply {
+            style = "-fx-font-weight: bold; -fx-font-size: 14px;"
+        }
+
+        section.children.add(titleLabel)
+        return section
+    }
 
     init {
-        styleClass.add("main-container")
-        background = Background(BackgroundFill(Color.WHITE, null, null))
         padding = Insets(20.0)
+        prefWidth = 1000.0
+        prefHeight = 700.0
+
+        styleClass.add("main-container")
 
         stylesheets.add(javaClass.getResource("/produtosview.css").toExternalForm())
-
-        minWidth = 800.0
-        minHeight = 600.0
 
         setupUI()
         loadProducts()
@@ -551,8 +572,8 @@ class ProdutosView : BorderPane() {
         formPanel.apply {
             padding = Insets(15.0)
             spacing = 10.0
-            prefWidth = 450.0
-            maxWidth = 450.0
+            prefWidth = 600.0  // Increased from 450.0
+            maxWidth = 600.0   // Increased from 450.0
             style = """
             -fx-background-color: white;
             -fx-border-color: rgb(223, 225, 230);
@@ -887,6 +908,7 @@ class ProdutosView : BorderPane() {
     private fun styleFormField(field: TextField) {
         field.apply {
             prefHeight = 36.0
+            prefWidth = 400.0
             styleClass.add("text-field")
         }
     }
@@ -2147,14 +2169,17 @@ class ProdutosView : BorderPane() {
     private lateinit var lblSemMovimentacao: Label
 
     private fun createStockDashboard(): VBox {
+        val container = createStandardSection("Dashboard de Estoque")
         dashboardContainer = VBox(10.0).apply {
             padding = Insets(10.0)
             style = """
-            -fx-background-color: white;
-            -fx-border-color: #dfe1e6;
-            -fx-border-width: 1px;
-            -fx-border-radius: 3px;
+        -fx-background-color: white;
+        -fx-border-color: #dfe1e6;
+        -fx-border-width: 1px;
+        -fx-border-radius: 3px;
+        -fx-margin-bottom: 20px; /* Add bottom margin */
         """
+            VBox.setMargin(this, Insets(0.0, 0.0, 20.0, 0.0))
         }
 
         val title = Label("Dashboard de Estoque").apply {
@@ -2216,10 +2241,8 @@ class ProdutosView : BorderPane() {
 
         activitySection.children.add(activityTablesContainer)
 
-        // Add all components to the dashboard
         dashboardContainer.children.addAll(title, cardsContainer, activitySection)
 
-        // Update all dashboard data
         updateDashboard()
 
         return dashboardContainer
@@ -2453,7 +2476,6 @@ class ProdutosView : BorderPane() {
                 }
 
                 Platform.runLater {
-                    // Use correct lookups with casting
                     val frequentTable = dashboardContainer.lookup("#frequentTable") as? TableView<Map<String, Any>>
                     if (frequentTable != null) {
                         frequentTable.items = FXCollections.observableArrayList(frequentProductsData)
