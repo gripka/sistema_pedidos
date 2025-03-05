@@ -26,7 +26,7 @@ import com.itextpdf.layout.properties.TextAlignment
 import com.itextpdf.layout.properties.UnitValue
 
 
-class HistoricoPedidosController {
+class PedidosEmAndamentoController {
     private val database = DatabaseHelper()
     private val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
     private val dateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
@@ -35,12 +35,8 @@ class HistoricoPedidosController {
         dataInicial: LocalDate?,
         dataFinal: LocalDate?,
         busca: String,
-        status: String?,
-        page: Int = 1,
-        pageSize: Int = 50
+        status: String?
     ): List<Map<String, Any>> {
-        val offset = (page - 1) * pageSize
-
         val queryParts = mutableListOf(
             """
         SELECT p.id, p.numero, p.data_pedido, p.telefone_contato, p.status, p.status_pedido,
@@ -78,9 +74,7 @@ class HistoricoPedidosController {
             params.add(status)
         }
 
-        queryParts.add("ORDER BY p.data_pedido DESC LIMIT ? OFFSET ?")
-        params.add(pageSize)
-        params.add(offset)
+        queryParts.add("ORDER BY p.data_pedido DESC")
 
         val query = queryParts.joinToString(" ")
         val resultados = mutableListOf<Map<String, Any>>()
@@ -659,66 +653,6 @@ class HistoricoPedidosController {
             e.printStackTrace()
             return false
         }
-    }
-
-    fun contarPedidos(
-        dataInicial: LocalDate?,
-        dataFinal: LocalDate?,
-        busca: String,
-        status: String?
-    ): Int {
-        val queryParts = mutableListOf(
-            """
-        SELECT COUNT(*) as total
-        FROM pedidos p
-        LEFT JOIN clientes c ON p.cliente_id = c.id
-        LEFT JOIN entregas e ON p.id = e.pedido_id
-        WHERE 1=1
-        """
-        )
-
-        val params = mutableListOf<Any>()
-
-        if (dataInicial != null) {
-            queryParts.add("AND DATE(p.data_pedido) >= ?")
-            params.add(dataInicial.toString())
-        }
-
-        if (dataFinal != null) {
-            queryParts.add("AND DATE(p.data_pedido) <= ?")
-            params.add(dataFinal.toString())
-        }
-
-        if (busca.isNotBlank()) {
-            queryParts.add("AND (p.numero LIKE ? OR p.telefone_contato LIKE ? OR c.nome LIKE ?)")
-            params.add("%$busca%")
-            params.add("%$busca%")
-            params.add("%$busca%")
-        }
-
-        if (status != null && status.isNotBlank()) {
-            queryParts.add("AND p.status = ?")
-            params.add(status)
-        }
-
-        val query = queryParts.joinToString(" ")
-        var total = 0
-
-        database.getConnection().use { conn ->
-            conn.prepareStatement(query).use { stmt ->
-                params.forEachIndexed { index, param ->
-                    stmt.setObject(index + 1, param)
-                }
-
-                stmt.executeQuery().use { rs ->
-                    if (rs.next()) {
-                        total = rs.getInt("total")
-                    }
-                }
-            }
-        }
-
-        return total
     }
 
     private fun extractNumericValue(formattedValue: String): Double {

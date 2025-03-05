@@ -1132,14 +1132,12 @@ class NovoPedidoController {
 
             val valorTotal = parseMoneyValue(pagamentoInfo.find { it.first == "Total do Pedido" }?.second ?: "0,00")
 
-            // Improved discount detection - search with more flexible criteria
+            // Discount detection
             val valorDescontoStr = descontoField.text
             val valorDesconto = if (descontoToggleGroup.selectedToggle.toString().contains("percentual")) {
-                // Handle percentage discount
                 val percentual = valorDescontoStr.replace(",", ".").toDoubleOrNull() ?: 0.0
                 (valorTotal * percentual / 100)
             } else {
-                // Handle flat discount value
                 parseMoneyValue(valorDescontoStr)
             }
             val tipoDesconto = if (descontoToggleGroup.selectedToggle.toString().contains("percentual"))
@@ -1161,11 +1159,11 @@ class NovoPedidoController {
                     }
 
                     val pedidoQuery = """
-                        INSERT INTO pedidos (numero, telefone_contato, observacao, status,
-                        valor_total, valor_desconto, tipo_desconto, forma_pagamento, valor_troco_para, valor_troco,
-                        data_retirada, hora_retirada)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """.trimIndent()
+                    INSERT INTO pedidos (numero, telefone_contato, observacao, status,
+                    valor_total, valor_desconto, tipo_desconto, forma_pagamento, valor_troco_para, valor_troco,
+                    data_retirada, hora_retirada)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent()
 
                     val pedidoId =
                         connection.prepareStatement(pedidoQuery, Statement.RETURN_GENERATED_KEYS).use { stmt ->
@@ -1196,9 +1194,9 @@ class NovoPedidoController {
                         }
 
                     val itemQuery = """
-                    INSERT INTO itens_pedido (pedido_id, produto_id, nome_produto, quantidade, valor_unitario, subtotal)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """.trimIndent()
+                INSERT INTO itens_pedido (pedido_id, produto_id, nome_produto, quantidade, valor_unitario, subtotal)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """.trimIndent()
 
                     produtosContainer.children.forEach { node ->
                         val hBox = node as HBox
@@ -1236,10 +1234,10 @@ class NovoPedidoController {
 
                     if (entregaInfo.first().second == "Sim") {
                         val entregaQuery = """
-                            INSERT INTO entregas (pedido_id, nome_destinatario, telefone_destinatario,
-                            endereco, numero, referencia, cidade, bairro, cep, valor_entrega, data_entrega, hora_entrega)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """.trimIndent()
+                        INSERT INTO entregas (pedido_id, nome_destinatario, telefone_destinatario,
+                        endereco, numero, referencia, cidade, bairro, cep, valor_entrega, data_entrega, hora_entrega)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """.trimIndent()
 
                         connection.prepareStatement(entregaQuery).use { stmt ->
                             stmt.setLong(1, pedidoId)
@@ -1264,7 +1262,9 @@ class NovoPedidoController {
                     connection.commit()
                     println("Pedido saved successfully. Starting print process...")
                     val printerController = PrinterController()
-                    val produtos = produtosContainer.children.map { node ->
+
+                    // Create products list for printing
+                    val produtosList = produtosContainer.children.map { node ->
                         val hBox = node as HBox
                         val qtdField = ((hBox.children[1] as VBox).children[1] as HBox).children[1] as TextField
                         val produtoField = ((hBox.children[2] as VBox).children[1] as TextField)
@@ -1272,22 +1272,75 @@ class NovoPedidoController {
                         val subtotalField = ((hBox.children[4] as VBox).children[1] as TextField)
 
                         mapOf(
-                            "quantidade" to qtdField.text,
-                            "nome" to produtoField.text,
-                            "valorUnitario" to valorField.text.replace("R$ ", ""),
-                            "subtotal" to subtotalField.text.replace("R$ ", "")
+                            "quantidade" to qtdField.text.toInt(),
+                            "nome_produto" to produtoField.text,
+                            "valor_unitario" to parseMoneyValue(valorField.text),
+                            "subtotal" to parseMoneyValue(subtotalField.text)
                         )
                     }
-                    println("Products mapped for printing: ${produtos.size} items")
 
+                    // Create pedidoData map with all required information
+                    val pedidoData = mutableMapOf<String, Any>()
 
-                    printerController.imprimirPedido(
-                        numeroPedido = numeroGerado,
-                        clienteInfo = clienteInfo,
-                        produtos = produtos,
-                        pagamentoInfo = pagamentoInfo,
-                        entregaInfo = entregaInfo
-                    )
+                    // Basic order info
+                    pedidoData["numero"] = numeroGerado
+                    pedidoData["observacao"] = observacao ?: ""
+                    pedidoData["telefone_contato"] = telefoneContato
+                    pedidoData["data_pedido"] = java.time.LocalDate.now().toString()
+                    pedidoData["status"] = status
+                    pedidoData["status_pedido"] = "Pendente"
+
+                    // Cliente info
+                    val clienteMap = mutableMapOf<String, Any>()
+                    clienteInfo.forEach { (key, value) ->
+                        when(key) {
+                            "Nome" -> clienteMap["nome"] = value
+                            "Endereço" -> clienteMap["endereco"] = value
+                            // Add other client fields as needed
+                        }
+                    }
+                    pedidoData["cliente"] = clienteMap
+
+                    // Payment info
+                    pedidoData["valor_total"] = valorTotal
+                    pedidoData["valor_desconto"] = valorDesconto
+                    pedidoData["tipo_desconto"] = tipoDesconto
+                    pedidoData["forma_pagamento"] = formaPagamento ?: ""
+                    pedidoData["valor_troco_para"] = valorTrocoPara
+                    pedidoData["valor_troco"] = valorTroco
+
+                    // Products
+                    pedidoData["itens"] = produtosList
+
+                    // Delivery info
+                    if (entregaInfo.isNotEmpty() && entregaInfo.first().second == "Sim") {
+                        val entregaMap = mutableMapOf<String, Any>()
+                        entregaInfo.forEach { (key, value) ->
+                            when(key) {
+                                "Nome" -> entregaMap["nome_destinatario"] = value
+                                "Telefone" -> entregaMap["telefone_destinatario"] = value
+                                "Endereço" -> entregaMap["endereco"] = value
+                                "Número" -> entregaMap["numero"] = value
+                                "Referência" -> entregaMap["referencia"] = value
+                                "Cidade" -> entregaMap["cidade"] = value
+                                "Bairro" -> entregaMap["bairro"] = value
+                                "CEP" -> entregaMap["cep"] = value
+                                "Valor" -> entregaMap["valor_entrega"] = parseMoneyValue(value)
+                                "Data" -> entregaMap["data_entrega"] = value
+                                "Hora" -> entregaMap["hora_entrega"] = value
+                            }
+                        }
+                        pedidoData["entrega"] = entregaMap
+                    } else {
+                        // Add pickup information
+                        val dataRetirada = pagamentoInfo.find { it.first == "Data de Retirada" }?.second
+                        val horaRetirada = pagamentoInfo.find { it.first == "Hora de Retirada" }?.second
+                        if (dataRetirada != null) pedidoData["data_retirada"] = dataRetirada
+                        if (horaRetirada != null) pedidoData["hora_retirada"] = horaRetirada
+                    }
+
+                    // Call printer controller with the single map parameter
+                    printerController.imprimirPedido(pedidoData = pedidoData)
 
                     return true
                 } catch (e: Exception) {

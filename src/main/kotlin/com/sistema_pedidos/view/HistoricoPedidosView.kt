@@ -19,6 +19,14 @@ class HistoricoPedidosView : VBox(10.0) {
     private val searchField = TextField()
     private val statusComboBox = ComboBox<String>()
 
+    // Pagination variables
+    private var currentPage = 1
+    private var pageSize = 50
+    private var totalRecords = 0
+    private var totalPages = 1
+    private val paginationControls = HBox(10.0)
+    private val currentPageLabel = Label("Página 1 de 1")
+
     init {
         padding = Insets(20.0)
         prefWidth = 1000.0
@@ -28,13 +36,11 @@ class HistoricoPedidosView : VBox(10.0) {
         stylesheets.add(javaClass.getResource("/historicopedidosview.css").toExternalForm())
 
         val headerBox = createHeaderBox()
-
         val filterBox = createFilterBox()
-
         setupTableView()
-
         val actionBox = createActionBox()
 
+        // Remove the separate paginationBox
         children.addAll(headerBox, filterBox, tableView, actionBox)
 
         refreshData()
@@ -208,6 +214,75 @@ class HistoricoPedidosView : VBox(10.0) {
         }
 
         dialog.showAndWait()
+    }
+
+    private fun createPaginationControls(): HBox {
+        paginationControls.apply {
+            alignment = Pos.CENTER
+            padding = Insets(10.0, 0.0, 10.0, 0.0)
+
+            val firstPageButton = Button("<<").apply {
+                styleClass.add("pagination-button")
+                setOnAction {
+                    if (currentPage > 1) {
+                        currentPage = 1
+                        refreshData()
+                    }
+                }
+            }
+
+            val prevPageButton = Button("<").apply {
+                styleClass.add("pagination-button")
+                setOnAction {
+                    if (currentPage > 1) {
+                        currentPage--
+                        refreshData()
+                    }
+                }
+            }
+
+            val nextPageButton = Button(">").apply {
+                styleClass.add("pagination-button")
+                setOnAction {
+                    if (currentPage < totalPages) {
+                        currentPage++
+                        refreshData()
+                    }
+                }
+            }
+
+            val lastPageButton = Button(">>").apply {
+                styleClass.add("pagination-button")
+                setOnAction {
+                    if (currentPage < totalPages) {
+                        currentPage = totalPages
+                        refreshData()
+                    }
+                }
+            }
+
+            val pageSizeBox = VBox(5.0).apply {
+                children.addAll(
+                    Label("Itens por página:"),
+                    ComboBox<Int>().apply {
+                        items.addAll(20, 50, 100, 200)
+                        selectionModel.select(1) // Default 50
+                        prefWidth = 80.0
+                        setOnAction {
+                            pageSize = value
+                            currentPage = 1  // Reset to first page when changing page size
+                            refreshData()
+                        }
+                    }
+                )
+            }
+
+            currentPageLabel.styleClass.add("pagination-label")
+
+            children.addAll(firstPageButton, prevPageButton, currentPageLabel, nextPageButton, lastPageButton, pageSizeBox)
+        }
+
+        return paginationControls
     }
 
     private fun createDetailsSection(title: String, items: List<Pair<String, String>>): VBox {
@@ -537,83 +612,154 @@ class HistoricoPedidosView : VBox(10.0) {
 
     private fun createActionBox(): HBox {
         return HBox(10.0).apply {
-            alignment = Pos.CENTER_RIGHT
             padding = Insets(10.0, 0.0, 0.0, 0.0)
 
-            val exportButton = Button("Exportar").apply {
-                styleClass.add("secondary-button")
-                setOnAction {
-                    // Get the selected items in the table
-                    val selectedPedido = tableView.selectionModel.selectedItem
+            // Create left section with pagination controls
+            val paginationBox = HBox(10.0).apply {
+                alignment = Pos.CENTER_LEFT
+                HBox.setHgrow(this, Priority.ALWAYS)
 
-                    if (selectedPedido == null) {
-                        // No order selected, show alert to user
-                        Alert(Alert.AlertType.INFORMATION).apply {
-                            title = "Informação"
-                            headerText = null
-                            contentText = "Selecione um pedido para exportar como PDF"
-                            showAndWait()
+                val firstPageButton = Button("<<").apply {
+                    styleClass.add("pagination-button")
+                    setOnAction {
+                        if (currentPage > 1) {
+                            currentPage = 1
+                            refreshData()
                         }
-                    } else {
-                        // Fetch complete order details
-                        val orderId = selectedPedido["id"] as Long
-                        val orderDetails = controller.getCompleteOrderDetails(orderId)
+                    }
+                }
 
-                        // Create a PDF export controller/service
-                        try {
-                            // Create a file chooser dialog for saving the PDF
-                            val fileChooser = javafx.stage.FileChooser().apply {
-                                title = "Salvar PDF"
-                                extensionFilters.add(
-                                    javafx.stage.FileChooser.ExtensionFilter("PDF Files", "*.pdf")
-                                )
-                                initialFileName = "Pedido_${orderDetails["numero"]}.pdf"
+                val prevPageButton = Button("<").apply {
+                    styleClass.add("pagination-button")
+                    setOnAction {
+                        if (currentPage > 1) {
+                            currentPage--
+                            refreshData()
+                        }
+                    }
+                }
+
+                val nextPageButton = Button(">").apply {
+                    styleClass.add("pagination-button")
+                    setOnAction {
+                        if (currentPage < totalPages) {
+                            currentPage++
+                            refreshData()
+                        }
+                    }
+                }
+
+                val lastPageButton = Button(">>").apply {
+                    styleClass.add("pagination-button")
+                    setOnAction {
+                        if (currentPage < totalPages) {
+                            currentPage = totalPages
+                            refreshData()
+                        }
+                    }
+                }
+
+                currentPageLabel.styleClass.add("pagination-label")
+
+                val pageSizeComboBox = ComboBox<Int>().apply {
+                    items.addAll(20, 50, 100, 200)
+                    selectionModel.select(1) // Default 50
+                    prefWidth = 80.0
+                    setOnAction {
+                        pageSize = value
+                        currentPage = 1  // Reset to first page when changing page size
+                        refreshData()
+                    }
+                }
+
+                val pageSizeLabel = Label("Itens por página:")
+
+                children.addAll(
+                    firstPageButton,
+                    prevPageButton,
+                    currentPageLabel,
+                    nextPageButton,
+                    lastPageButton,
+                    pageSizeLabel,
+                    pageSizeComboBox
+                )
+            }
+
+            // Create right section with action buttons
+            val actionBox = HBox(10.0).apply {
+                alignment = Pos.CENTER_RIGHT
+
+                val exportButton = Button("Exportar").apply {
+                    styleClass.add("secondary-button")
+                    setOnAction {
+                        // Existing export button action code...
+                        val selectedPedido = tableView.selectionModel.selectedItem
+
+                        if (selectedPedido == null) {
+                            Alert(Alert.AlertType.INFORMATION).apply {
+                                title = "Informação"
+                                headerText = null
+                                contentText = "Selecione um pedido para exportar como PDF"
+                                showAndWait()
                             }
+                        } else {
+                            val orderId = selectedPedido["id"] as Long
+                            val orderDetails = controller.getCompleteOrderDetails(orderId)
 
-                            // Show save dialog
-                            val file = fileChooser.showSaveDialog(scene.window)
+                            try {
+                                val fileChooser = javafx.stage.FileChooser().apply {
+                                    title = "Salvar PDF"
+                                    extensionFilters.add(
+                                        javafx.stage.FileChooser.ExtensionFilter("PDF Files", "*.pdf")
+                                    )
+                                    initialFileName = "Pedido_${orderDetails["numero"]}.pdf"
+                                }
 
-                            if (file != null) {
-                                // Export order to PDF
-                                val success = controller.exportarPedidoParaPDF(orderDetails, file.absolutePath)
+                                val file = fileChooser.showSaveDialog(scene.window)
 
-                                if (success) {
-                                    Alert(Alert.AlertType.INFORMATION).apply {
-                                        title = "Sucesso"
-                                        headerText = null
-                                        contentText = "Pedido exportado com sucesso para: ${file.absolutePath}"
-                                        showAndWait()
-                                    }
-                                } else {
-                                    Alert(Alert.AlertType.ERROR).apply {
-                                        title = "Erro"
-                                        headerText = null
-                                        contentText = "Erro ao exportar o pedido para PDF"
-                                        showAndWait()
+                                if (file != null) {
+                                    val success = controller.exportarPedidoParaPDF(orderDetails, file.absolutePath)
+
+                                    if (success) {
+                                        Alert(Alert.AlertType.INFORMATION).apply {
+                                            title = "Sucesso"
+                                            headerText = null
+                                            contentText = "Pedido exportado com sucesso para: ${file.absolutePath}"
+                                            showAndWait()
+                                        }
+                                    } else {
+                                        Alert(Alert.AlertType.ERROR).apply {
+                                            title = "Erro"
+                                            headerText = null
+                                            contentText = "Erro ao exportar o pedido para PDF"
+                                            showAndWait()
+                                        }
                                     }
                                 }
-                            }
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                            Alert(Alert.AlertType.ERROR).apply {
-                                title = "Erro"
-                                headerText = null
-                                contentText = "Erro ao exportar o pedido: ${e.message}"
-                                showAndWait()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                                Alert(Alert.AlertType.ERROR).apply {
+                                    title = "Erro"
+                                    headerText = null
+                                    contentText = "Erro ao exportar o pedido: ${e.message}"
+                                    showAndWait()
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            val refreshButton = Button("Atualizar").apply {
-                styleClass.add("primary-button")
-                setOnAction {
-                    refreshData()
+                val refreshButton = Button("Atualizar").apply {
+                    styleClass.add("primary-button")
+                    setOnAction {
+                        refreshData()
+                    }
                 }
+
+                children.addAll(exportButton, refreshButton)
             }
 
-            children.addAll(exportButton, refreshButton)
+            children.addAll(paginationBox, actionBox)
         }
     }
 
@@ -624,7 +770,19 @@ class HistoricoPedidosView : VBox(10.0) {
         val status = statusComboBox.selectionModel.selectedItem
             .takeIf { it != "Todos" }
 
-        val pedidos = controller.buscarPedidos(dataIni, dataFim, busca, status)
+        // Get total count first
+        val totalResult = controller.contarPedidos(dataIni, dataFim, busca, status)
+        totalRecords = totalResult
+        totalPages = Math.ceil(totalRecords.toDouble() / pageSize).toInt().coerceAtLeast(1)
+
+        // Adjust current page if it's beyond the total pages
+        if (currentPage > totalPages) {
+            currentPage = totalPages
+        }
+
+        currentPageLabel.text = "Página $currentPage de $totalPages"
+
+        val pedidos = controller.buscarPedidos(dataIni, dataFim, busca, status, currentPage, pageSize)
         tableView.items.clear()
         tableView.items.addAll(pedidos)
     }

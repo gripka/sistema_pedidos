@@ -1,6 +1,6 @@
 package com.sistema_pedidos.view
 
-import com.sistema_pedidos.controller.HistoricoPedidosController
+import com.sistema_pedidos.controller.PedidosEmAndamentoController
 import javafx.geometry.Insets
 import javafx.geometry.Pos
 import javafx.scene.control.*
@@ -10,7 +10,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 class PedidosEmAndamentoView : VBox(10.0) {
-    private val controller = HistoricoPedidosController()
+    private val controller = PedidosEmAndamentoController()
     private val tableView = TableView<Map<String, Any>>()
     private val dataInicial = DatePicker(LocalDate.now().minusDays(7))
     private val dataFinal = DatePicker(LocalDate.now())
