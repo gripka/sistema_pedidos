@@ -19,6 +19,7 @@ import java.sql.SQLException
 import java.text.NumberFormat
 import java.util.*
 import java.sql.Connection
+import javafx.beans.property.SimpleStringProperty
 
 data class UnidadeMedida(val codigo: String, val descricao: String) {
     override fun toString() = "$codigo - $descricao"
@@ -2146,7 +2147,7 @@ class ProdutosView : BorderPane() {
     private lateinit var lblSemMovimentacao: Label
 
     private fun createStockDashboard(): VBox {
-        dashboardContainer = VBox(5.0).apply {
+        dashboardContainer = VBox(10.0).apply {
             padding = Insets(10.0)
             style = """
             -fx-background-color: white;
@@ -2160,26 +2161,102 @@ class ProdutosView : BorderPane() {
             style = "-fx-font-weight: bold; -fx-font-size: 14px;"
         }
 
+        // Primary KPI metrics
         lblTotalProdutos = Label("0")
         lblBaixoEstoque = Label("0")
         lblValorEstoque = Label("R$ 0,00")
         lblSemMovimentacao = Label("0")
+        lblMovimentacoes7Dias = Label("0") // New metric
 
         val cardsContainer = HBox(10.0).apply {
             alignment = Pos.CENTER_LEFT
+            spacing = 8.0
             children.addAll(
                 createKpiCard("Total de Produtos", lblTotalProdutos, "#4CAF50"),
                 createKpiCard("Produtos com Estoque Baixo", lblBaixoEstoque, "#FFA500"),
                 createKpiCard("Valor Total em Estoque", lblValorEstoque, "#2196F3"),
-                createKpiCard("Produtos sem Movimentação", lblSemMovimentacao, "#9C27B0")
+                createKpiCard("Produtos sem Movimentação", lblSemMovimentacao, "#9C27B0"),
+                createKpiCard("Movimentações (7 dias)", lblMovimentacoes7Dias, "#FF5722")
             )
         }
 
-        dashboardContainer.children.addAll(title, cardsContainer)
+        // Create activity metrics section with tables
+        val activitySection = VBox(10.0).apply {
+            padding = Insets(5.0)
+            spacing = 10.0
+            style = """
+            -fx-border-color: #e0e0e0;
+            -fx-border-width: 0 0 0 0;
+            -fx-border-radius: 3px;
+        """
+        }
+
+        // Most frequently moved products
+        val frequentMovementsTable = createCompactTableView(
+            "Produtos Mais Movimentados",
+            listOf("Produto", "Movimentações", "Último Movimento"),
+            120.0,
+            "frequentTable" // Add ID here
+        )
+
+        // Latest transactions
+        val latestTransactionsTable = createCompactTableView(
+            "Últimas Movimentações",
+            listOf("Data", "Produto", "Tipo", "Qtd"),
+            120.0,
+            "latestTable" // Add ID here
+        )
+
+        // Activity metrics in a horizontal layout
+        val activityTablesContainer = HBox(15.0).apply {
+            children.addAll(frequentMovementsTable, latestTransactionsTable)
+            HBox.setHgrow(frequentMovementsTable, Priority.ALWAYS)
+            HBox.setHgrow(latestTransactionsTable, Priority.ALWAYS)
+        }
+
+        activitySection.children.add(activityTablesContainer)
+
+        // Add all components to the dashboard
+        dashboardContainer.children.addAll(title, cardsContainer, activitySection)
+
+        // Update all dashboard data
         updateDashboard()
 
         return dashboardContainer
     }
+
+    private fun createCompactTableView(title: String, columns: List<String>, height: Double, id: String): VBox {
+        val container = VBox(5.0)
+
+        val titleLabel = Label(title).apply {
+            style = "-fx-font-weight: bold; -fx-font-size: 12px;"
+        }
+
+        val tableView = TableView<Map<String, Any>>().apply {
+            this.id = id
+            prefHeight = height
+            columns.forEachIndexed { index, columnName ->
+                val col = TableColumn<Map<String, Any>, String>(columnName)
+                col.cellValueFactory = Callback { param ->
+                    SimpleStringProperty(param.value[columnName]?.toString() ?: "")
+                }
+                this.columns.add(col)
+            }
+
+            columnResizePolicy = TableView.CONSTRAINED_RESIZE_POLICY
+            style = """
+            -fx-font-size: 11px;
+            -fx-border-color: #e0e0e0;
+            -fx-border-width: 1px;
+        """
+        }
+
+        container.children.addAll(titleLabel, tableView)
+        return container
+    }
+
+    private lateinit var lblMovimentacoes7Dias: Label
+
 
     private fun createKpiCard(title: String, valueLabel: Label, color: String): HBox {
         val card = HBox(8.0).apply {
@@ -2317,47 +2394,78 @@ class ProdutosView : BorderPane() {
     private fun updateDashboard() {
         try {
             db.getConnection().use { conn ->
-                // Calculate total products
-                val totalStmt = conn.prepareStatement("SELECT COUNT(*) FROM produtos")
-                totalStmt.executeQuery().use { rs ->
-                    if (rs.next()) {
-                        lblTotalProdutos.text = rs.getInt(1).toString()
-                    }
-                }
 
-                // Calculate low stock products
-                val lowStockStmt = conn.prepareStatement(
-                    "SELECT COUNT(*) FROM produtos WHERE estoque_atual <= estoque_minimo AND estoque_minimo > 0"
-                )
-                lowStockStmt.executeQuery().use { rs ->
-                    if (rs.next()) {
-                        lblBaixoEstoque.text = rs.getInt(1).toString()
-                    }
-                }
-
-                // Calculate total stock value
-                val valueStmt = conn.prepareStatement(
-                    "SELECT SUM(valor_unitario * estoque_atual) FROM produtos"
-                )
-                valueStmt.executeQuery().use { rs ->
-                    if (rs.next()) {
-                        val totalValue = rs.getDouble(1)
-                        val formatter = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
-                        lblValorEstoque.text = formatter.format(totalValue)
-                    }
-                }
-
-                // Products without movement in last 30 days
-                val noMovementStmt = conn.prepareStatement("""
-                SELECT COUNT(*) FROM produtos
-                WHERE id NOT IN (
-                    SELECT DISTINCT produto_id FROM movimentacao_estoque
-                    WHERE data_movimentacao >= datetime('now', '-30 day')
-                )
+                val movementsStmt = conn.prepareStatement("""
+                SELECT COUNT(*) FROM movimentacao_estoque
+                WHERE data_movimentacao >= datetime('now', '-7 days')
             """)
-                noMovementStmt.executeQuery().use { rs ->
+                movementsStmt.executeQuery().use { rs ->
                     if (rs.next()) {
-                        lblSemMovimentacao.text = rs.getInt(1).toString()
+                        lblMovimentacoes7Dias.text = rs.getInt(1).toString()
+                    }
+                }
+
+                // Most frequently moved products
+                val frequentMovementsStmt = conn.prepareStatement("""
+                SELECT p.nome AS Produto, COUNT(m.id) AS Movimentações,
+                       MAX(m.data_movimentacao) AS "Último Movimento"
+                FROM movimentacao_estoque m
+                JOIN produtos p ON m.produto_id = p.id
+                GROUP BY m.produto_id
+                ORDER BY COUNT(m.id) DESC
+                LIMIT 5
+            """)
+
+                val frequentProductsData = mutableListOf<Map<String, Any>>()
+                frequentMovementsStmt.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        frequentProductsData.add(mapOf(
+                            "Produto" to rs.getString("Produto"),
+                            "Movimentações" to rs.getInt("Movimentações"),
+                            "Último Movimento" to rs.getString("Último Movimento").split(" ")[0]
+                        ))
+                    }
+                }
+
+                // Latest transactions
+                val latestTransactionsStmt = conn.prepareStatement("""
+                SELECT
+                    substr(m.data_movimentacao, 1, 10) AS Data,
+                    p.nome AS Produto,
+                    m.tipo_movimentacao AS Tipo,
+                    m.quantidade_movimentada AS Qtd
+                FROM movimentacao_estoque m
+                JOIN produtos p ON m.produto_id = p.id
+                ORDER BY m.data_movimentacao DESC
+                LIMIT 5
+            """)
+
+                val latestTransactionsData = mutableListOf<Map<String, Any>>()
+                latestTransactionsStmt.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        latestTransactionsData.add(mapOf(
+                            "Data" to rs.getString("Data"),
+                            "Produto" to rs.getString("Produto"),
+                            "Tipo" to rs.getString("Tipo"),
+                            "Qtd" to rs.getInt("Qtd")
+                        ))
+                    }
+                }
+
+                Platform.runLater {
+                    // Use correct lookups with casting
+                    val frequentTable = dashboardContainer.lookup("#frequentTable") as? TableView<Map<String, Any>>
+                    if (frequentTable != null) {
+                        frequentTable.items = FXCollections.observableArrayList(frequentProductsData)
+                    } else {
+                        println("Could not find #frequentTable")
+                    }
+
+                    val latestTable = dashboardContainer.lookup("#latestTable") as? TableView<Map<String, Any>>
+                    if (latestTable != null) {
+                        latestTable.items = FXCollections.observableArrayList(latestTransactionsData)
+                    } else {
+                        println("Could not find #latestTable")
                     }
                 }
             }
