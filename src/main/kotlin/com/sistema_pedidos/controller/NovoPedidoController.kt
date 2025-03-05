@@ -1236,26 +1236,27 @@ class NovoPedidoController {
 
                     if (entregaInfo.first().second == "Sim") {
                         val entregaQuery = """
-                        INSERT INTO entregas (pedido_id, nome_destinatario, telefone_destinatario,
-                        endereco, referencia, cidade, bairro, cep, valor_entrega, data_entrega, hora_entrega)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """.trimIndent()
+                            INSERT INTO entregas (pedido_id, nome_destinatario, telefone_destinatario,
+                            endereco, numero, referencia, cidade, bairro, cep, valor_entrega, data_entrega, hora_entrega)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """.trimIndent()
 
                         connection.prepareStatement(entregaQuery).use { stmt ->
                             stmt.setLong(1, pedidoId)
                             stmt.setString(2, entregaInfo.find { it.first == "Nome" }?.second)
                             stmt.setString(3, entregaInfo.find { it.first == "Telefone" }?.second)
                             stmt.setString(4, entregaInfo.find { it.first == "Endereço" }?.second)
-                            stmt.setString(5, entregaInfo.find { it.first == "Referência" }?.second)
-                            stmt.setString(6, entregaInfo.find { it.first == "Cidade" }?.second)
-                            stmt.setString(7, entregaInfo.find { it.first == "Bairro" }?.second)
-                            stmt.setString(8, entregaInfo.find { it.first == "CEP" }?.second)
+                            stmt.setString(5, entregaInfo.find { it.first == "Número" }?.second)
+                            stmt.setString(6, entregaInfo.find { it.first == "Referência" }?.second)
+                            stmt.setString(7, entregaInfo.find { it.first == "Cidade" }?.second)
+                            stmt.setString(8, entregaInfo.find { it.first == "Bairro" }?.second)
+                            stmt.setString(9, entregaInfo.find { it.first == "CEP" }?.second)
                             stmt.setDouble(
-                                9,
+                                10,
                                 parseMoneyValue(entregaInfo.find { it.first == "Valor" }?.second ?: "0,00")
                             )
-                            stmt.setString(10, entregaInfo.find { it.first == "Data" }?.second)
-                            stmt.setString(11, entregaInfo.find { it.first == "Hora" }?.second)
+                            stmt.setString(11, entregaInfo.find { it.first == "Data" }?.second)
+                            stmt.setString(12, entregaInfo.find { it.first == "Hora" }?.second)
                             stmt.executeUpdate()
                         }
                     }

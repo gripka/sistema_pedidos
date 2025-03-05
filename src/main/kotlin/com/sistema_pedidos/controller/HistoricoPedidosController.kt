@@ -261,35 +261,6 @@ class HistoricoPedidosController {
         }
     }
 
-    fun mostrarDetalhesPedido(pedido: Map<String, Any>) {
-        try {
-            val pedidoId = pedido["id"] as Long
-            val detalhes = buscarDetalhePedido(pedidoId)
-            val itensPedido = buscarItensPedido(pedidoId)
-
-            val dialog = Dialog<ButtonType>().apply {
-                title = "Detalhes do Pedido ${pedido["numero"]}"
-                dialogPane.buttonTypes.add(ButtonType.CLOSE)
-                dialogPane.minWidth = 600.0
-
-                val content = VBox(10.0).apply {
-                    padding = javafx.geometry.Insets(20.0)
-                    children.addAll(
-                        criarSecaoDetalhesPedido(pedido, detalhes),
-                        criarSecaoItensPedido(itensPedido)
-                    )
-                }
-
-                dialogPane.content = content
-            }
-
-            dialog.showAndWait()
-
-        } catch (e: Exception) {
-            showAlert("Erro", "Falha ao mostrar detalhes do pedido: ${e.message}")
-        }
-    }
-
     fun exportarPedidoParaPDF(orderDetails: Map<String, Any>, filePath: String): Boolean {
         try {
             // Create PDF document with margins
@@ -593,6 +564,7 @@ class HistoricoPedidosController {
                     entregaInfo.add(Pair("Nome", rs.getString("nome_destinatario") ?: ""))
                     entregaInfo.add(Pair("Telefone", rs.getString("telefone_destinatario") ?: ""))
                     entregaInfo.add(Pair("Endereço", rs.getString("endereco") ?: ""))
+                    entregaInfo.add(Pair("Número", rs.getString("numero") ?: ""))
                     entregaInfo.add(Pair("Referência", rs.getString("referencia") ?: ""))
                     entregaInfo.add(Pair("Cidade", rs.getString("cidade") ?: ""))
                     entregaInfo.add(Pair("Bairro", rs.getString("bairro") ?: ""))

@@ -32,10 +32,32 @@ class DatabaseHelper {
         val queries = arrayOf(
             """CREATE TABLE IF NOT EXISTS clientes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tipo TEXT CHECK (tipo IN ('PESSOA_FISICA', 'PESSOA_JURIDICA')) DEFAULT 'PESSOA_FISICA',
+                
+                /* PF fields */
                 nome TEXT,
                 sobrenome TEXT,
+                cpf TEXT,
+                
+                /* PJ fields */
+                razao_social TEXT,
+                nome_fantasia TEXT,
+                cnpj TEXT,
+                inscricao_estadual TEXT,
+                
+                /* Common fields */
                 telefone TEXT UNIQUE,
-                observacao TEXT
+                email TEXT,
+                observacao TEXT,
+                
+                /* Address fields */
+                cep TEXT,
+                logradouro TEXT,
+                numero TEXT,
+                complemento TEXT,
+                bairro TEXT,
+                cidade TEXT,
+                estado TEXT
             )""",
 
             """CREATE TABLE IF NOT EXISTS produtos (
@@ -92,6 +114,7 @@ class DatabaseHelper {
                 nome_destinatario TEXT NOT NULL,
                 telefone_destinatario TEXT,
                 endereco TEXT NOT NULL,
+                numero TEXT,
                 referencia TEXT,
                 cidade TEXT NOT NULL,
                 bairro TEXT NOT NULL,

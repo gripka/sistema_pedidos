@@ -245,8 +245,8 @@
 }
 
 .radio-button.custom-radio:selected > .radio {
-    -fx-background-color: #495057;
-    -fx-border-color: #495057;
+    -fx-background-color: #6056E8;
+    -fx-border-color: #6056E8;
 }
 
 .radio-button.custom-radio > .radio > .dot {

@@ -347,7 +347,7 @@ class NovoPedidoView : BorderPane() {
                         styleClass.add("payment-toggle-button")
                         prefWidth = 130.0
                         prefHeight = 35.0
-                        if (forma == "Dinheiro") isSelected = true  // Default selection
+                        if (forma == "Dinheiro") isSelected = true
                     }
                 }
             )
@@ -738,6 +738,7 @@ class NovoPedidoView : BorderPane() {
         val nomeField = findTextField("Nome do Destinatário")
         val telefoneField = findTextField("Telefone do Destinatário")
         val enderecoField = findTextField("Endereço")
+        val numeroField = findTextField("Número")
         val referenciaField = findTextField("Referência")
         val cidadeField = findTextField("Cidade")
         val bairroField = findTextField("Bairro")
@@ -751,6 +752,7 @@ class NovoPedidoView : BorderPane() {
             "Nome" to (nomeField?.text ?: ""),
             "Telefone" to (telefoneField?.text ?: ""),
             "Endereço" to (enderecoField?.text ?: ""),
+            "Número" to (numeroField?.text ?: ""),
             "Referência" to (referenciaField?.text ?: ""),
             "Cidade" to (cidadeField?.text ?: ""),
             "Bairro" to (bairroField?.text ?: ""),
@@ -960,6 +962,17 @@ class NovoPedidoView : BorderPane() {
                                     styleClass.add("text-field")
                                     maxWidth = Double.POSITIVE_INFINITY
                                     HBox.setHgrow(this, Priority.ALWAYS)
+                                }
+                            )
+                        },
+                        VBox(10.0).apply {
+                            prefWidth = 80.0
+                            children.addAll(
+                                Label("Número").apply { styleClass.add("field-label") },
+                                TextField().apply {
+                                    promptText = "Nº"
+                                    styleClass.add("text-field")
+                                    prefWidth = 80.0
                                 }
                             )
                         },

@@ -572,8 +572,8 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
         formPanel.apply {
             padding = Insets(15.0)
             spacing = 10.0
-            prefWidth = 600.0  // Increased from 450.0
-            maxWidth = 600.0   // Increased from 450.0
+            prefWidth = 600.0
+            maxWidth = 600.0
             style = """
             -fx-background-color: white;
             -fx-border-color: rgb(223, 225, 230);
@@ -1092,13 +1092,11 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
 
                         stmt.executeUpdate()
 
-                        // Remove insumos existentes
                         val deleteStmt = conn.prepareStatement("DELETE FROM produto_insumos WHERE produto_id = ?")
                         deleteStmt.setLong(1, produtoId)
                         deleteStmt.executeUpdate()
                     }
 
-                    // Salvar os insumos do produto
                     if (produtoId != null && insumosDosProdutos.isNotEmpty()) {
                         val insumosSql = "INSERT INTO produto_insumos (produto_id, insumo_id, quantidade) VALUES (?, ?, ?)"
                         val insumoStmt = conn.prepareStatement(insumosSql)
@@ -1127,7 +1125,6 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
                 }
             }
 
-            // Reload products and clear form
             loadProducts()
             limparFormulario()
             insumosDosProdutos.clear()
@@ -2182,7 +2179,7 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
             VBox.setMargin(this, Insets(0.0, 0.0, 20.0, 0.0))
         }
 
-        val title = Label("Dashboard de Estoque").apply {
+        val title = Label("2Dashboard de Estoque").apply {
             style = "-fx-font-weight: bold; -fx-font-size: 14px;"
         }
 
@@ -2216,23 +2213,20 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
         """
         }
 
-        // Most frequently moved products
         val frequentMovementsTable = createCompactTableView(
             "Produtos Mais Movimentados",
             listOf("Produto", "Movimentações", "Último Movimento"),
             120.0,
-            "frequentTable" // Add ID here
+            "frequentTable"
         )
 
-        // Latest transactions
         val latestTransactionsTable = createCompactTableView(
             "Últimas Movimentações",
             listOf("Data", "Produto", "Tipo", "Qtd"),
             120.0,
-            "latestTable" // Add ID here
+            "latestTable"
         )
 
-        // Activity metrics in a horizontal layout
         val activityTablesContainer = HBox(15.0).apply {
             children.addAll(frequentMovementsTable, latestTransactionsTable)
             HBox.setHgrow(frequentMovementsTable, Priority.ALWAYS)
@@ -2241,7 +2235,7 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
 
         activitySection.children.add(activityTablesContainer)
 
-        dashboardContainer.children.addAll(title, cardsContainer, activitySection)
+        dashboardContainer.children.addAll(cardsContainer, activitySection)
 
         updateDashboard()
 
@@ -2279,7 +2273,6 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
     }
 
     private lateinit var lblMovimentacoes7Dias: Label
-
 
     private fun createKpiCard(title: String, valueLabel: Label, color: String): HBox {
         val card = HBox(8.0).apply {
@@ -2340,13 +2333,11 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
                         println("Estoque do insumo $insumoNome reduzido em $qtdTotalReduzir unidades")
                     }
 
-                    // Verificar se estoque ficou negativo ou abaixo do mínimo
                     verificarEstoque(insumoId, conn)
                 }
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            // Tratar erro conforme necessário
         }
     }
 
@@ -2364,10 +2355,8 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
 
             if (estoqueAtual < 0) {
                 println("ALERTA: Estoque do produto $nome está negativo: $estoqueAtual")
-                // Implementar notificação ao usuário
             } else if (estoqueAtual < estoqueMinimo) {
                 println("ALERTA: Estoque do produto $nome está abaixo do mínimo: $estoqueAtual (mínimo: $estoqueMinimo)")
-                // Implementar notificação ao usuário
             }
         }
     }
