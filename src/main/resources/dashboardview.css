@@ -202,6 +202,7 @@
     -fx-border-color: #6056e8;
 }
 
+/* Buttons */
 .action-button {
     -fx-min-width: 130px;
     -fx-pref-height: 40px;
@@ -628,9 +629,9 @@
 }
 
 .dialog-button-bar {
-    -fx-alignment: center;
-    -fx-spacing: 10px;
-    -fx-padding: 0px 120px 0px 0px; /* Increased right padding from 75px to 120px */
+    -fx-alignment: center; /* Center align the buttons */
+    -fx-spacing: 10px; /* Add spacing between buttons if needed */
+    -fx-padding: -20px 75px 00px 00px; /* Add padding around the button bar */
 }
 
 .dialog-button {
@@ -692,3 +693,23 @@
     -fx-pref-width: 100px;
 }
 
+.custom-checkbox .box {
+    -fx-background-color: white;
+    -fx-border-color: #cccccc;
+    -fx-border-radius: 3px;
+    -fx-background-radius: 3px;
+    -fx-border-width: 1px;
+}
+
+.custom-checkbox:selected .box {
+    -fx-background-color: #6056e8;
+    -fx-border-color: #6056e8;
+}
+
+.custom-checkbox:selected .mark {
+    -fx-background-color: white;
+}
+
+.custom-checkbox:hover .box {
+    -fx-border-color: #6056e8;
+}

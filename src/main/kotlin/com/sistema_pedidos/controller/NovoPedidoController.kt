@@ -1118,8 +1118,6 @@ class NovoPedidoController {
         }
     }
 
-
-
     fun salvarPedido(
         clienteInfo: List<Pair<String, String>>,
         pagamentoInfo: List<Pair<String, String>>,
@@ -1241,13 +1239,13 @@ class NovoPedidoController {
 
                         connection.prepareStatement(entregaQuery).use { stmt ->
                             stmt.setLong(1, pedidoId)
-                            stmt.setString(2, entregaInfo.find { it.first == "Nome" }?.second)
+                            stmt.setString(2, formatarTextoCapitalizado(entregaInfo.find { it.first == "Nome" }?.second ?: ""))
                             stmt.setString(3, entregaInfo.find { it.first == "Telefone" }?.second)
-                            stmt.setString(4, entregaInfo.find { it.first == "Endereço" }?.second)
+                            stmt.setString(4, formatarTextoCapitalizado(entregaInfo.find { it.first == "Endereço" }?.second ?: ""))
                             stmt.setString(5, entregaInfo.find { it.first == "Número" }?.second)
-                            stmt.setString(6, entregaInfo.find { it.first == "Referência" }?.second)
-                            stmt.setString(7, entregaInfo.find { it.first == "Cidade" }?.second)
-                            stmt.setString(8, entregaInfo.find { it.first == "Bairro" }?.second)
+                            stmt.setString(6, formatarTextoCapitalizado(entregaInfo.find { it.first == "Referência" }?.second ?: ""))
+                            stmt.setString(7, formatarTextoCapitalizado(entregaInfo.find { it.first == "Cidade" }?.second ?: ""))
+                            stmt.setString(8, formatarTextoCapitalizado(entregaInfo.find { it.first == "Bairro" }?.second ?: ""))
                             stmt.setString(9, entregaInfo.find { it.first == "CEP" }?.second)
                             stmt.setDouble(
                                 10,
@@ -1294,8 +1292,8 @@ class NovoPedidoController {
                     val clienteMap = mutableMapOf<String, Any>()
                     clienteInfo.forEach { (key, value) ->
                         when(key) {
-                            "Nome" -> clienteMap["nome"] = value
-                            "Endereço" -> clienteMap["endereco"] = value
+                            "Nome" -> clienteMap["nome"] = formatarTextoCapitalizado(value)
+                            "Endereço" -> clienteMap["endereco"] = formatarTextoCapitalizado(value)
                             // Add other client fields as needed
                         }
                     }
@@ -1317,13 +1315,13 @@ class NovoPedidoController {
                         val entregaMap = mutableMapOf<String, Any>()
                         entregaInfo.forEach { (key, value) ->
                             when(key) {
-                                "Nome" -> entregaMap["nome_destinatario"] = value
+                                "Nome" -> entregaMap["nome_destinatario"] = formatarTextoCapitalizado(value)
                                 "Telefone" -> entregaMap["telefone_destinatario"] = value
-                                "Endereço" -> entregaMap["endereco"] = value
+                                "Endereço" -> entregaMap["endereco"] = formatarTextoCapitalizado(value)
                                 "Número" -> entregaMap["numero"] = value
-                                "Referência" -> entregaMap["referencia"] = value
-                                "Cidade" -> entregaMap["cidade"] = value
-                                "Bairro" -> entregaMap["bairro"] = value
+                                "Referência" -> entregaMap["referencia"] = formatarTextoCapitalizado(value)
+                                "Cidade" -> entregaMap["cidade"] = formatarTextoCapitalizado(value)
+                                "Bairro" -> entregaMap["bairro"] = formatarTextoCapitalizado(value)
                                 "CEP" -> entregaMap["cep"] = value
                                 "Valor" -> entregaMap["valor_entrega"] = parseMoneyValue(value)
                                 "Data" -> entregaMap["data_entrega"] = value
@@ -1351,6 +1349,16 @@ class NovoPedidoController {
         } catch (e: Exception) {
             e.printStackTrace()
             return false
+        }
+    }
+
+    // Function to format text with proper capitalization, respecting exceptions
+    private fun formatarTextoCapitalizado(texto: String): String {
+        val excecoes = setOf("de", "da", "do", "das", "dos", "e", "com", "para", "a", "o", "em",
+            "por", "sem", "sob", "sobre", "à", "às", "ao", "aos")
+
+        return texto.lowercase().split(" ").joinToString(" ") { palavra ->
+            if (palavra in excecoes) palavra else palavra.replaceFirstChar { it.uppercase() }
         }
     }
 }

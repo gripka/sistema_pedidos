@@ -64,8 +64,22 @@ class MainView(private val stage: Stage) : BorderPane() {
 
 
     fun setCenterView(view: javafx.scene.Node) {
+        // Se o node atual for um Closeable, feche-o antes de substituir
+        val currentView = center
+        if (currentView is AutoCloseable) {
+            try {
+                currentView.close()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
         center = view
         bottom = null
+
+        if (view is Refreshable) {
+            view.refresh()
+        }
     }
 
     fun setLeftMenu(menu: javafx.scene.Node) {

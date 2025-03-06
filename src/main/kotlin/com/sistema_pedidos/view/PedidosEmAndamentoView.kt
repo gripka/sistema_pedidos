@@ -9,12 +9,14 @@ import javafx.stage.StageStyle
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-class PedidosEmAndamentoView : VBox(10.0) {
+class PedidosEmAndamentoView : VBox(10.0), ViewLifecycle {
     private val controller = PedidosEmAndamentoController()
     private val tableView = TableView<Map<String, Any>>()
     private val dataInicial = DatePicker(LocalDate.now().minusDays(7))
     private val dataFinal = DatePicker(LocalDate.now())
     private val searchField = TextField()
+
+
 
     init {
         padding = Insets(20.0)
@@ -35,6 +37,15 @@ class PedidosEmAndamentoView : VBox(10.0) {
         children.addAll(headerBox, filterBox, tableView, actionBox)
 
         refreshData()
+    }
+
+    override fun refresh() {
+        refreshData()
+    }
+
+    override fun close() {
+        tableView.items.clear()
+
     }
 
     private fun createHeaderBox(): HBox {

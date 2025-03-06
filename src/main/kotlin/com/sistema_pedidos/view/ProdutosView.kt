@@ -47,7 +47,6 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
     private val insumosDosProdutos = FXCollections.observableArrayList<InsumoQuantidade>()
     private val mainView: MainView? = stage?.let { MainView(it) }
 
-    // Standard section creation methods to replace direct VBox creation
     private fun createStandardSection(title: String): VBox {
         val section = VBox(10.0).apply {
             padding = Insets(10.0)

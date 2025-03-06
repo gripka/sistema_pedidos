@@ -5,6 +5,6 @@ import javafx.scene.control.Label
 
 class ConfiguracoesView : VBox() {
     init {
-        children.add(Label("Configurações"))
+        children.add(Label("Em breve..."))
     }
 }

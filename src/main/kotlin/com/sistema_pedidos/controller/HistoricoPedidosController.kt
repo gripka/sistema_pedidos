@@ -2,17 +2,13 @@ package com.sistema_pedidos.controller
 
 import com.sistema_pedidos.database.DatabaseHelper
 import javafx.scene.control.Alert
-import javafx.scene.control.ButtonType
-import javafx.scene.control.Dialog
 import javafx.scene.layout.VBox
 import java.io.File
 import java.io.FileWriter
-import java.sql.ResultSet
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-import com.itextpdf.kernel.colors.ColorConstants
 import com.itextpdf.kernel.pdf.PdfDocument
 import com.itextpdf.kernel.pdf.PdfWriter
 import com.itextpdf.kernel.pdf.canvas.draw.SolidLine
@@ -21,10 +17,12 @@ import com.itextpdf.layout.element.Cell
 import com.itextpdf.layout.element.LineSeparator
 import com.itextpdf.layout.element.Paragraph
 import com.itextpdf.layout.element.Table
-import com.itextpdf.layout.properties.HorizontalAlignment
 import com.itextpdf.layout.properties.TextAlignment
 import com.itextpdf.layout.properties.UnitValue
-
+import javafx.application.Platform
+import javafx.scene.control.ButtonBar
+import javafx.geometry.Pos
+import javafx.stage.StageStyle
 
 class HistoricoPedidosController {
     private val database = DatabaseHelper()
@@ -44,8 +42,8 @@ class HistoricoPedidosController {
         val queryParts = mutableListOf(
             """
         SELECT p.id, p.numero, p.data_pedido, p.telefone_contato, p.status, p.status_pedido,
-               p.valor_total, p.data_retirada, p.hora_retirada, 
-               c.nome, c.sobrenome,
+               p.valor_total, p.data_retirada, p.hora_retirada,
+               c.nome, c.sobrenome, c.telefone as cliente_telefone,
                e.endereco, e.bairro, e.cidade, e.data_entrega, e.hora_entrega
         FROM pedidos p
         LEFT JOIN clientes c ON p.cliente_id = c.id
@@ -733,6 +731,100 @@ class HistoricoPedidosController {
         }
     }
 
+    fun imprimirNotaNaoFiscal(pedido: Map<String, Any>) {
+        try {
+            val pedidoId = pedido["id"] as Long
+
+            // Get complete order data
+            val orderDetails = getCompleteOrderDetails(pedidoId)
+
+            // Format data as expected by NotaFiscalController
+            val pedidoData = mutableMapOf<String, Any>()
+
+            // Add basic order info
+            pedidoData["numero"] = pedido["numero"] as String
+            pedidoData["data_pedido"] = orderDetails["data_pedido"] as String
+            pedidoData["status"] = orderDetails["status"] as String
+            pedidoData["status_pedido"] = pedido["status_pedido"] as String
+            pedidoData["valor_total"] = extractNumericValue(pedido["valor_total"] as String)
+
+            // Add cliente info
+            val clienteInfoList = orderDetails["cliente"] as List<Pair<String, String>>
+            val clienteMap = mutableMapOf<String, Any>()
+            clienteInfoList.forEach { (key, value) ->
+                when(key) {
+                    "Nome" -> clienteMap["nome"] = value
+                    "Telefone" -> pedidoData["telefone_contato"] = value
+                    "Observação" -> pedidoData["observacao"] = value
+                }
+            }
+            pedidoData["cliente"] = clienteMap
+
+            // Add payment info
+            val pagamentoInfoList = orderDetails["pagamento"] as List<Pair<String, String>>
+            pagamentoInfoList.forEach { (key, value) ->
+                when(key) {
+                    "Forma de Pagamento" -> pedidoData["forma_pagamento"] = value
+                    "Valor Total" -> if(!pedidoData.containsKey("valor_total"))
+                        pedidoData["valor_total"] = extractNumericValue(value)
+                    "Desconto" -> pedidoData["valor_desconto"] = extractNumericValue(value)
+                    "Troco Para" -> pedidoData["valor_troco_para"] = extractNumericValue(value)
+                    "Troco" -> pedidoData["valor_troco"] = extractNumericValue(value)
+                    "Data de Retirada" -> pedidoData["data_retirada"] = value
+                    "Hora de Retirada" -> pedidoData["hora_retirada"] = value
+                }
+            }
+
+            // Add product items
+            val produtosList = mutableListOf<Map<String, Any>>()
+            val produtosInfoList = orderDetails["produtos"] as List<Pair<String, String>>
+
+            for (i in produtosInfoList.indices step 5) {
+                if (i+4 < produtosInfoList.size) {
+                    val produtoMap = mutableMapOf<String, Any>()
+                    produtoMap["codigo_produto"] = produtosInfoList[i].second
+                    produtoMap["nome_produto"] = produtosInfoList[i+1].second
+                    produtoMap["quantidade"] = produtosInfoList[i+2].second.toInt()
+                    produtoMap["valor_unitario"] = extractNumericValue(produtosInfoList[i+3].second)
+                    produtoMap["subtotal"] = extractNumericValue(produtosInfoList[i+4].second)
+                    produtosList.add(produtoMap)
+                }
+            }
+            pedidoData["itens"] = produtosList
+
+            // Add delivery info if available
+            val entregaInfoList = orderDetails["entrega"] as List<Pair<String, String>>
+            if (entregaInfoList.isNotEmpty() && entregaInfoList.first().second == "Sim") {
+                val entregaMap = mutableMapOf<String, Any>()
+                entregaInfoList.forEach { (key, value) ->
+                    when(key) {
+                        "Nome" -> entregaMap["nome_destinatario"] = value
+                        "Telefone" -> entregaMap["telefone_destinatario"] = value
+                        "Endereço" -> entregaMap["endereco"] = value
+                        "Número" -> entregaMap["numero"] = value
+                        "Referência" -> entregaMap["referencia"] = value
+                        "Cidade" -> entregaMap["cidade"] = value
+                        "Bairro" -> entregaMap["bairro"] = value
+                        "CEP" -> entregaMap["cep"] = value
+                        "Valor" -> entregaMap["valor_entrega"] = extractNumericValue(value)
+                        "Data" -> entregaMap["data_entrega"] = value
+                        "Hora" -> entregaMap["hora_entrega"] = value
+                    }
+                }
+                pedidoData["entrega"] = entregaMap
+            }
+
+            // Print the non-fiscal receipt
+            val notaNaoFiscalController = NotaNaoFiscalController()
+            notaNaoFiscalController.imprimirNotaFiscal(pedidoData = pedidoData)
+
+            showAlert("Sucesso", "Nota fiscal enviada para impressão", Alert.AlertType.INFORMATION)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            showAlert("Erro", "Falha ao imprimir nota fiscal: ${e.message}")
+        }
+    }
+
     fun imprimirPedido(pedido: Map<String, Any>) {
         try {
             val pedidoId = pedido["id"] as Long
@@ -816,7 +908,6 @@ class HistoricoPedidosController {
                 pedidoData["entrega"] = entregaMap
             }
 
-            // Print the order
             val printerController = PrinterController()
             printerController.imprimirPedido(pedidoData = pedidoData)
 
@@ -896,12 +987,59 @@ class HistoricoPedidosController {
         }
     }
 
-    private fun showAlert(title: String, message: String, type: Alert.AlertType = Alert.AlertType.ERROR) {
-        Alert(type).apply {
+    private fun showAlert(title: String, message: String, alertType: Alert.AlertType = Alert.AlertType.ERROR) {
+        val alert = Alert(alertType).apply {
             this.title = title
-            this.headerText = null
-            this.contentText = message
-            showAndWait()
+            headerText = null
+            contentText = message
+
+            // Remove title bar
+            initStyle(StageStyle.UNDECORATED)
+
+            // Remove the default icon
+            dialogPane.graphic = null
         }
+
+        // Make sure to apply your CSS stylesheet
+        val cssPath = javaClass.getResource("/historicopedidosview.css")?.toExternalForm()
+        if (cssPath != null) {
+            alert.dialogPane.stylesheets.add(cssPath)
+        }
+
+        // Apply CSS classes to different parts of the dialog
+        alert.dialogPane.styleClass.add("custom-dialog")
+
+        with(alert.dialogPane) {
+            lookupAll(".content").forEach {
+                it.styleClass.add("dialog-content")
+                // Center the content text horizontally
+                (it as? javafx.scene.Parent)?.style = "-fx-alignment: center; -fx-text-alignment: center;"
+            }
+            lookupAll(".header-panel").forEach { it.styleClass.add("dialog-header") }
+            lookupAll(".button-bar").forEach { it.styleClass.add("dialog-button-bar") }
+
+            // Center the message label specifically
+            lookupAll(".content .label").forEach {
+                it.style = "-fx-alignment: center; -fx-text-alignment: center; -fx-min-width: 100%; -fx-padding: 10 0;"
+            }
+        }
+
+        // Apply styling to buttons after they're created
+        Platform.runLater {
+            alert.dialogPane.buttonTypes.forEach { buttonType ->
+                val button = alert.dialogPane.lookupButton(buttonType)
+                button.styleClass.add("dialog-button")
+            }
+
+            // Center the button bar
+            val buttonBar = alert.dialogPane.lookup(".button-bar") as ButtonBar
+            buttonBar.buttonOrder = ""
+            buttonBar.style = "-fx-alignment: center;"
+
+            // Make the dialog wider to accommodate centered text better
+            alert.dialogPane.minWidth = 300.0
+        }
+
+        alert.showAndWait()
     }
 }

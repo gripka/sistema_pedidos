@@ -18,6 +18,7 @@ class Main : Application() {
         val dbHelper = DatabaseHelper()
 
         val mainView = MainView(primaryStage)
+        val dashboardView = DashboardView()
         val novoPedidoView = NovoPedidoView()
         val produtosView = ProdutosView()
         val pedidosEmAndamentoView = PedidosEmAndamentoView()
@@ -26,6 +27,7 @@ class Main : Application() {
         val clientesView = ClientesView()
         val menuView = MenuView { viewName ->
             when (viewName) {
+                "dashboard" -> mainView.setCenterView(dashboardView)
                 "novoPedido" -> mainView.setCenterView(novoPedidoView)
                 "pedidosAndamento" -> mainView.setCenterView(pedidosEmAndamentoView)
                 "produtos" -> mainView.setCenterView(produtosView)
@@ -34,16 +36,16 @@ class Main : Application() {
                 "clientes" -> mainView.setCenterView(clientesView)
             }
         }
+
         val tables = dbHelper.listTables()
         println("Tabelas no banco de dados: $tables")
 
 
         val titleBarView = TitleBarView(primaryStage)
 
-        // Set the initial view, side menu, and title bar
         mainView.setTopTitleBar(titleBarView)
         mainView.setLeftMenu(menuView)
-        mainView.setCenterView(novoPedidoView)
+        mainView.setCenterView(dashboardView)
 
         val scene = Scene(mainView, 1000.0, 680.0, Color.TRANSPARENT)
         scene.stylesheets.add(javaClass.getResource("/styles.css").toExternalForm())
@@ -51,14 +53,11 @@ class Main : Application() {
         primaryStage.scene = scene
         primaryStage.title = "Sistema de Pedidos"
 
-        // Set the application icon
         primaryStage.icons.add(Image("icons/icon.png"))
 
-        // Set minimum width and height for the window
         primaryStage.minWidth = 800.0
         primaryStage.minHeight = 600.0
 
-        // Adjust bounds when maximized to not overlap the taskbar
         primaryStage.maximizedProperty().addListener { _, _, maximized ->
             if (maximized) {
                 val screenBounds: Rectangle2D = Screen.getPrimary().visualBounds
@@ -68,7 +67,6 @@ class Main : Application() {
             }
         }
 
-        // Make the window resizable from any border
         ResizableWindow(primaryStage)
 
         primaryStage.show()

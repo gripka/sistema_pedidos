@@ -399,7 +399,7 @@ class HistoricoPedidosView : VBox(10.0) {
         retiradaCol.prefWidth = 200.0
 
         val acoesCol = TableColumn<Map<String, Any>, Void>("Ações")
-        acoesCol.prefWidth = 420.0  // Aumentei para acomodar o novo botão
+        acoesCol.prefWidth = 600.0  // Aumentei para acomodar o novo botão
         acoesCol.setCellFactory {
             object : TableCell<Map<String, Any>, Void>() {
                 private val viewButton = Button("Ver").apply {
@@ -496,7 +496,14 @@ class HistoricoPedidosView : VBox(10.0) {
                     }
                 }
 
-
+                private val btnImprimirNotaNaoFiscal = Button("Nota Não Fiscal").apply {
+                    styleClass.add("small-button")
+                    prefWidth = 140.0
+                    setOnAction {
+                        val pedido = tableView.items[index]
+                        controller.imprimirNotaNaoFiscal(pedido)
+                    }
+                }
 
                 private val statusButton = Button("Status do pedido").apply {
                     styleClass.add("small-button")
@@ -575,13 +582,12 @@ class HistoricoPedidosView : VBox(10.0) {
                     if (empty) {
                         graphic = null
                     } else {
-                        // Removed the line that was changing the button text
                         graphic = box
                     }
                 }
 
                 private val box = HBox(5.0).apply {
-                    children.addAll(viewButton, pagamentoButton, printButton, statusButton)
+                    children.addAll(viewButton, pagamentoButton, printButton,btnImprimirNotaNaoFiscal, statusButton)
                     alignment = Pos.CENTER
                 }
             }
@@ -602,10 +608,8 @@ class HistoricoPedidosView : VBox(10.0) {
 
         tableView.columnResizePolicy = TableView.UNCONSTRAINED_RESIZE_POLICY
 
-        // Set placeholder text
         tableView.placeholder = Label("Nenhum pedido encontrado")
 
-        // Ensure table doesn't cause window expansion while keeping columns visible
         val totalColumnWidth = tableView.columns.sumOf { it.prefWidth }
         tableView.prefWidth = totalColumnWidth
     }
@@ -614,7 +618,6 @@ class HistoricoPedidosView : VBox(10.0) {
         return HBox(10.0).apply {
             padding = Insets(10.0, 0.0, 0.0, 0.0)
 
-            // Create left section with pagination controls
             val paginationBox = HBox(10.0).apply {
                 alignment = Pos.CENTER_LEFT
                 HBox.setHgrow(this, Priority.ALWAYS)

@@ -207,24 +207,24 @@ class ClientesController {
         try {
             database.getConnection().use { conn ->
                 conn.prepareStatement("""
-                    INSERT INTO clientes (
-                        tipo, 
-                        nome, sobrenome, cpf,
-                        razao_social, nome_fantasia, cnpj, inscricao_estadual,
-                        telefone, email, observacao,
-                        cep, logradouro, numero, complemento, bairro, cidade, estado
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """).use { stmt ->
+                INSERT INTO clientes (
+                    tipo, 
+                    nome, sobrenome, cpf,
+                    razao_social, nome_fantasia, cnpj, inscricao_estadual,
+                    telefone, email, observacao,
+                    cep, logradouro, numero, complemento, bairro, cidade, estado
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """).use { stmt ->
                     stmt.setString(1, cliente.tipo.name)
 
-                    // PF fields
-                    stmt.setString(2, cliente.nome)
-                    stmt.setString(3, cliente.sobrenome)
+                    // PF fields - with capitalization
+                    stmt.setString(2, formatarTextoCapitalizado(cliente.nome))
+                    stmt.setString(3, formatarTextoCapitalizado(cliente.sobrenome))
                     stmt.setString(4, cliente.cpf)
 
-                    // PJ fields
-                    stmt.setString(5, cliente.razaoSocial)
-                    stmt.setString(6, cliente.nomeFantasia)
+                    // PJ fields - with capitalization
+                    stmt.setString(5, formatarTextoCapitalizado(cliente.razaoSocial))
+                    stmt.setString(6, formatarTextoCapitalizado(cliente.nomeFantasia))
                     stmt.setString(7, cliente.cnpj)
                     stmt.setString(8, cliente.inscricaoEstadual)
 
@@ -233,13 +233,13 @@ class ClientesController {
                     stmt.setString(10, cliente.email)
                     stmt.setString(11, cliente.observacao)
 
-                    // Address fields
+                    // Address fields - with capitalization
                     stmt.setString(12, cliente.cep)
-                    stmt.setString(13, cliente.logradouro)
+                    stmt.setString(13, formatarTextoCapitalizado(cliente.logradouro))
                     stmt.setString(14, cliente.numero)
-                    stmt.setString(15, cliente.complemento)
-                    stmt.setString(16, cliente.bairro)
-                    stmt.setString(17, cliente.cidade)
+                    stmt.setString(15, formatarTextoCapitalizado(cliente.complemento))
+                    stmt.setString(16, formatarTextoCapitalizado(cliente.bairro))
+                    stmt.setString(17, formatarTextoCapitalizado(cliente.cidade))
                     stmt.setString(18, cliente.estado)
 
                     stmt.executeUpdate()
@@ -262,24 +262,24 @@ class ClientesController {
         try {
             database.getConnection().use { conn ->
                 conn.prepareStatement("""
-                    UPDATE clientes 
-                    SET tipo = ?,
-                        nome = ?, sobrenome = ?, cpf = ?,
-                        razao_social = ?, nome_fantasia = ?, cnpj = ?, inscricao_estadual = ?,
-                        telefone = ?, email = ?, observacao = ?,
-                        cep = ?, logradouro = ?, numero = ?, complemento = ?, bairro = ?, cidade = ?, estado = ?
-                    WHERE id = ?
-                """).use { stmt ->
+                UPDATE clientes 
+                SET tipo = ?,
+                    nome = ?, sobrenome = ?, cpf = ?,
+                    razao_social = ?, nome_fantasia = ?, cnpj = ?, inscricao_estadual = ?,
+                    telefone = ?, email = ?, observacao = ?,
+                    cep = ?, logradouro = ?, numero = ?, complemento = ?, bairro = ?, cidade = ?, estado = ?
+                WHERE id = ?
+            """).use { stmt ->
                     stmt.setString(1, cliente.tipo.name)
 
-                    // PF fields
-                    stmt.setString(2, cliente.nome)
-                    stmt.setString(3, cliente.sobrenome)
+                    // PF fields - with capitalization
+                    stmt.setString(2, formatarTextoCapitalizado(cliente.nome))
+                    stmt.setString(3, formatarTextoCapitalizado(cliente.sobrenome))
                     stmt.setString(4, cliente.cpf)
 
-                    // PJ fields
-                    stmt.setString(5, cliente.razaoSocial)
-                    stmt.setString(6, cliente.nomeFantasia)
+                    // PJ fields - with capitalization
+                    stmt.setString(5, formatarTextoCapitalizado(cliente.razaoSocial))
+                    stmt.setString(6, formatarTextoCapitalizado(cliente.nomeFantasia))
                     stmt.setString(7, cliente.cnpj)
                     stmt.setString(8, cliente.inscricaoEstadual)
 
@@ -288,13 +288,13 @@ class ClientesController {
                     stmt.setString(10, cliente.email)
                     stmt.setString(11, cliente.observacao)
 
-                    // Address fields
+                    // Address fields - with capitalization
                     stmt.setString(12, cliente.cep)
-                    stmt.setString(13, cliente.logradouro)
+                    stmt.setString(13, formatarTextoCapitalizado(cliente.logradouro))
                     stmt.setString(14, cliente.numero)
-                    stmt.setString(15, cliente.complemento)
-                    stmt.setString(16, cliente.bairro)
-                    stmt.setString(17, cliente.cidade)
+                    stmt.setString(15, formatarTextoCapitalizado(cliente.complemento))
+                    stmt.setString(16, formatarTextoCapitalizado(cliente.bairro))
+                    stmt.setString(17, formatarTextoCapitalizado(cliente.cidade))
                     stmt.setString(18, cliente.estado)
 
                     stmt.setLong(19, cliente.id)
@@ -312,6 +312,16 @@ class ClientesController {
             }
             showAlert("Erro", mensagemErro)
             return false
+        }
+    }
+
+    // Function to format text with proper capitalization, respecting exceptions
+    private fun formatarTextoCapitalizado(texto: String): String {
+        val excecoes = setOf("de", "da", "do", "das", "dos", "e", "com", "para", "a", "o", "em",
+            "por", "sem", "sob", "sobre", "à", "às", "ao", "aos")
+
+        return texto.lowercase().split(" ").joinToString(" ") { palavra ->
+            if (palavra in excecoes) palavra else palavra.replaceFirstChar { it.uppercase() }
         }
     }
 

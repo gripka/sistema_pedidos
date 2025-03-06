@@ -45,7 +45,7 @@ class TitleBarView(private val stage: Stage) : HBox() {
         }
 
         // Add a label or other components to the title bar
-        val titleLabel = Label("Sistema de Pedidos").apply {
+        val titleLabel = Label("Blossom ERP\n").apply {
             textFill = Color.WHITE
             padding = Insets(0.0, 0.0, 0.0, 10.0) // Move the title slightly to the right
             setOnMousePressed { event: MouseEvent ->
