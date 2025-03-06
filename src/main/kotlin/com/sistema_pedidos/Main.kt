@@ -2,6 +2,7 @@ package com.sistema_pedidos
 
 import com.sistema_pedidos.database.DatabaseHelper
 import javafx.application.Application
+import javafx.application.Platform
 import javafx.geometry.Rectangle2D
 import javafx.scene.Scene
 import javafx.stage.Screen
@@ -10,10 +11,23 @@ import javafx.stage.StageStyle
 import com.sistema_pedidos.view.*
 import javafx.scene.paint.Color
 import javafx.scene.image.Image
+import java.lang.management.ManagementFactory
 
 class Main : Application() {
     override fun start(primaryStage: Stage) {
-        // Inicializa o banco de dados
+        // Initialize the single instance lock with our stage
+        if (!SingleInstanceLock.initialize(primaryStage)) {
+            // Another instance is already running and was notified to focus
+            Platform.exit()
+            return
+        }
+
+        setProcessName("Blossom ERP")
+
+        Runtime.getRuntime().addShutdownHook(Thread {
+            SingleInstanceLock.release()
+        })
+
         DatabaseHelper()
         val dbHelper = DatabaseHelper()
 
@@ -40,7 +54,6 @@ class Main : Application() {
         val tables = dbHelper.listTables()
         println("Tabelas no banco de dados: $tables")
 
-
         val titleBarView = TitleBarView(primaryStage)
 
         mainView.setTopTitleBar(titleBarView)
@@ -51,9 +64,9 @@ class Main : Application() {
         scene.stylesheets.add(javaClass.getResource("/styles.css").toExternalForm())
         primaryStage.initStyle(StageStyle.TRANSPARENT)
         primaryStage.scene = scene
-        primaryStage.title = "Sistema de Pedidos"
+        primaryStage.title = "Blossom ERP"
 
-        primaryStage.icons.add(Image("icons/icon.png"))
+        primaryStage.icons.add(Image("icons/icon.ico"))
 
         primaryStage.minWidth = 800.0
         primaryStage.minHeight = 600.0
@@ -69,7 +82,21 @@ class Main : Application() {
 
         ResizableWindow(primaryStage)
 
+        primaryStage.setOnCloseRequest {
+            SingleInstanceLock.release()
+        }
+
         primaryStage.show()
+    }
+}
+
+fun setProcessName(name: String) {
+    try {
+        val pid = ManagementFactory.getRuntimeMXBean().name.split("@")[0]
+        val process = ProcessBuilder("cmd", "/c", "title", name).start()
+        process.waitFor()
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
 }
 

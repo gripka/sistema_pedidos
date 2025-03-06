@@ -1,7 +1,8 @@
 plugins {
     kotlin("jvm") version "1.8.0"
     application
-    id("org.openjfx.javafxplugin") version "0.0.13" // Plugin JavaFX
+    id("org.openjfx.javafxplugin") version "0.0.13"
+    id("org.beryx.runtime") version "1.12.7"
 }
 
 repositories {
@@ -28,6 +29,23 @@ javafx {
     modules = listOf("javafx.controls", "javafx.fxml")
 }
 
+runtime {
+    options.set(listOf("--strip-debug", "--compress", "2", "--no-header-files", "--no-man-pages"))
+    jpackage {
+        imageName = "BlossomERP"
+        imageOptions = listOf("--icon", "src/main/resources/icons/icon.ico")
+        installerOptions = listOf(
+            "--win-menu",
+            "--win-shortcut",
+            "--name", "Blossom ERP",
+            "--app-version", "0.6.0",
+            "--description", "Otimize a administração da sua floricultura ...",
+            "--vendor", "Gripka"
+        )
+        installerType = "exe"
+    }
+}
+
 kotlin {
     jvmToolchain {
         (this as JavaToolchainSpec).languageVersion.set(JavaLanguageVersion.of(17))
@@ -39,7 +57,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
 }
 
 tasks.withType<JavaExec> {
-    // Ensure JavaFX modules are added to the runtime classpath
     jvmArgs = listOf(
         "--module-path", configurations.runtimeClasspath.get().asPath,
         "--add-modules", "javafx.controls,javafx.fxml"
