@@ -68,6 +68,7 @@ class DashboardView : BorderPane(), ViewLifecycle {
             "totalDescontos" to dashboardController.getTotalDescontosAplicados(),
             "produtosMaisVendidos" to dashboardController.getProdutosMaisVendidos(),
             "vendasUltimos7Dias" to dashboardController.getVendasUltimos7Dias(),
+            "vendasUltimos30Dias" to dashboardController.getVendasUltimos30Dias(),
             "itensBaixoEstoque" to dashboardController.getItensBaixoEstoque(),
             "pedidosPendentes" to dashboardController.getPedidosPendentes(),
 
@@ -327,22 +328,47 @@ class DashboardView : BorderPane(), ViewLifecycle {
     private fun createSalesChartSection(): VBox {
         val container = VBox(10.0).apply {
             styleClass.add("container-box")
-            style =
-                "-fx-background-color: white; -fx-background-radius: 10; -fx-padding: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 10, 0, 0, 5);"
+            style = "-fx-background-color: white; -fx-background-radius: 10; -fx-padding: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 10, 0, 0, 5);"
         }
 
-        val title = Label("Faturamento - Últimos 7 dias").apply {
+        val title = Label("Faturamento").apply {
             styleClass.add("section-label")
         }
 
-        val chart = createSalesLineChart()
-        container.children.addAll(title, chart)
+        // Create HBox to hold charts side by side
+        val chartsContainer = HBox(15.0).apply {
+            HBox.setHgrow(this, Priority.ALWAYS)
+        }
+
+        // Create each chart in its own VBox with title
+        val chart7Days = VBox(5.0).apply {
+            HBox.setHgrow(this, Priority.ALWAYS)
+            children.addAll(
+                Label("Últimos 7 dias").apply { styleClass.add("subsection-label") },
+                createSalesLineChart(7)
+            )
+        }
+
+        val chart30Days = VBox(5.0).apply {
+            HBox.setHgrow(this, Priority.ALWAYS)
+            children.addAll(
+                Label("Últimos 30 dias").apply { styleClass.add("subsection-label") },
+                createSalesLineChart(30)
+            )
+        }
+
+        chartsContainer.children.addAll(chart7Days, chart30Days)
+        container.children.addAll(chartsContainer)
 
         return container
     }
 
-    private fun createSalesLineChart(): LineChart<String, Number> {
-        val vendasData = dashboardData["vendasUltimos7Dias"] as Map<String, Double>
+    private fun createSalesLineChart(days: Int): LineChart<String, Number> {
+        val vendasData = if (days == 7) {
+            dashboardData["vendasUltimos7Dias"] as Map<String, Double>
+        } else {
+            dashboardData["vendasUltimos30Dias"] as Map<String, Double>
+        }
 
         val xAxis = CategoryAxis()
         val yAxis = NumberAxis()
@@ -351,19 +377,18 @@ class DashboardView : BorderPane(), ViewLifecycle {
         yAxis.label = "Valor (R$)"
 
         val lineChart = LineChart<String, Number>(xAxis, yAxis).apply {
-            title = "Faturamento - Últimos 7 dias"
             animated = true
             createSymbols = true
             isLegendVisible = false
-            prefHeight = 300.0
+            prefHeight = 200.0
         }
 
         val series = XYChart.Series<String, Number>()
         series.name = "Faturamento"
 
-        // Add data points for past 7 days
+        // Add data points for past days
         val today = LocalDate.now()
-        for (i in 6 downTo 0) {
+        for (i in (days - 1) downTo 0) {
             val date = today.minusDays(i.toLong())
             val formattedDate = date.format(dateFormatter)
             val dateKey = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))

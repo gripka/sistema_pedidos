@@ -126,13 +126,14 @@ class DashboardController {
 
         try {
             val query = """
-            SELECT p.codigo, p.nome, 
-                SUM(ip.quantidade) as quantidade_vendida, 
-                SUM(ip.subtotal) as valor_total
+        SELECT p.codigo, p.nome, 
+            SUM(ip.quantidade) as quantidade_vendida, 
+            SUM(ip.subtotal) as valor_total
             FROM produtos p
             JOIN itens_pedido ip ON p.id = ip.produto_id
             JOIN pedidos ped ON ip.pedido_id = ped.id
             WHERE ped.status_pedido != 'Cancelado'
+            AND ip.subtotal > 0
             GROUP BY p.id
             ORDER BY quantidade_vendida DESC
             LIMIT 5
@@ -164,10 +165,11 @@ class DashboardController {
         return try {
             dbHelper.getConnection().use { conn ->
                 val query = """
-                SELECT AVG(valor_total) as ticket_medio 
-                FROM pedidos 
-                WHERE status_pedido != 'Cancelado'
-            """
+                    SELECT AVG(valor_total) as ticket_medio 
+                    FROM pedidos 
+                    WHERE status_pedido != 'Cancelado'
+                    AND valor_total > 0
+                """
                 conn.createStatement().use { stmt ->
                     val rs = stmt.executeQuery(query)
                     if (rs.next()) rs.getDouble("ticket_medio") else 0.0
@@ -213,11 +215,12 @@ class DashboardController {
         return try {
             dbHelper.getConnection().use { conn ->
                 val query = """
-                SELECT SUM(valor_total) as total 
-                FROM pedidos 
-                WHERE status = 'Pago'
-                AND strftime('%Y-%m', data_pedido) = strftime('%Y-%m', 'now')
-            """
+                    SELECT SUM(valor_total) as total 
+                    FROM pedidos 
+                    WHERE status = 'Pago'
+                    AND valor_total > 0
+                    AND strftime('%Y-%m', data_pedido) = strftime('%Y-%m', 'now')
+                """
                 conn.createStatement().use { stmt ->
                     val rs = stmt.executeQuery(query)
                     if (rs.next()) rs.getDouble("total") else 0.0
@@ -286,7 +289,12 @@ class DashboardController {
         val today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
         return try {
             dbHelper.getConnection().use { conn ->
-                val query = "SELECT SUM(valor_total) FROM pedidos WHERE date(data_pedido) = ? AND status = 'Pago'"
+                val query = """
+                    SELECT SUM(valor_total) FROM pedidos 
+                    WHERE date(data_pedido) = ? 
+                    AND status = 'Pago'
+                    AND valor_total > 0
+                    """
                 conn.prepareStatement(query).use { stmt ->
                     stmt.setString(1, today)
                     val rs = stmt.executeQuery()
@@ -379,6 +387,33 @@ class DashboardController {
         }
     }
 
+    fun getVendasUltimos30Dias(): Map<String, Double> {
+        return try {
+            dbHelper.getConnection().use { conn ->
+                val query = """
+                SELECT date(data_pedido) as data, SUM(valor_total) as total
+                FROM pedidos
+                WHERE data_pedido >= date('now', '-30 days')
+                AND status = 'Pago'
+                AND valor_total > 0
+                GROUP BY date(data_pedido)
+                ORDER BY data_pedido
+            """
+                conn.createStatement().use { stmt ->
+                    val rs = stmt.executeQuery(query)
+                    val vendas = mutableMapOf<String, Double>()
+                    while (rs.next()) {
+                        vendas[rs.getString("data")] = rs.getDouble("total")
+                    }
+                    vendas
+                }
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
+            emptyMap()
+        }
+    }
+
     fun getVendasUltimos7Dias(): Map<String, Double> {
         return try {
             dbHelper.getConnection().use { conn ->
@@ -387,6 +422,7 @@ class DashboardController {
                     FROM pedidos
                     WHERE data_pedido >= date('now', '-7 days')
                     AND status = 'Pago'
+                    AND valor_total > 0
                     GROUP BY date(data_pedido)
                     ORDER BY data_pedido
                 """
