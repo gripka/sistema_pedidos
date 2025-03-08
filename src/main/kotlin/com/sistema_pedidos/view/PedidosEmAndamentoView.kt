@@ -17,7 +17,6 @@ class PedidosEmAndamentoView : VBox(10.0), ViewLifecycle {
     private val searchField = TextField()
 
 
-
     init {
         padding = Insets(20.0)
         prefWidth = 1000.0
@@ -157,7 +156,6 @@ class PedidosEmAndamentoView : VBox(10.0), ViewLifecycle {
                 createDetailsSection("Pagamento", orderDetails["pagamento"] as List<Pair<String, String>>)
             )
 
-            // Show entrega details only if there is delivery
             val entregaDetails = orderDetails["entrega"] as List<Pair<String, String>>
             if (entregaDetails.isNotEmpty() && entregaDetails.first().second != "Não") {
                 children.add(createDetailsSection("Entrega", entregaDetails))
@@ -237,7 +235,6 @@ class PedidosEmAndamentoView : VBox(10.0), ViewLifecycle {
         tableView.isTableMenuButtonVisible = true
         tableView.prefHeight = Region.USE_COMPUTED_SIZE
 
-        // Configure columns with proper widths
         val numeroCol = TableColumn<Map<String, Any>, String>("Nº Pedido")
         numeroCol.setCellValueFactory { data -> javafx.beans.property.SimpleStringProperty(data.value["numero"] as String) }
         numeroCol.prefWidth = 100.0
@@ -255,7 +252,11 @@ class PedidosEmAndamentoView : VBox(10.0), ViewLifecycle {
         telefoneCol.prefWidth = 130.0
 
         val produtosCol = TableColumn<Map<String, Any>, String>("Produtos")
-        produtosCol.setCellValueFactory { data -> javafx.beans.property.SimpleStringProperty(data.value["produtos"] as? String ?: "") }
+        produtosCol.setCellValueFactory { data ->
+            javafx.beans.property.SimpleStringProperty(
+                data.value["produtos"] as? String ?: ""
+            )
+        }
         produtosCol.prefWidth = 300.0
 
         val totalCol = TableColumn<Map<String, Any>, String>("Total")
@@ -325,6 +326,77 @@ class PedidosEmAndamentoView : VBox(10.0), ViewLifecycle {
                     setOnAction {
                         val pedido = tableView.items[index]
                         showOrderDetailsDialog(pedido)
+                    }
+                }
+
+                private val pagamentoButton = Button("Pagamento").apply {
+                    styleClass.add("small-button")
+                    prefWidth = 120.0
+                    setOnAction {
+                        val pedido = tableView.items[index]
+                        val pedidoId = pedido["id"] as Long
+                        val currentStatus = pedido["status"] as String
+
+                        val dialog = Dialog<String>()
+                        dialog.title = "Atualizar Status de Pagamento"
+                        dialog.headerText = "Selecione o status de pagamento"
+                        dialog.initStyle(StageStyle.UNDECORATED)
+
+                        val buttonTypeOk = ButtonType("Confirmar", ButtonBar.ButtonData.OK_DONE)
+                        val buttonTypeCancel = ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE)
+                        dialog.dialogPane.buttonTypes.addAll(buttonTypeOk, buttonTypeCancel)
+
+                        (dialog.dialogPane.lookup(".button-bar") as ButtonBar).apply {
+                            buttonOrder = ""
+                            buttonMinWidth = 100.0
+                            alignment = Pos.CENTER
+                            styleClass.add("dialog-button-bar")
+                        }
+
+                        val statusOptions = listOf("Pendente", "Pago", "Cancelado")
+                        val comboBox = ComboBox<String>().apply {
+                            items.addAll(statusOptions)
+                            value = currentStatus
+                            prefHeight = 36.0
+                            prefWidth = 200.0
+                        }
+
+                        val content = VBox(10.0).apply {
+                            padding = Insets(20.0)
+                            spacing = 10.0
+                            prefWidth = 400.0
+                            styleClass.add("dialog-content")
+                            children.addAll(
+                                Label("Status de pagamento:").apply {
+                                    styleClass.add("field-label")
+                                },
+                                comboBox
+                            )
+                        }
+
+                        dialog.dialogPane.stylesheets.addAll(this@PedidosEmAndamentoView.stylesheets)
+                        dialog.dialogPane.content = content
+                        dialog.dialogPane.styleClass.add("custom-dialog")
+
+                        dialog.setResultConverter { buttonType ->
+                            if (buttonType == buttonTypeOk) comboBox.value else null
+                        }
+
+                        val result = dialog.showAndWait()
+
+                        result.ifPresent { novoStatus ->
+                            if (controller.atualizarStatusPagamentoPedido(pedidoId, novoStatus)) {
+                                (pedido as MutableMap<String, Any>)["status"] = novoStatus
+                                tableView.refresh()
+                            } else {
+                                Alert(Alert.AlertType.ERROR).apply {
+                                    title = "Erro"
+                                    headerText = null
+                                    contentText = "Erro ao atualizar o status de pagamento"
+                                    showAndWait()
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -420,7 +492,7 @@ class PedidosEmAndamentoView : VBox(10.0), ViewLifecycle {
                 }
 
                 private val box = HBox(5.0).apply {
-                    children.addAll(viewButton, printButton, statusButton)
+                    children.addAll(viewButton, pagamentoButton, printButton, statusButton)
                     alignment = Pos.CENTER
                 }
             }
@@ -476,7 +548,63 @@ class PedidosEmAndamentoView : VBox(10.0), ViewLifecycle {
             status == "Preparando" || status == "Pendente" || status == "Em Entrega"
         }
 
+        // Sort orders by delivery/pickup time
+        val pedidosOrdenados = pedidosEmAndamento.sortedBy { pedido ->
+            // Parse the delivery/pickup information from "retirada" field
+            val retirada = pedido["retirada"] as String
+            extractDateTimeForSorting(retirada)
+        }
+
         tableView.items.clear()
-        tableView.items.addAll(pedidosEmAndamento)
+        tableView.items.addAll(pedidosOrdenados)
+    }
+
+    /**
+     * Extracts a sortable datetime from the delivery/pickup text
+     * Returns a date string in format "yyyy-MM-dd HH:mm" or "9999-12-31" for entries without dates
+     */
+    private fun extractDateTimeForSorting(retiradaText: String): String {
+        try {
+            // Check if it's a delivery
+            if (retiradaText.startsWith("Endereço:")) {
+                // For deliveries, extract the date and time after the address
+                val dateTimePart = retiradaText.substringAfter("Entrega: ", "")
+                if (dateTimePart.isNotEmpty()) {
+                    return convertToSortableDateTime(dateTimePart)
+                }
+            } else {
+                // For pickups, the format is "Retirada: dd/MM/yyyy às HH:mm"
+                val dateTimePart = retiradaText.substringAfter("Retirada: ", "")
+                if (dateTimePart.isNotEmpty() && !dateTimePart.contains("Não definida")) {
+                    return convertToSortableDateTime(dateTimePart)
+                }
+            }
+
+            // For pending orders without dates, return a far future date to place them at the end
+            return "9999-12-31"
+        } catch (e: Exception) {
+            // If any error occurs during parsing, return a high value to sort to the end
+            return "9999-12-31"
+        }
+    }
+
+    /**
+     * Converts date string from "dd/MM/yyyy às HH:mm" to "yyyy-MM-dd HH:mm" for proper sorting
+     */
+    private fun convertToSortableDateTime(dateTimeText: String): String {
+        try {
+            // Extract the date and time parts
+            val datePart = dateTimeText.substringBefore(" às ")
+            val timePart = dateTimeText.substringAfter(" às ", "00:00")
+
+            // Parse the date
+            val formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
+            val parsedDate = LocalDate.parse(datePart, formatter)
+
+            // Return in sortable format
+            return "${parsedDate.format(DateTimeFormatter.ISO_LOCAL_DATE)} $timePart"
+        } catch (e: Exception) {
+            return "9999-12-31"
+        }
     }
 }

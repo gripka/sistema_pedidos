@@ -703,7 +703,7 @@ class NovoPedidoView : BorderPane() {
         val formaPagamento = findSelectedToggleText("payment-toggle-button")
         val status = findSelectedToggleText("payment-toggle-button", 1)
         val descontoType = if ((controller.getDescontoToggleGroup().selectedToggle as? RadioButton)?.id == "valor") "Valor" else "Percentual"
-        val desconto = findTextField("Desconto")?.text ?: "R$ 0,00"
+        val desconto = controller.getDescontoFieldText()
         val dataRetirada = findDatePicker("Data de Retirada")?.value?.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) ?: ""
         val horaRetirada = findPickupTimeValue() ?: ""
 

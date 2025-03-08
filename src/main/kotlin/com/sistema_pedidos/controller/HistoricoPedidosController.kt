@@ -918,20 +918,90 @@ class HistoricoPedidosController {
         }
     }
 
+    private fun buscarProdutosInfo(pedidoId: Long): List<Pair<String, String>> {
+        val produtosInfo = mutableListOf<Pair<String, String>>()
 
-    private fun buscarClienteInfo(pedidoId: Long): List<Pair<String, String>> {
-        // Implementação para buscar informações do cliente
-        return listOf()
-    }
+        try {
+            val produtos = buscarItensPedido(pedidoId)
 
-    private fun buscarProdutosParaImpressao(pedidoId: Long): List<Map<String, String>> {
-        // Implementação para buscar produtos
-        return listOf()
+            produtos.forEach { produto ->
+                produtosInfo.add(Pair("Código", produto["codigo"].toString()))
+                produtosInfo.add(Pair("Nome", produto["nome"].toString()))
+                produtosInfo.add(Pair("Quantidade", produto["quantidade"].toString()))
+                produtosInfo.add(Pair("Valor Unitário",
+                    "R$ ${String.format("%.2f", produto["valor_unitario"]).replace(".", ",")}"))
+                produtosInfo.add(Pair("Subtotal",
+                    "R$ ${String.format("%.2f", produto["subtotal"]).replace(".", ",")}"))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return produtosInfo
     }
 
     private fun buscarPagamentoInfo(pedidoId: Long): List<Pair<String, String>> {
-        // Implementação para buscar informações de pagamento
-        return listOf()
+        val pagamentoInfo = mutableListOf<Pair<String, String>>()
+
+        try {
+            database.getConnection().use { conn ->
+                conn.prepareStatement("""
+                SELECT 
+                    forma_pagamento, valor_total, valor_desconto, tipo_desconto,
+                    valor_troco_para, valor_troco, data_retirada, hora_retirada
+                FROM pedidos
+                WHERE id = ?
+            """).use { stmt ->
+                    stmt.setLong(1, pedidoId)
+                    val rs = stmt.executeQuery()
+
+                    if (rs.next()) {
+                        pagamentoInfo.add(Pair("Forma de Pagamento", rs.getString("forma_pagamento") ?: ""))
+
+                        // Format total value
+                        val valorTotal = rs.getDouble("valor_total")
+                        pagamentoInfo.add(Pair("Valor Total",
+                            "R$ ${String.format("%.2f", valorTotal).replace(".", ",")}"))
+
+                        // Format discount value
+                        val valorDesconto = rs.getDouble("valor_desconto")
+                        val tipoDesconto = rs.getString("tipo_desconto") ?: "valor"
+
+                        if (tipoDesconto == "percentual") {
+                            val percentual = (valorDesconto / valorTotal) * 100
+                            pagamentoInfo.add(Pair("Desconto (Percentual)",
+                                "${String.format("%.2f", percentual).replace(".", ",")}%"))
+                        } else {
+                            pagamentoInfo.add(Pair("Desconto",
+                                "R$ ${String.format("%.2f", valorDesconto).replace(".", ",")}"))
+                        }
+
+                        val valorTrocoPara = rs.getDouble("valor_troco_para")
+                        if (valorTrocoPara > 0) {
+                            pagamentoInfo.add(Pair("Troco Para",
+                                "R$ ${String.format("%.2f", valorTrocoPara).replace(".", ",")}"))
+
+                            val valorTroco = rs.getDouble("valor_troco")
+                            pagamentoInfo.add(Pair("Troco",
+                                "R$ ${String.format("%.2f", valorTroco).replace(".", ",")}"))
+                        }
+
+                        val dataRetirada = rs.getString("data_retirada")
+                        val horaRetirada = rs.getString("hora_retirada")
+
+                        if (dataRetirada != null && horaRetirada != null &&
+                            dataRetirada != "Entrega" && horaRetirada != "Entrega") {
+                            pagamentoInfo.add(Pair("Data de Retirada", dataRetirada))
+                            pagamentoInfo.add(Pair("Hora de Retirada", horaRetirada))
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return pagamentoInfo
     }
 
     private fun buscarEntregaInfo(pedidoId: Long): List<Pair<String, String>> {

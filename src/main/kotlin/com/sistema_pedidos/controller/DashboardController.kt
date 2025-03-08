@@ -121,26 +121,34 @@ class DashboardController {
         return 0.0
     }
 
-    fun getProdutosMaisVendidos(): List<Map<String, Any>> {
+    fun getProdutosMaisVendidosAno(): List<Map<String, Any>> {
         val produtos = mutableListOf<Map<String, Any>>()
 
         try {
+            val now = java.time.LocalDate.now()
+            val firstDayOfYear = now.withDayOfYear(1).toString()
+            val lastDayOfYear = now.withDayOfYear(now.lengthOfYear()).toString()
+
             val query = """
         SELECT p.codigo, p.nome, 
             SUM(ip.quantidade) as quantidade_vendida, 
             SUM(ip.subtotal) as valor_total
-            FROM produtos p
-            JOIN itens_pedido ip ON p.id = ip.produto_id
-            JOIN pedidos ped ON ip.pedido_id = ped.id
-            WHERE ped.status_pedido != 'Cancelado'
-            AND ip.subtotal > 0
-            GROUP BY p.id
-            ORDER BY quantidade_vendida DESC
-            LIMIT 5
+        FROM produtos p
+        JOIN itens_pedido ip ON p.id = ip.produto_id
+        JOIN pedidos ped ON ip.pedido_id = ped.id
+        WHERE ped.status_pedido != 'Cancelado'
+        AND ip.subtotal > 0
+        AND ped.data_pedido BETWEEN ? AND ?
+        GROUP BY p.id
+        ORDER BY quantidade_vendida DESC
+        LIMIT 5
         """
 
             DatabaseHelper().getConnection().use { conn ->
                 conn.prepareStatement(query).use { stmt ->
+                    stmt.setString(1, firstDayOfYear)
+                    stmt.setString(2, lastDayOfYear)
+
                     val resultSet = stmt.executeQuery()
                     while (resultSet.next()) {
                         produtos.add(mapOf(
@@ -159,7 +167,98 @@ class DashboardController {
         return produtos
     }
 
-    // In DashboardController.kt
+    fun getProdutosMaisVendidosSemana(): List<Map<String, Any>> {
+        val produtos = mutableListOf<Map<String, Any>>()
+
+        try {
+            // Get the first and last day of the current week
+            val now = java.time.LocalDate.now()
+            val firstDayOfWeek = now.minusDays(now.dayOfWeek.value - 1L).toString()
+            val lastDayOfWeek = now.plusDays(7L - now.dayOfWeek.value).toString()
+
+            val query = """
+        SELECT p.codigo, p.nome, 
+            SUM(ip.quantidade) as quantidade_vendida, 
+            SUM(ip.subtotal) as valor_total
+        FROM produtos p
+        JOIN itens_pedido ip ON p.id = ip.produto_id
+        JOIN pedidos ped ON ip.pedido_id = ped.id
+        WHERE ped.status_pedido != 'Cancelado'
+        AND ip.subtotal > 0
+        AND ped.data_pedido BETWEEN ? AND ?
+        GROUP BY p.id
+        ORDER BY quantidade_vendida DESC
+        LIMIT 5
+        """
+
+            DatabaseHelper().getConnection().use { conn ->
+                conn.prepareStatement(query).use { stmt ->
+                    stmt.setString(1, firstDayOfWeek)
+                    stmt.setString(2, lastDayOfWeek)
+
+                    val resultSet = stmt.executeQuery()
+                    while (resultSet.next()) {
+                        produtos.add(mapOf(
+                            "codigo" to resultSet.getString("codigo"),
+                            "nome" to resultSet.getString("nome"),
+                            "quantidade_vendida" to resultSet.getInt("quantidade_vendida"),
+                            "valor_total" to resultSet.getDouble("valor_total")
+                        ))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return produtos
+    }
+
+    fun getProdutosMaisVendidos(): List<Map<String, Any>> {
+        val produtos = mutableListOf<Map<String, Any>>()
+
+        try {
+            val now = java.time.LocalDate.now()
+            val firstDayOfMonth = now.withDayOfMonth(1).toString()
+            val lastDayOfMonth = now.withDayOfMonth(now.lengthOfMonth()).toString()
+
+            val query = """
+        SELECT p.codigo, p.nome, 
+            SUM(ip.quantidade) as quantidade_vendida, 
+            SUM(ip.subtotal) as valor_total
+        FROM produtos p
+        JOIN itens_pedido ip ON p.id = ip.produto_id
+        JOIN pedidos ped ON ip.pedido_id = ped.id
+        WHERE ped.status_pedido != 'Cancelado'
+        AND ip.subtotal > 0
+        AND ped.data_pedido BETWEEN ? AND ?
+        GROUP BY p.id
+        ORDER BY quantidade_vendida DESC
+        LIMIT 5
+        """
+
+            DatabaseHelper().getConnection().use { conn ->
+                conn.prepareStatement(query).use { stmt ->
+                    stmt.setString(1, firstDayOfMonth)
+                    stmt.setString(2, lastDayOfMonth)
+
+                    val resultSet = stmt.executeQuery()
+                    while (resultSet.next()) {
+                        produtos.add(mapOf(
+                            "codigo" to resultSet.getString("codigo"),
+                            "nome" to resultSet.getString("nome"),
+                            "quantidade_vendida" to resultSet.getInt("quantidade_vendida"),
+                            "valor_total" to resultSet.getDouble("valor_total")
+                        ))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        return produtos
+    }
 
     fun getTicketMedio(): Double {
         return try {

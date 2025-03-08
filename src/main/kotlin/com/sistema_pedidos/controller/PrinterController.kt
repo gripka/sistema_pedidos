@@ -18,6 +18,7 @@ class PrinterController {
     private val COMPANY_NAME = "FLORICULTURA ADRIANA FLORES"
     private val COMPANY_PHONE = "(42) 99815-5900"
     private val COMPANY_ADDRESS = "Rua 19 de Dezembro, 347 - Centro"
+    private val LINE_WIDTH = 32 // Maximum characters per line for most thermal printers
 
     // Lista de impressoras térmicas conhecidas (pode ser expandida conforme necessário)
     private val knownThermalPrinters = listOf(
@@ -123,6 +124,22 @@ class PrinterController {
                 val right = Style()
                     .setJustification(EscPosConst.Justification.Right)
 
+                val smallFont = Style()
+                    .setFontSize(Style.FontSize._1, Style.FontSize._1)
+
+                val smallCenter = Style()
+                    .setFontSize(Style.FontSize._1, Style.FontSize._1)
+                    .setJustification(EscPosConst.Justification.Center)
+
+                val smallBold = Style()
+                    .setFontSize(Style.FontSize._1, Style.FontSize._1)
+                    .setBold(true)
+
+                val smallBoldCenter = Style()
+                    .setFontSize(Style.FontSize._1, Style.FontSize._1)
+                    .setBold(true)
+                    .setJustification(EscPosConst.Justification.Center)
+
                 val linhaDiv = "--------------------------------"
 
                 // Cabeçalho da empresa
@@ -148,25 +165,26 @@ class PrinterController {
                     .feed(1)
                     .writeLF(linhaDiv)
 
-                // Cliente
                 val clienteInfo = pedidoData["cliente"] as? Map<String, Any>
                 val telefoneContato = pedidoData["telefone_contato"] as? String ?: ""
 
                 escpos.write(bold, "CLIENTE:")
                     .feed(1)
+                escpos.write(smallFont, "")
 
                 if (clienteInfo != null) {
                     val tipoCliente = clienteInfo["tipo"] as? String
                     if (tipoCliente == "PESSOA_FISICA") {
                         val nome = clienteInfo["nome"] as? String ?: ""
                         val sobrenome = clienteInfo["sobrenome"] as? String ?: ""
-                        escpos.writeLF("Nome: $nome $sobrenome")
+                        val nomeCompleto = "$nome $sobrenome"
+                        imprimirTextoComWrapping(escpos, "Nome: $nomeCompleto")
                     } else {
                         val razaoSocial = clienteInfo["razao_social"] as? String ?: ""
                         val nomeFantasia = clienteInfo["nome_fantasia"] as? String ?: ""
-                        escpos.writeLF("Empresa: $razaoSocial")
+                        imprimirTextoComWrapping(escpos, "Empresa: $razaoSocial")
                         if (nomeFantasia.isNotEmpty()) {
-                            escpos.writeLF("Nome Fantasia: $nomeFantasia")
+                            imprimirTextoComWrapping(escpos, "Nome Fantasia: $nomeFantasia")
                         }
                     }
                     escpos.writeLF("Tel: ${clienteInfo["telefone"] ?: telefoneContato}")
@@ -177,11 +195,12 @@ class PrinterController {
                 val observacao = pedidoData["observacao"] as? String ?: ""
                 if (observacao.isNotEmpty()) {
                     escpos.feed(1)
-                        .writeLF("Observação: $observacao")
+                    imprimirTextoComWrapping(escpos, "Observação: $observacao")
                 }
 
                 escpos.feed(1)
                     .writeLF(linhaDiv)
+                escpos.write(Style(), "")
 
                 // Produtos
                 escpos.write(bold, "PRODUTOS:")
@@ -191,7 +210,6 @@ class PrinterController {
 
                 // Cabeçalho da tabela de itens
                 escpos.writeLF("QTD PRODUTO             VALOR   TOTAL")
-                escpos.writeLF(linhaDiv)
 
                 itens.forEach { item ->
                     val qtd = (item["quantidade"] as Number).toInt()
@@ -199,18 +217,18 @@ class PrinterController {
                     val valorUnit = formatarValor(item["valor_unitario"] as Number)
                     val subtotal = formatarValor(item["subtotal"] as Number)
 
-                    // Formato tabular para os produtos
-                    val truncatedName = truncateText(nome, 20)
-                    escpos.writeLF(String.format("%-3s %-20s %-7s %s",
-                        "${qtd}x", truncatedName, valorUnit, subtotal))
+                    // Formato para primeira linha
+                    escpos.writeLF(
+                        String.format(
+                            "%-3s %-20s %-7s %s",
+                            "${qtd}x", truncateText(nome, 20), valorUnit, subtotal
+                        )
+                    )
 
-                    // Se o nome for muito longo, continuar em nova linha
+                    // Se o nome for muito longo, imprimir o resto com wrapping
                     if (nome.length > 20) {
-                        val remaining = nome.substring(20)
-                        val chunks = remaining.chunked(28)
-                        chunks.forEach { chunk ->
-                            escpos.writeLF("    $chunk")
-                        }
+                        val restante = nome.substring(20)
+                        imprimirTextoIndentado(escpos, restante, 4)
                     }
                 }
 
@@ -227,7 +245,8 @@ class PrinterController {
 
                 escpos.write(bold, "PAGAMENTO:")
                     .feed(1)
-                    .writeLF("Forma: $formaPagamento")
+                escpos.write(smallFont, "")
+                imprimirTextoComWrapping(escpos, "Forma: $formaPagamento")
 
                 if ((valorDesconto.toDoubleOrNull() ?: 0.0) > 0) {
                     val descInfo = if (tipoDesconto == "percentual") {
@@ -251,35 +270,50 @@ class PrinterController {
 
                 escpos.feed(1)
                     .writeLF(linhaDiv)
+                escpos.write(Style(), "")
 
-                // Entrega ou retirada
                 val entrega = pedidoData["entrega"] as? Map<String, Any>
                 if (entrega != null) {
                     escpos.write(bold, "ENTREGA:")
                         .feed(1)
-                        .writeLF("Destinatário: ${entrega["nome_destinatario"]}")
-                        .writeLF("Telefone: ${entrega["telefone_destinatario"]}")
-                        .writeLF("Endereço: ${entrega["endereco"]}, ${entrega["numero"]}")
+                    escpos.write(bold, "PEDIDO #$numeroPedido")
+                        .feed(1)
+                    val nomeDestinatario = entrega["nome_destinatario"] as? String ?: ""
+                    imprimirTextoComWrapping(escpos, "Destinatário: $nomeDestinatario")
+
+                    val telefone = entrega["telefone_destinatario"] as? String ?: ""
+                    if (telefone.isNotEmpty()) {
+                        escpos.writeLF("Telefone: $telefone")
+                    }
+
+                    val numero = (entrega["numero"] as? String)?.takeIf { it.isNotBlank() } ?: "S/N"
+                    val endereco = "${entrega["endereco"]}, $numero"
+                    imprimirTextoComWrapping(escpos, "Endereço: $endereco")
 
                     val referencia = entrega["referencia"] as? String ?: ""
                     if (referencia.isNotEmpty()) {
-                        escpos.writeLF("Referência: $referencia")
+                        imprimirTextoComWrapping(escpos, "Referência: $referencia")
                     }
 
-                    escpos.writeLF("Bairro: ${entrega["bairro"]}")
-                        .writeLF("Cidade: ${entrega["cidade"]}")
+                    val bairro = entrega["bairro"] as? String ?: ""
+                    if (bairro.isNotEmpty()) {
+                        imprimirTextoComWrapping(escpos, "Bairro: $bairro")
+                    }
+
+                    val cidade = entrega["cidade"] as? String ?: ""
+                    if (cidade.isNotEmpty()) {
+                        imprimirTextoComWrapping(escpos, "Cidade: $cidade")
+                    }
 
                     val cep = entrega["cep"] as? String ?: ""
                     if (cep.isNotEmpty()) {
                         escpos.writeLF("CEP: $cep")
                     }
 
-                    val valorEntrega = formatarValor(entrega["valor_entrega"] as? Number ?: 0)
                     val dataEntrega = formatarData(entrega["data_entrega"] as String)
                     val horaEntrega = entrega["hora_entrega"] as String
 
-                    escpos.writeLF("Valor entrega: R$ $valorEntrega")
-                        .writeLF("Data/Hora: $dataEntrega $horaEntrega")
+                    escpos.writeLF("Data/Hora: $dataEntrega $horaEntrega")
                 } else {
                     // Informações de retirada
                     val dataRetirada = pedidoData["data_retirada"] as? String
@@ -300,83 +334,70 @@ class PrinterController {
                 escpos.feed(1)
                     .write(center, "Obrigado pela preferência!")
                     .feed(1)
+                    .writeLF("Impresso em: " + SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(Date()))
                     .feed(3)
                     .cut(CutMode.FULL)
             }
         }
     }
 
-    /**
-     * Formata texto para o tamanho especificado
-     */
+    private fun imprimirTextoComWrapping(escpos: EscPos, texto: String, maxWidth: Int = LINE_WIDTH) {
+        if (texto.length <= maxWidth) {
+            escpos.writeLF(texto)
+            return
+        }
+
+        var remainingText = texto
+        while (remainingText.isNotEmpty()) {
+            val length = minOf(maxWidth, remainingText.length)
+            val cutPoint = if (length < remainingText.length) {
+                // Try to cut at a space to avoid breaking words
+                val lastSpace = remainingText.substring(0, length).lastIndexOf(' ')
+                if (lastSpace > maxWidth / 2) lastSpace + 1 else length
+            } else {
+                length
+            }
+
+            escpos.writeLF(remainingText.substring(0, cutPoint))
+            remainingText = remainingText.substring(cutPoint).trimStart()
+        }
+    }
+
+    private fun imprimirTextoIndentado(escpos: EscPos, texto: String, indentacao: Int) {
+        val indent = " ".repeat(indentacao)
+        val maxWidth = LINE_WIDTH - indentacao
+
+        var remainingText = texto
+        while (remainingText.isNotEmpty()) {
+            val length = minOf(maxWidth, remainingText.length)
+            val cutPoint = if (length < remainingText.length) {
+                val lastSpace = remainingText.substring(0, length).lastIndexOf(' ')
+                if (lastSpace > maxWidth / 2) lastSpace + 1 else length
+            } else {
+                length
+            }
+
+            escpos.writeLF(indent + remainingText.substring(0, cutPoint))
+            remainingText = remainingText.substring(cutPoint).trimStart()
+        }
+    }
+
     private fun truncateText(text: String, maxLength: Int): String {
         return if (text.length <= maxLength) text else text.substring(0, maxLength)
     }
 
-    /**
-     * Formata um valor monetário
-     */
+    private fun formatarData(data: String): String {
+        try {
+            val formatoOriginal = SimpleDateFormat("yyyy-MM-dd")
+            val formatoDesejado = SimpleDateFormat("dd/MM/yyyy")
+            val date = formatoOriginal.parse(data)
+            return formatoDesejado.format(date)
+        } catch (e: Exception) {
+            return data
+        }
+    }
+
     private fun formatarValor(valor: Number): String {
         return String.format("%.2f", valor.toDouble())
-    }
-
-    /**
-     * Formata uma data no formato brasileiro
-     */
-    private fun formatarData(dataStr: String): String {
-        try {
-            val inputFormat = SimpleDateFormat("yyyy-MM-dd")
-            val outputFormat = SimpleDateFormat("dd/MM/yyyy")
-            val date = inputFormat.parse(dataStr)
-            return outputFormat.format(date)
-        } catch (e: Exception) {
-            return dataStr
-        }
-    }
-
-    /**
-     * Imprime texto simples na impressora térmica especificada
-     */
-    fun imprimirTexto(texto: String, printService: PrintService? = null) {
-        try {
-            val impressora = printService ?: getImpressoraPadrao()
-            ?: throw IOException("Nenhuma impressora térmica encontrada.")
-
-            if (!isThermalPrinter(impressora)) {
-                throw IOException("A impressora ${impressora.name} não é uma impressora térmica.")
-            }
-
-            PrinterOutputStream(impressora).use { outputStream ->
-                EscPos(outputStream).use { escpos ->
-                    escpos.writeLF(texto)
-                        .feed(3)
-                        .cut(CutMode.FULL)
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            println("Erro ao imprimir texto: ${e.message}")
-        }
-    }
-
-    /**
-     * Verifica se a impressora térmica especificada está disponível
-     */
-    fun verificarImpressora(printService: PrintService?): Boolean {
-        return try {
-            val impressora = printService ?: getImpressoraPadrao()
-            ?: return false
-
-            // Verifica se é uma impressora térmica
-            if (!isThermalPrinter(impressora)) {
-                return false
-            }
-
-            // Verifica se a impressora está disponível usando DocFlavor
-            impressora.isDocFlavorSupported(javax.print.DocFlavor.BYTE_ARRAY.AUTOSENSE)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
     }
 }

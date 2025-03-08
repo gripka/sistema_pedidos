@@ -203,6 +203,10 @@ class NovoPedidoController {
         }
     }
 
+    fun getDescontoFieldText(): String {
+        return descontoField.text
+    }
+
     fun buscarClientePorTelefone(telefone: String, callback: (Map<String, String>?) -> Unit) {
         val telefoneClean = telefone.replace(Regex("[^0-9]"), "")
 
@@ -454,14 +458,14 @@ class NovoPedidoController {
             val suggestionsMenu = ContextMenu().apply {
                 styleClass.add("product-suggestions")
                 style = """
-                    -fx-background-color: white;
-                    -fx-border-color: rgb(223, 225, 230);
-                    -fx-border-width: 1px;
-                    -fx-border-radius: 3px;
-                    -fx-background-radius: 3px;
-                    -fx-effect: dropshadow(gaussian, rgba(9, 30, 66, 0.15), 8, 0, 0, 2);
-                    -fx-padding: 4px;
-                """
+            -fx-background-color: white;
+            -fx-border-color: rgb(223, 225, 230);
+            -fx-border-width: 1px;
+            -fx-border-radius: 3px;
+            -fx-background-radius: 3px;
+            -fx-effect: dropshadow(gaussian, rgba(9, 30, 66, 0.15), 8, 0, 0, 2);
+            -fx-padding: 4px;
+        """
             }
 
             textProperty().addListener { _, _, newValue ->
@@ -477,10 +481,10 @@ class NovoPedidoController {
                         limitedProdutos.forEach { produto ->
                             val menuItem = MenuItem(produto.nome)
                             menuItem.style = """
-                                -fx-padding: 5px 8px;
-                                -fx-font-size: 13px;
-                                -fx-pref-width: ${this.width - 20}px; 
-                            """
+                        -fx-padding: 5px 8px;
+                        -fx-font-size: 13px;
+                        -fx-pref-width: ${this.width - 20}px; 
+                    """
 
                             menuItem.setOnAction {
                                 checkInsumosSuficientes(produto.id, 1) { hasSuficientes, insumosEmFalta ->
@@ -515,17 +519,17 @@ class NovoPedidoController {
                                         }
 
                                         dialog.dialogPane.style = """
-        -fx-background-color: white;
-        -fx-border-color: #D3D3D3;
-        -fx-border-width: 1px;
-    """
+                                        -fx-background-color: white;
+                                        -fx-border-color: #D3D3D3;
+                                        -fx-border-width: 1px;
+                                    """
 
                                         dialog.dialogPane.content = content
 
                                         dialog.dialogPane.lookup(".header-panel")?.style = """
-        -fx-background-color: #FFA500;
-        -fx-background-radius: 0;
-    """
+                                        -fx-background-color: #FFA500;
+                                        -fx-background-radius: 0;
+                                    """
 
                                         val headerLabel = dialog.dialogPane.lookup(".header-panel .label") as? Label
                                         headerLabel?.style = "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"
@@ -543,9 +547,9 @@ class NovoPedidoController {
                                             buttonOrder = ButtonBar.BUTTON_ORDER_NONE
                                             buttonMinWidth = 100.0
                                             style = """
-        -fx-background-color: white;
-        -fx-alignment: center;
-        """
+                                        -fx-background-color: white;
+                                        -fx-alignment: center;
+                                        """
                                             padding = Insets(0.0, 0.0, 15.0, 0.0)
                                         }
 
@@ -580,9 +584,25 @@ class NovoPedidoController {
                 }
             }
 
+            // Enhanced key event handling
             setOnKeyPressed { event ->
-                if (event.code == KeyCode.ESCAPE) {
-                    suggestionsMenu.hide()
+                when (event.code) {
+                    KeyCode.ESCAPE -> {
+                        suggestionsMenu.hide()
+                    }
+                    KeyCode.SPACE -> {
+                        if (suggestionsMenu.isShowing) {
+                            event.consume()
+                        }
+                    }
+                    else -> {
+                    }
+                }
+            }
+
+            suggestionsMenu.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED) { event ->
+                if (event.code == KeyCode.SPACE) {
+                    event.consume()
                 }
             }
 
@@ -944,55 +964,42 @@ class NovoPedidoController {
             }
         }
 
-        // Reset discount type
         descontoToggleGroup.selectToggle(
             descontoToggleGroup.toggles.find { (it as RadioButton).id == "valor" }
         )
 
-        // Reset delivery switch and form
         val deliverySwitch = contentContainer.lookup(".switch") as? StackPane
         deliverySwitch?.let {
             val checkbox = it.children.find { node -> node is CheckBox } as? CheckBox
             checkbox?.isSelected = false
         }
 
-        // Reset products
         produtosContainer.children.clear()
         listaProdutos.clear()
         addNovoProduto()
 
-        // Reset total label
         totalLabelRef.text = "R$ 0,00"
 
-        // Reset troco fields
         trocoParaField.text = "R$ 0,00"
         trocoCalculadoLabel.text = "R$ 0,00"
 
-        // Reset valor entrega
         valorEntregaField.text = "R$ 0,00"
 
-        // Reset desconto field
         descontoField.text = if ((descontoToggleGroup.selectedToggle as? RadioButton)?.id == "valor")
             "R$ 0,00" else "0,00"
     }
 
     private fun parseMoneyValue(value: String): Double {
-        // Remove R$ e espaços
         var cleanValue = value.replace(Regex("[R$\\s]"), "")
 
-        // Remove os pontos de separador de milhar
         cleanValue = cleanValue.replace(".", "")
 
-        // Substitui vírgula por ponto para decimal
         cleanValue = cleanValue.replace(",", ".")
 
-        // Converte para Double dividindo por 100 apenas se não houver ponto decimal
         return try {
             if (!value.contains(",")) {
-                // Se não tem vírgula, assume que é um valor em centavos
                 cleanValue.toDouble() / 100
             } else {
-                // Se tem vírgula, é um valor já formatado com decimais
                 cleanValue.toDouble()
             }
         } catch (e: NumberFormatException) {
@@ -1118,6 +1125,16 @@ class NovoPedidoController {
         }
     }
 
+    private fun buscarClienteIdPorTelefone(connection: Connection, telefone: String): Long? {
+        if (telefone.isBlank()) return null
+
+        return connection.prepareStatement("SELECT id FROM clientes WHERE telefone = ?").use { stmt ->
+            stmt.setString(1, telefone)
+            val rs = stmt.executeQuery()
+            if (rs.next()) rs.getLong("id") else null
+        }
+    }
+
     fun salvarPedido(
         clienteInfo: List<Pair<String, String>>,
         pagamentoInfo: List<Pair<String, String>>,
@@ -1130,16 +1147,19 @@ class NovoPedidoController {
 
             val valorTotal = parseMoneyValue(pagamentoInfo.find { it.first == "Total do Pedido" }?.second ?: "0,00")
 
-            // Discount detection
-            val valorDescontoStr = descontoField.text
-            val valorDesconto = if (descontoToggleGroup.selectedToggle.toString().contains("percentual")) {
-                val percentual = valorDescontoStr.replace(",", ".").toDoubleOrNull() ?: 0.0
-                (valorTotal * percentual / 100)
+            val descontoPair = pagamentoInfo.find { it.first.startsWith("Desconto") }
+            val tipoDesconto = if ((descontoToggleGroup.selectedToggle as? RadioButton)?.id == "valor")
+                "valor" else "percentual"
+            val valorDescontoStr = descontoPair?.second?.trim() ?: "0,00"
+            val valorDesconto = if (tipoDesconto == "valor") {
+                parseMoneyValue(descontoField.text)
             } else {
-                parseMoneyValue(valorDescontoStr)
+                // For percentual type
+                val percentualText = descontoField.text.replace("%", "").replace(",", ".")
+                val percentual = percentualText.toDoubleOrNull() ?: 0.0
+                (valorTotal * percentual / 100)
             }
-            val tipoDesconto = if (descontoToggleGroup.selectedToggle.toString().contains("percentual"))
-                "percentual" else "valor"
+            println("Saving discount: $valorDesconto of type $tipoDesconto")
             val formaPagamento = pagamentoInfo.find { it.first == "Forma de Pagamento" }?.second
             val valorTrocoPara = parseMoneyValue(trocoParaField.text)
             val valorTroco = parseMoneyValue(trocoCalculadoLabel.text)
@@ -1155,34 +1175,58 @@ class NovoPedidoController {
                             numeroGerado = "PED%04d".format(rs.getInt("next_num"))
                         }
                     }
+// Change from val to var clienteId
+                    var clienteId = buscarClienteIdPorTelefone(connection, telefoneContato)
+                    if (clienteId == null && telefoneContato.isNotBlank()) {
+                        // Extract name and sobrenome
+                        val nome = clienteInfo.find { it.first == "Nome" }?.second?.split(" ")?.firstOrNull() ?: ""
+                        val sobrenome = clienteInfo.find { it.first == "Nome" }?.second?.split(" ")?.drop(1)?.joinToString(" ") ?: ""
 
+                        // Inserir o cliente novo
+                        connection.prepareStatement(
+                            "INSERT INTO clientes (nome, sobrenome, telefone) VALUES (?, ?, ?)",
+                            Statement.RETURN_GENERATED_KEYS
+                        ).use { stmt ->
+                            stmt.setString(1, nome)
+                            stmt.setString(2, sobrenome)
+                            stmt.setString(3, telefoneContato)
+                            stmt.executeUpdate()
+
+                            stmt.generatedKeys.use { keys ->
+                                if (keys.next()) {
+                                    clienteId = keys.getLong(1)
+                                }
+                            }
+                        }
+                    }
                     val pedidoQuery = """
-                    INSERT INTO pedidos (numero, telefone_contato, observacao, status,
-                    valor_total, valor_desconto, tipo_desconto, forma_pagamento, valor_troco_para, valor_troco,
-                    data_retirada, hora_retirada)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """.trimIndent()
+                        INSERT INTO pedidos (numero, cliente_id, telefone_contato, observacao, status,
+                        valor_total, valor_desconto, tipo_desconto, forma_pagamento, valor_troco_para, valor_troco,
+                        data_retirada, hora_retirada)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """.trimIndent()
 
                     val pedidoId =
                         connection.prepareStatement(pedidoQuery, Statement.RETURN_GENERATED_KEYS).use { stmt ->
                             stmt.setString(1, numeroGerado)
-                            stmt.setString(2, telefoneContato)
-                            stmt.setString(3, observacao)
-                            stmt.setString(4, status)
-                            stmt.setDouble(5, valorTotal)
-                            stmt.setDouble(6, valorDesconto)
-                            stmt.setString(7, tipoDesconto)
-                            stmt.setString(8, formaPagamento)
-                            stmt.setDouble(9, valorTrocoPara)
-                            stmt.setDouble(10, valorTroco)
+                            stmt.setObject(2, clienteId)
+                            stmt.setString(3, telefoneContato)
+                            stmt.setString(4, observacao)
+                            stmt.setString(5, status)
+                            stmt.setDouble(6, valorTotal)
+                            stmt.setDouble(7, valorDesconto)
+                            stmt.setString(8, tipoDesconto)
+                            stmt.setString(9, formaPagamento)
+                            stmt.setDouble(10, valorTrocoPara)
+                            stmt.setDouble(11, valorTroco)
 
                             // Se houver entrega, define data e hora de retirada como "Entrega"
                             if (entregaInfo.first().second == "Sim") {
-                                stmt.setString(11, "Entrega")
                                 stmt.setString(12, "Entrega")
+                                stmt.setString(13, "Entrega")
                             } else {
-                                stmt.setString(11, pagamentoInfo.find { it.first == "Data de Retirada" }?.second)
-                                stmt.setString(12, pagamentoInfo.find { it.first == "Hora de Retirada" }?.second)
+                                stmt.setString(12, pagamentoInfo.find { it.first == "Data de Retirada" }?.second)
+                                stmt.setString(13, pagamentoInfo.find { it.first == "Hora de Retirada" }?.second)
                             }
 
                             stmt.executeUpdate()
@@ -1288,15 +1332,25 @@ class NovoPedidoController {
                     pedidoData["status"] = status
                     pedidoData["status_pedido"] = "Pendente"
 
-                    // Cliente info
                     val clienteMap = mutableMapOf<String, Any>()
-                    clienteInfo.forEach { (key, value) ->
-                        when(key) {
-                            "Nome" -> clienteMap["nome"] = formatarTextoCapitalizado(value)
-                            "Endereço" -> clienteMap["endereco"] = formatarTextoCapitalizado(value)
-                            // Add other client fields as needed
+
+                    val clienteInfoList = clienteInfo
+
+                    if (clienteInfoList.isNotEmpty()) {
+                        clienteInfoList.forEach { (key, value) ->
+                            when(key) {
+                                "Nome" -> clienteMap["nome"] = value
+                                "Telefone" -> pedidoData["telefone_contato"] = value
+                                "Observação" -> pedidoData["observacao"] = value
+                            }
                         }
+                    } else {
+                        pedidoData["telefone_contato"] = pedidoData["telefone_contato"] ?:
+                                telefoneContato // Replace pedido["telefone_contato"]
+
+                        clienteMap["nome"] = "Cliente"
                     }
+
                     pedidoData["cliente"] = clienteMap
 
                     // Payment info
@@ -1307,10 +1361,8 @@ class NovoPedidoController {
                     pedidoData["valor_troco_para"] = valorTrocoPara
                     pedidoData["valor_troco"] = valorTroco
 
-                    // Products
                     pedidoData["itens"] = produtosList
 
-                    // Delivery info
                     if (entregaInfo.isNotEmpty() && entregaInfo.first().second == "Sim") {
                         val entregaMap = mutableMapOf<String, Any>()
                         entregaInfo.forEach { (key, value) ->
@@ -1330,14 +1382,12 @@ class NovoPedidoController {
                         }
                         pedidoData["entrega"] = entregaMap
                     } else {
-                        // Add pickup information
                         val dataRetirada = pagamentoInfo.find { it.first == "Data de Retirada" }?.second
                         val horaRetirada = pagamentoInfo.find { it.first == "Hora de Retirada" }?.second
                         if (dataRetirada != null) pedidoData["data_retirada"] = dataRetirada
                         if (horaRetirada != null) pedidoData["hora_retirada"] = horaRetirada
                     }
 
-                    // Call printer controller with the single map parameter
                     printerController.imprimirPedido(pedidoData = pedidoData)
 
                     return true
@@ -1352,7 +1402,6 @@ class NovoPedidoController {
         }
     }
 
-    // Function to format text with proper capitalization, respecting exceptions
     private fun formatarTextoCapitalizado(texto: String): String {
         val excecoes = setOf("de", "da", "do", "das", "dos", "e", "com", "para", "a", "o", "em",
             "por", "sem", "sob", "sobre", "à", "às", "ao", "aos")

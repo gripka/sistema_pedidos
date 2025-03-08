@@ -67,12 +67,12 @@ class DashboardView : BorderPane(), ViewLifecycle {
             "pedidosCancelados" to dashboardController.getTotalPedidosCancelados(),
             "totalDescontos" to dashboardController.getTotalDescontosAplicados(),
             "produtosMaisVendidos" to dashboardController.getProdutosMaisVendidos(),
+            "produtosMaisVendidosSemana" to dashboardController.getProdutosMaisVendidosSemana(),
             "vendasUltimos7Dias" to dashboardController.getVendasUltimos7Dias(),
             "vendasUltimos30Dias" to dashboardController.getVendasUltimos30Dias(),
             "itensBaixoEstoque" to dashboardController.getItensBaixoEstoque(),
             "pedidosPendentes" to dashboardController.getPedidosPendentes(),
 
-            // New data for additional cards
             "ticketMedio" to dashboardController.getTicketMedio(),
             "produtosCadastrados" to dashboardController.getTotalProdutosCadastrados(),
             "produtosEstoqueBaixo" to dashboardController.getTotalProdutosEstoqueBaixo(),
@@ -272,22 +272,70 @@ class DashboardView : BorderPane(), ViewLifecycle {
     }
 
     private fun createTopProductsSection(): VBox {
-        val topProductsData = dashboardData["produtosMaisVendidos"] as List<Map<String, Any>>
+        val monthlyProductsData = dashboardData["produtosMaisVendidos"] as List<Map<String, Any>>
+        val weeklyProductsData = dashboardData["produtosMaisVendidosSemana"] as? List<Map<String, Any>> ?: emptyList()
 
-        val container = VBox(10.0).apply {
+        val container = VBox(15.0).apply {
             styleClass.add("container-box")
-            style =
-                "-fx-background-color: white; -fx-background-radius: 10; -fx-padding: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 10, 0, 0, 5);"
+            style = "-fx-background-color: white; -fx-background-radius: 10; -fx-padding: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 10, 0, 0, 5);"
         }
 
         val title = Label("Produtos Mais Vendidos").apply {
             styleClass.add("section-label")
         }
 
-        val table = createTopProductsTable(topProductsData)
-        table.styleClass.add("table-view")
+        val tablesContainer = HBox(15.0).apply {
+            HBox.setHgrow(this, Priority.ALWAYS)
+        }
 
-        container.children.addAll(title, table)
+        val weeklyContainer = VBox(5.0).apply {
+            HBox.setHgrow(this, Priority.ALWAYS)
+            prefWidth = 300.0
+            styleClass.add("subsection-container")
+            padding = Insets(10.0)
+        }
+
+        val weeklyTitle = Label("Esta Semana").apply {
+            styleClass.add("subsection-label")
+        }
+
+        val weeklyTable = createTopProductsTable(weeklyProductsData)
+        weeklyTable.styleClass.add("table-view")
+        weeklyContainer.children.addAll(weeklyTitle, weeklyTable)
+
+        val monthlyContainer = VBox(5.0).apply {
+            HBox.setHgrow(this, Priority.ALWAYS)
+            prefWidth = 300.0
+            styleClass.add("subsection-container")
+            padding = Insets(10.0)
+        }
+
+        val monthlyTitle = Label("Este Mês").apply {
+            styleClass.add("subsection-label")
+        }
+
+        val monthlyTable = createTopProductsTable(monthlyProductsData)
+        monthlyTable.styleClass.add("table-view")
+        monthlyContainer.children.addAll(monthlyTitle, monthlyTable)
+
+        val yearlyContainer = VBox(5.0).apply {
+            HBox.setHgrow(this, Priority.ALWAYS)
+            prefWidth = 300.0
+            styleClass.add("subsection-container")
+            padding = Insets(10.0)
+        }
+
+        val yearlyTitle = Label("Este Ano").apply {
+            styleClass.add("subsection-label")
+        }
+
+        val yearlyProductsData = dashboardController.getProdutosMaisVendidosAno()
+        val yearlyTable = createTopProductsTable(yearlyProductsData)
+        yearlyTable.styleClass.add("table-view")
+        yearlyContainer.children.addAll(yearlyTitle, yearlyTable)
+
+        tablesContainer.children.addAll(weeklyContainer, monthlyContainer, yearlyContainer)
+        container.children.addAll(title, tablesContainer)
         return container
     }
 
@@ -295,32 +343,40 @@ class DashboardView : BorderPane(), ViewLifecycle {
         val tableView = TableView<Map<String, Any>>()
 
         val codeColumn = TableColumn<Map<String, Any>, String>("Código").apply {
-            prefWidth = 100.0
-            setCellValueFactory { cellData -> javafx.beans.property.SimpleStringProperty(cellData.value["codigo"] as String) }
-        }
-
-        val nameColumn = TableColumn<Map<String, Any>, String>("Nome").apply {
-            prefWidth = 250.0
-            setCellValueFactory { cellData -> javafx.beans.property.SimpleStringProperty(cellData.value["nome"] as String) }
-        }
-
-        val qtyColumn = TableColumn<Map<String, Any>, String>("Qtd. Vendida").apply {
-            prefWidth = 110.0
+            prefWidth = 80.0
             setCellValueFactory { cellData ->
-                javafx.beans.property.SimpleStringProperty((cellData.value["quantidade_vendida"] as Int).toString())
+                javafx.beans.property.SimpleStringProperty(cellData.value["codigo"] as? String ?: "")
             }
         }
 
-        val valueColumn = TableColumn<Map<String, Any>, String>("Valor Total").apply {
-            prefWidth = 120.0
+        val nameColumn = TableColumn<Map<String, Any>, String>("Nome").apply {
+            prefWidth = 160.0
             setCellValueFactory { cellData ->
-                javafx.beans.property.SimpleStringProperty(formatter.format(cellData.value["valor_total"] as Double))
+                javafx.beans.property.SimpleStringProperty(cellData.value["nome"] as? String ?: "")
+            }
+        }
+
+        val qtyColumn = TableColumn<Map<String, Any>, String>("Qtd.").apply {
+            prefWidth = 60.0
+            setCellValueFactory { cellData ->
+                javafx.beans.property.SimpleStringProperty((cellData.value["quantidade_vendida"] as? Int)?.toString() ?: "0")
+            }
+        }
+
+        val valueColumn = TableColumn<Map<String, Any>, String>("Valor").apply {
+            prefWidth = 100.0
+            setCellValueFactory { cellData ->
+                javafx.beans.property.SimpleStringProperty(formatter.format(cellData.value["valor_total"] as? Double ?: 0.0))
             }
         }
 
         tableView.columns.addAll(codeColumn, nameColumn, qtyColumn, valueColumn)
         tableView.items.addAll(products)
-        tableView.prefHeight = 200.0
+        tableView.prefHeight = 242.0
+        tableView.isEditable = false
+
+        // Handle empty table state
+        tableView.placeholder = Label("Sem dados disponíveis")
 
         return tableView
     }
