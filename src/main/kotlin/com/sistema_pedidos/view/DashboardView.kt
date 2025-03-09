@@ -59,27 +59,35 @@ class DashboardView : BorderPane(), ViewLifecycle {
 
     private fun loadDashboardData(): Map<String, Any> {
         return mapOf(
+            // Grupo de métricas de pedidos do dia
             "pedidosHoje" to dashboardController.getTotalPedidosHoje(),
             "valorTotalHoje" to dashboardController.getValorTotalHoje(),
-            "totalClientes" to dashboardController.getTotalClientes(),
-            "entregasRealizadas" to dashboardController.getTotalEntregasRealizadas(),
-            "pedidosSemEntrega" to dashboardController.getTotalPedidosSemEntrega(),
-            "pedidosCancelados" to dashboardController.getTotalPedidosCancelados(),
+            "entregasHoje" to dashboardController.getEntregasHoje(),
+
+            // Grupo de métricas financeiras
+            "totalEntradasMes" to dashboardController.getTotalEntradasMes(),
+            "ticketMedio" to dashboardController.getTicketMedio(),
             "totalDescontos" to dashboardController.getTotalDescontosAplicados(),
+            "formaPagamentoMaisUsada" to dashboardController.getFormaPagamentoMaisUsada(),
+
+            // Grupo de status de pedidos
+            "pedidosPendentes" to dashboardController.getPedidosPendentes(),
+            "pedidosConcluidos" to dashboardController.getTotalPedidosConcluidos(),
+            "pedidosCancelados" to dashboardController.getTotalPedidosCancelados(),
+            "pedidosSemEntrega" to dashboardController.getTotalPedidosSemEntrega(),
+            "taxaCancelamento" to dashboardController.getTaxaCancelamento(),
+
+            // Restante dos dados...
+            "entregasRealizadas" to dashboardController.getTotalEntregasRealizadas(),
+            "produtosCadastrados" to dashboardController.getTotalProdutosCadastrados(),
+            "produtosSemEstoque" to dashboardController.getTotalProdutosSemEstoque(),
+            "produtosEstoqueBaixo" to dashboardController.getTotalProdutosEstoqueBaixo(),
+            "itensBaixoEstoque" to dashboardController.getItensBaixoEstoque(),
             "produtosMaisVendidos" to dashboardController.getProdutosMaisVendidos(),
             "produtosMaisVendidosSemana" to dashboardController.getProdutosMaisVendidosSemana(),
             "vendasUltimos7Dias" to dashboardController.getVendasUltimos7Dias(),
             "vendasUltimos30Dias" to dashboardController.getVendasUltimos30Dias(),
-            "itensBaixoEstoque" to dashboardController.getItensBaixoEstoque(),
-            "pedidosPendentes" to dashboardController.getPedidosPendentes(),
-
-            "ticketMedio" to dashboardController.getTicketMedio(),
-            "produtosCadastrados" to dashboardController.getTotalProdutosCadastrados(),
-            "produtosEstoqueBaixo" to dashboardController.getTotalProdutosEstoqueBaixo(),
-            "totalEntradasMes" to dashboardController.getTotalEntradasMes(),
-            "pedidosConcluidos" to dashboardController.getTotalPedidosConcluidos(),
-            "entregasHoje" to dashboardController.getEntregasHoje(),
-            "produtosSemEstoque" to dashboardController.getTotalProdutosSemEstoque()
+            "totalClientes" to dashboardController.getTotalClientes()
         )
     }
 
@@ -123,7 +131,84 @@ class DashboardView : BorderPane(), ViewLifecycle {
             prefWrapLength = 1000.0
         }
 
-        // Original cards
+        // Grupo de status de pedidos
+        val concluidosCard = createInfoCard(
+            "Pedidos Concluídos",
+            (dashboardData["pedidosConcluidos"] as Int).toString(),
+            "#8BC34A"
+        )
+
+        val canceladosCard = createInfoCard(
+            "Pedidos Cancelados",
+            (dashboardData["pedidosCancelados"] as Int).toString(),
+            "#F44336"
+        )
+
+        // Novo card para Taxa de Cancelamento
+        val taxaCancelamentoCard = createInfoCard(
+            "Taxa de Cancelamento",
+            String.format("%.1f%%", dashboardData["taxaCancelamento"] as Double),
+            "#FF5252"
+        )
+
+        val semEntregaCard = createInfoCard(
+            "Pedidos sem Entrega",
+            (dashboardData["pedidosSemEntrega"] as Int).toString(),
+            "#FF9800"
+        )
+
+        // Grupo de entregas
+        val entregasCard = createInfoCard(
+            "Entregas Realizadas",
+            (dashboardData["entregasRealizadas"] as Int).toString(),
+            "#9C27B0"
+        )
+
+        // Grupo de produtos
+        val produtosCard = createInfoCard(
+            "Produtos Ativos",
+            (dashboardData["produtosCadastrados"] as Int).toString(),
+            "#795548"
+        )
+
+        val semEstoqueCard = createInfoCard(
+            "Sem Estoque",
+            (dashboardData["produtosSemEstoque"] as Int).toString(),
+            "#E91E63"
+        )
+
+        val estoqueBaixoCard = createInfoCard(
+            "Produtos Est. Baixo",
+            (dashboardData["produtosEstoqueBaixo"] as Int).toString(),
+            "#FF5722"
+        )
+
+        // Dados gerais
+        val clientesCard = createInfoCard(
+            "Total de Clientes",
+            (dashboardData["totalClientes"] as Int).toString(),
+            "#FFC107"
+        )
+
+        cardsBox.children.addAll(
+            concluidosCard, canceladosCard, taxaCancelamentoCard, semEntregaCard,
+            entregasCard,
+            produtosCard, semEstoqueCard, estoqueBaixoCard,
+            clientesCard
+        )
+
+        return cardsBox
+    }
+
+    private fun createSummaryCardsRow1(): FlowPane {
+        val cardsBox = FlowPane().apply {
+            hgap = 15.0
+            vgap = 15.0
+            alignment = Pos.CENTER
+            prefWrapLength = 1000.0
+        }
+
+        // Grupo de métricas de pedidos do dia
         val pedidosCard = createInfoCard(
             "Pedidos Hoje",
             (dashboardData["pedidosHoje"] as Int).toString(),
@@ -136,100 +221,46 @@ class DashboardView : BorderPane(), ViewLifecycle {
             "#2196F3"
         )
 
-        val entregasCard = createInfoCard(
-            "Entregas Realizadas",
-            (dashboardData["entregasRealizadas"] as Int).toString(),
-            "#9C27B0"
+        val entregasHojeCard = createInfoCard(
+            "Entregas Hoje",
+            (dashboardData["entregasHoje"] as Int).toString(),
+            "#673AB7"
         )
 
-        val semEntregaCard = createInfoCard(
-            "Pedidos sem Entrega",
-            (dashboardData["pedidosSemEntrega"] as Int).toString(),
-            "#FF9800"
-        )
-
-        // New cards
-        val ticketMedioCard = createInfoCard(
-            "Ticket Médio",
-            formatter.format(dashboardData["ticketMedio"] as Double),
-            "#607D8B" // Blue Grey
-        )
-
-        val produtosCard = createInfoCard(
-            "Produtos Ativos",
-            (dashboardData["produtosCadastrados"] as Int).toString(),
-            "#795548" // Brown
-        )
-
-        val estoqueBaixoCard = createInfoCard(
-            "Produtos Est. Baixo",
-            (dashboardData["produtosEstoqueBaixo"] as Int).toString(),
-            "#FF5722" // Deep Orange
-        )
-
+        // Grupo de métricas financeiras
         val entradasMesCard = createInfoCard(
             "Faturamento do Mês",
             formatter.format(dashboardData["totalEntradasMes"] as Double),
-            "#3F51B5" // Indigo
+            "#3F51B5"
         )
 
-        cardsBox.children.addAll(
-            pedidosCard, faturamentoCard, entregasCard, semEntregaCard,
-            ticketMedioCard, produtosCard, estoqueBaixoCard, entradasMesCard
-        )
-
-        return cardsBox
-    }
-
-    private fun createSummaryCardsRow1(): FlowPane {
-        val cardsBox = FlowPane().apply {
-            hgap = 15.0
-            vgap = 15.0
-            alignment = Pos.CENTER
-            prefWrapLength = 1000.0 // This is valid for FlowPane
-        }
-
-        // Original cards
-        val canceladosCard = createInfoCard(
-            "Pedidos Cancelados",
-            (dashboardData["pedidosCancelados"] as Int).toString(),
-            "#F44336" // Red
+        val ticketMedioCard = createInfoCard(
+            "Ticket Médio",
+            formatter.format(dashboardData["ticketMedio"] as Double),
+            "#607D8B"
         )
 
         val descontosCard = createInfoCard(
             "Total Descontos",
             formatter.format(dashboardData["totalDescontos"] as Double),
-            "#009688" // Teal
+            "#009688"
         )
 
-        val clientesCard = createInfoCard(
-            "Total de Clientes",
-            (dashboardData["totalClientes"] as Int).toString(),
-            "#FFC107" // Amber
-        )
+        // Novo card para Forma de Pagamento
+        val formaPagamentoData = dashboardData["formaPagamentoMaisUsada"] as Map<String, Any>
+        val metodo = formaPagamentoData["metodo"] as String
+        val percentual = formaPagamentoData["percentual"] as Double
 
-        // New cards
-        val concluidosCard = createInfoCard(
-            "Pedidos Concluídos",
-            (dashboardData["pedidosConcluidos"] as Int).toString(),
-            "#8BC34A" // Light Green
-        )
-
-        val entregasHojeCard = createInfoCard(
-            "Entregas Hoje",
-            (dashboardData["entregasHoje"] as Int).toString(),
-            "#673AB7" // Deep Purple
-        )
-
-        val semEstoqueCard = createInfoCard(
-            "Sem Estoque",
-            (dashboardData["produtosSemEstoque"] as Int).toString(),
-            "#E91E63" // Pink
+        val formaPagamentoCard = createInfoCard(
+            "Pagamento Principal",
+            "$metodo (${String.format("%.1f", percentual)}%)",
+            "#00BCD4"
         )
 
         cardsBox.children.addAll(
-            canceladosCard, descontosCard, clientesCard,
-            concluidosCard, entregasHojeCard, semEstoqueCard
+            pedidosCard, faturamentoCard, entregasHojeCard,
+            entradasMesCard, ticketMedioCard, descontosCard,
+            formaPagamentoCard
         )
 
         return cardsBox

@@ -38,7 +38,7 @@ runtime {
             "--win-menu",
             "--win-shortcut",
             "--name", "Blossom ERP",
-            "--app-version", "0.6.0",
+            "--app-version", "0.6.1",
             "--description", "Otimize a administração da sua floricultura ...",
             "--vendor", "Gripka"
         )

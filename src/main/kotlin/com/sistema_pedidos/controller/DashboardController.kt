@@ -26,7 +26,60 @@ class DashboardController {
         }
     }
 
-    // In DashboardController.kt
+// Add to DashboardController.kt
+fun getTaxaCancelamento(): Double {
+    return try {
+        dbHelper.getConnection().use { conn ->
+            val query = """
+                SELECT
+                    (SELECT COUNT(*) FROM pedidos WHERE status_pedido = 'Cancelado'
+                     AND data_pedido >= date('now', '-30 days')) * 100.0 /
+                    NULLIF((SELECT COUNT(*) FROM pedidos
+                     WHERE data_pedido >= date('now', '-30 days')), 0) AS taxa
+            """
+            conn.createStatement().use { stmt ->
+                val rs = stmt.executeQuery(query)
+                if (rs.next()) rs.getDouble("taxa") else 0.0
+            }
+        }
+    } catch (e: SQLException) {
+        e.printStackTrace()
+        0.0
+    }
+}
+
+fun getFormaPagamentoMaisUsada(): Map<String, Any> {
+    return try {
+        dbHelper.getConnection().use { conn ->
+            val query = """
+                SELECT forma_pagamento, COUNT(*) as quantidade,
+                COUNT(*) * 100.0 / (SELECT COUNT(*) FROM pedidos
+                WHERE forma_pagamento IS NOT NULL) as percentual
+                FROM pedidos
+                WHERE forma_pagamento IS NOT NULL
+                GROUP BY forma_pagamento
+                ORDER BY quantidade DESC
+                LIMIT 1
+            """
+            conn.createStatement().use { stmt ->
+                val rs = stmt.executeQuery(query)
+                if (rs.next()) {
+                    mapOf(
+                        "metodo" to rs.getString("forma_pagamento"),
+                        "quantidade" to rs.getInt("quantidade"),
+                        "percentual" to rs.getDouble("percentual")
+                    )
+                } else {
+                    mapOf("metodo" to "N/A", "quantidade" to 0, "percentual" to 0.0)
+                }
+            }
+        }
+    } catch (e: SQLException) {
+        e.printStackTrace()
+        mapOf("metodo" to "Erro", "quantidade" to 0, "percentual" to 0.0)
+    }
+}
+
     fun getTotalEntregasRealizadas(): Int {
         // Count orders with delivery that are completed
         try {
