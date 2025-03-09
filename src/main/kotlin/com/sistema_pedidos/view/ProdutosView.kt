@@ -47,6 +47,12 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
     private val insumosDosProdutos = FXCollections.observableArrayList<InsumoQuantidade>()
     private val mainView: MainView? = stage?.let { MainView(it) }
 
+    private var currentPage = 0
+    private var pageSize = 15
+    private lateinit var pagination: Pagination
+    private lateinit var rowsPerPageComboBox: ComboBox<Int>
+    private var totalItems = 0
+
     private fun createStandardSection(title: String): VBox {
         val section = VBox(10.0).apply {
             padding = Insets(10.0)
@@ -121,9 +127,10 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
             styleClass.add("primary-button")
             prefHeight = 36.0
             setOnAction {
+                // Create the dialog
                 val dialog = Dialog<String>()
-                dialog.title = "Nova Categoria"
-                dialog.headerText = "Adicionar Nova Categoria"
+                dialog.title = "Gerenciar Categorias"
+                dialog.headerText = "Adicionar ou Remover Categorias"
                 dialog.initStyle(StageStyle.UNDECORATED)
 
                 val buttonTypeOk = ButtonType("Confirmar", ButtonBar.ButtonData.OK_DONE)
@@ -133,6 +140,38 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
                 // Apply CSS to dialog
                 dialog.dialogPane.stylesheets.addAll(this@ProdutosView.stylesheets)
 
+// Create the ListView first
+                val categoriasList = ListView<String>().apply {
+                    items.setAll(loadCategories())
+                    prefHeight = 200.0
+
+                    // Add custom styling for selection consistency
+                    style = """
+        -fx-background-color: white;
+        -fx-background-insets: 0;
+        -fx-padding: 0;
+    """
+
+                    // Style selected items to match table selection style
+                    cellFactory = Callback {
+                        object : ListCell<String>() {
+                            override fun updateItem(item: String?, empty: Boolean) {
+                                super.updateItem(item, empty)
+                                if (empty || item == null) {
+                                    text = null
+                                    style = ""
+                                } else {
+                                    text = item
+                                    style = when (isSelected) {
+                                        true -> "-fx-background-color: #e3edfb; -fx-text-fill: #495057;"
+                                        false -> "-fx-background-color: transparent; -fx-text-fill: #212529;"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Dialog content setup
                 val textField = TextField().apply {
                     prefHeight = 36.0
@@ -141,15 +180,93 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
                     styleClass.add("text-field")
                 }
 
-                val content = VBox(10.0).apply {
+                val btnAdd = Button("Adicionar").apply {
+                    styleClass.add("primary-button")
+                    prefHeight = 36.0
+                    setOnAction {
+                        val newCategory = textField.text.trim()
+                        if (newCategory.isNotEmpty()) {
+                            saveCategory(newCategory)
+                            textField.clear()
+                            categoriasList.items.setAll(loadCategories())
+                        }
+                    }
+                }
+
+                val btnDelete = Button("Excluir Categoria").apply {
+                    styleClass.add("botao-cancel")
+                    prefHeight = 36.0
+                    isDisable = true
+                    style = """
+        -fx-background-color: #dc3545;
+        -fx-text-fill: white;
+    """
+
+                    setOnAction {
+                        val selectedCategory = categoriasList.selectionModel.selectedItem
+                        if (selectedCategory != null) {
+                            val confirmation = Alert(Alert.AlertType.CONFIRMATION)
+                            confirmation.title = "Confirmar Exclusão"
+                            confirmation.headerText = "Excluir Categoria"
+                            confirmation.contentText = "Tem certeza que deseja excluir a categoria '$selectedCategory'?"
+
+                            val btnYes = ButtonType("Sim", ButtonBar.ButtonData.YES)
+                            val btnNo = ButtonType("Não", ButtonBar.ButtonData.NO)
+                            confirmation.buttonTypes.setAll(btnYes, btnNo)
+
+                            val result = confirmation.showAndWait()
+                            if (result.isPresent && result.get().buttonData == ButtonBar.ButtonData.YES) {
+                                if (deleteCategory(selectedCategory)) {
+                                    categoriasList.items.setAll(loadCategories())
+                                    isDisable = true
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Enable delete button when category is selected
+                categoriasList.selectionModel.selectedItemProperty().addListener { _, _, newValue ->
+                    btnDelete.isDisable = newValue == null
+                }
+
+                val addBox = HBox(10.0, textField, btnAdd).apply {
+                    alignment = Pos.CENTER_LEFT
+                }
+
+                val content = VBox(15.0).apply {
                     padding = Insets(20.0)
                     spacing = 10.0
-                    prefWidth = 400.0
+                    prefWidth = 500.0
                     children.addAll(
-                        Label("Nome da categoria:").apply {
-                            style = "-fx-font-size: 14px; -fx-text-fill: #2B2D31;"
+                        Label("Nova categoria:").apply {
+                            styleClass.add("field-label")
                         },
-                        textField
+                        addBox,
+                        Label("Categorias existentes:").apply {
+                            styleClass.add("field-label")
+                            style = "-fx-padding: 10 0 0 0;"
+                        },
+                        VBox().apply {
+                            styleClass.add("list-container")
+                            style = """
+                                -fx-background-color: white;
+                                -fx-border-color: rgb(223, 225, 230);
+                                -fx-border-width: 1px;
+                                -fx-border-radius: 3px;
+                                -fx-padding: 1px;
+                            """
+                            VBox.setVgrow(this, Priority.ALWAYS)
+                            children.add(categoriasList.apply {
+                                prefHeight = 200.0
+                                style = """
+                                -fx-background-color: white;
+                                -fx-background-insets: 0;
+                                -fx-padding: 0;
+                            """
+                            })
+                        },
+                        btnDelete
                     )
                 }
 
@@ -171,68 +288,23 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
                 val headerLabel = dialog.dialogPane.lookup(".header-panel .label") as? Label
                 headerLabel?.style = "-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 16px;"
 
-                // Important: Get button references before the dialog is shown
+                // Style buttons
                 val confirmButton = dialog.dialogPane.lookupButton(buttonTypeOk)
                 val cancelButton = dialog.dialogPane.lookupButton(buttonTypeCancel)
-
-                // Apply styles to buttons directly
                 confirmButton.styleClass.add("primary-button")
                 cancelButton.styleClass.add("secondary-button")
 
-                // Apply inline styles to ensure visual consistency
-                confirmButton.style = """
-            -fx-background-color: #6056e8;
-            -fx-text-fill: white;
-            -fx-font-size: 14px;
-            -fx-font-weight: bold;
-            -fx-background-radius: 5px;
-            -fx-min-width: 100px;
-            -fx-padding: 8px 16px;
-            -fx-cursor: hand;
-        """
-
-                cancelButton.style = """
-            -fx-background-color: #f0f0f0;
-            -fx-text-fill: #333333;
-            -fx-font-size: 14px;
-            -fx-font-weight: bold;
-            -fx-background-radius: 5px;
-            -fx-min-width: 100px;
-            -fx-padding: 8px 16px;
-            -fx-cursor: hand;
-        """
-
-                // Configure button bar to center buttons
+                // Configure button bar
                 val buttonBar = dialog.dialogPane.lookup(".button-bar") as ButtonBar
                 buttonBar.apply {
                     buttonOrder = ""
                     buttonMinWidth = 100.0
-                    alignment = Pos.CENTER
-                    padding = Insets(0.0, 75.0, 0.0, 0.0)
-                    style = "-fx-background-color: white;"
                 }
 
-                dialog.setResultConverter { buttonType ->
-                    if (buttonType == buttonTypeOk) textField.text else null
-                }
+                dialog.showAndWait()
 
-                confirmButton.setOnMouseEntered {
-                    confirmButton.style += "-fx-background-color: #433a94;"
-                }
-
-                confirmButton.setOnMouseExited {
-                    confirmButton.style += "-fx-background-color: #6056e8;"
-                }
-
-                dialog.showAndWait().ifPresent { newCategory ->
-                    val trimmed = newCategory.trim()
-                    if (trimmed.isNotEmpty() && !cbCategoria.items.contains(trimmed)) {
-                        saveCategory(trimmed)
-                        cbCategoria.items.add(trimmed)
-                        FXCollections.sort(cbCategoria.items)
-                        cbCategoria.value = trimmed
-                    }
-                }
+                // Refresh the category combo box after dialog closes
+                cbCategoria.items = FXCollections.observableArrayList(loadCategories())
             }
         }
 
@@ -243,7 +315,7 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
 
         val btnFiltrarBaixoEstoque = Button("Filtrar baixo estoque").apply {
             tooltip = Tooltip("Mostrar apenas itens com estoque baixo")
-            styleClass.add("primary-button")
+            styleClass.add("secondary-button")
 
             var filtroAtivo = false
 
@@ -293,8 +365,120 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
 
         setCenter(splitPane)
 
+        val paginationBox = setupPagination()
+        val bottomBox = HBox(10.0, paginationBox).apply {
+            alignment = Pos.CENTER_LEFT
+            padding = Insets(10.0)
+        }
+        setBottom(bottomBox)
+
         Platform.runLater {
             verificarAlertasEstoque()
+        }
+    }
+
+
+private fun setupPagination(): HBox {
+    val paginationControls = HBox(10.0).apply {
+        alignment = Pos.CENTER_LEFT
+        padding = Insets(10.0, 0.0, 0.0, 0.0)
+
+        val firstPageButton = Button("<<").apply {
+            styleClass.add("pagination-button")
+            setOnAction {
+                if (currentPage > 0) {
+                    currentPage = 0
+                    loadProductsPage(currentPage, pageSize)
+                }
+            }
+        }
+
+        val prevPageButton = Button("<").apply {
+            styleClass.add("pagination-button")
+            setOnAction {
+                if (currentPage > 0) {
+                    currentPage--
+                    loadProductsPage(currentPage, pageSize)
+                }
+            }
+        }
+
+        val currentPageLabel = Label("Página ${currentPage + 1} de ${Math.ceil(totalItems.toDouble() / pageSize).toInt().coerceAtLeast(1)}").apply {
+            styleClass.add("pagination-label")
+        }
+
+        val nextPageButton = Button(">").apply {
+            styleClass.add("pagination-button")
+            setOnAction {
+                val totalPages = Math.ceil(totalItems.toDouble() / pageSize).toInt().coerceAtLeast(1)
+                if (currentPage < totalPages - 1) {
+                    currentPage++
+                    loadProductsPage(currentPage, pageSize)
+                }
+            }
+        }
+
+        val lastPageButton = Button(">>").apply {
+            styleClass.add("pagination-button")
+            setOnAction {
+                val totalPages = Math.ceil(totalItems.toDouble() / pageSize).toInt().coerceAtLeast(1)
+                if (currentPage < totalPages - 1) {
+                    currentPage = totalPages - 1
+                    loadProductsPage(currentPage, pageSize)
+                }
+            }
+        }
+
+        val pageSizeBox = HBox(5.0).apply {
+            alignment = Pos.CENTER
+            children.addAll(
+                Label("Itens por página:").apply {
+                    styleClass.add("pagination-label")
+                },
+                ComboBox<Int>().apply {
+                    rowsPerPageComboBox = this
+                    items = FXCollections.observableArrayList(10, 15, 25, 50, 100)
+                    value = pageSize
+                    prefWidth = 80.0
+
+                    valueProperty().addListener { _, _, newValue ->
+                        pageSize = newValue
+                        updatePagination()
+                    }
+                }
+            )
+        }
+
+        children.addAll(firstPageButton, prevPageButton, currentPageLabel, nextPageButton, lastPageButton, pageSizeBox)
+    }
+
+    return paginationControls
+    }
+
+private fun updatePagination() {
+        // Calculate new page count
+        val newPageCount = Math.ceil(totalItems.toDouble() / pageSize.toDouble()).toInt()
+
+        // Adjust current page if needed
+        if (currentPage >= newPageCount) {
+            currentPage = maxOf(0, newPageCount - 1)
+        }
+
+        // Reload current page with new page size
+        loadProductsPage(currentPage, pageSize)
+    }
+
+    private fun updateTotalItems() {
+        try {
+            db.getConnection().use { conn ->
+                val stmt = conn.createStatement()
+                val rs = stmt.executeQuery("SELECT COUNT(*) FROM produtos")
+                if (rs.next()) {
+                    totalItems = rs.getInt(1)
+                }
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
         }
     }
 
@@ -977,31 +1161,48 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
         }
     }
 
-    private fun deleteCategory(categoria: String) {
+    private fun deleteCategory(categoria: String): Boolean {
         try {
             db.getConnection().use { conn ->
-                // First check if category is in use
+                // First check if category is used in any products
                 val checkStmt = conn.prepareStatement("SELECT COUNT(*) FROM produtos WHERE categoria = ?")
                 checkStmt.setString(1, categoria)
-                val rs = checkStmt.executeQuery()
-                rs.next()
-                val count = rs.getInt(1)
+                val checkRs = checkStmt.executeQuery()
 
-                if (count > 0) {
-                    showAlert("Erro ao excluir",
-                        "Esta categoria não pode ser excluída pois está sendo usada por $count produto(s).")
-                    return
+                if (checkRs.next() && checkRs.getInt(1) > 0) {
+                    showAlert(
+                        "Categoria em uso",
+                        "Esta categoria está sendo usada por produtos e não pode ser excluída.",
+                        Alert.AlertType.WARNING
+                    )
+                    return false
                 }
 
                 // If not in use, delete it
                 val stmt = conn.prepareStatement("DELETE FROM categorias WHERE nome = ?")
                 stmt.setString(1, categoria)
-                stmt.executeUpdate()
+                val result = stmt.executeUpdate()
 
-                showAlert("Sucesso", "Categoria excluída com sucesso!", Alert.AlertType.INFORMATION)
+                if (result > 0) {
+                    showAlert(
+                        "Sucesso",
+                        "A categoria foi excluída com sucesso.",
+                        Alert.AlertType.INFORMATION
+                    )
+                    return true
+                } else {
+                    showAlert(
+                        "Erro",
+                        "Não foi possível excluir a categoria.",
+                        Alert.AlertType.ERROR
+                    )
+                    return false
+                }
             }
         } catch (e: SQLException) {
-            showAlert("Erro ao excluir categoria", e.message ?: "Erro desconhecido")
+            showAlert("Erro", "Não foi possível excluir a categoria: ${e.message}")
+            e.printStackTrace()
+            return false
         }
     }
 
@@ -2398,8 +2599,47 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
     }
 
     private fun loadProducts() {
-        produtos.setAll(loadProductsFromDb())
+        updateTotalItems()
+        loadProductsPage(currentPage, pageSize)
         updateDashboard()
+    }
+
+    private fun loadProductsPage(page: Int, pageSize: Int) {
+        produtos.clear()
+        try {
+            db.getConnection().use { conn ->
+                val stmt = conn.prepareStatement("""
+                SELECT * FROM produtos ORDER BY nome
+                LIMIT ? OFFSET ?
+            """)
+                stmt.setInt(1, pageSize)
+                stmt.setInt(2, page * pageSize)
+
+                val rs = stmt.executeQuery()
+                while (rs.next()) {
+                    produtos.add(
+                        Produto(
+                            id = rs.getLong("id"),
+                            codigo = rs.getString("codigo"),
+                            nome = rs.getString("nome"),
+                            descricao = rs.getString("descricao") ?: "",
+                            valorUnitario = rs.getDouble("valor_unitario"),
+                            categoria = rs.getString("categoria") ?: "",
+                            ehInsumo = rs.getInt("eh_insumo") == 1,
+                            unidadeMedida = rs.getString("unidade_medida"),
+                            estoqueMinimo = rs.getInt("estoque_minimo"),
+                            estoqueAtual = rs.getInt("estoque_atual"),
+                            status = rs.getString("status"),
+                            dataCadastro = rs.getString("data_cadastro"),
+                            dataAtualizacao = rs.getString("data_atualizacao")
+                        )
+                    )
+                }
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
+            showAlert("Erro ao carregar produtos", e.message ?: "Erro ao acessar banco de dados")
+        }
     }
 
     private fun updateDashboard() {
@@ -2488,15 +2728,34 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
         produtos.clear()
         try {
             db.getConnection().use { conn ->
-                val stmt = conn.prepareStatement(
-                    """SELECT * FROM produtos 
-                       WHERE nome LIKE ? OR codigo LIKE ? OR categoria LIKE ?
-                       ORDER BY nome"""
-                )
+                // First count total matches for pagination
+                val countStmt = conn.prepareStatement("""
+                SELECT COUNT(*) FROM produtos
+                WHERE nome LIKE ? OR codigo LIKE ? OR categoria LIKE ?
+            """)
                 val searchTerm = "%$term%"
+                countStmt.setString(1, searchTerm)
+                countStmt.setString(2, searchTerm)
+                countStmt.setString(3, searchTerm)
+
+                countStmt.executeQuery().use { rs ->
+                    if (rs.next()) {
+                        totalItems = rs.getInt(1)
+                    }
+                }
+
+                // Then get the page data
+                val stmt = conn.prepareStatement("""
+                SELECT * FROM produtos
+                WHERE nome LIKE ? OR codigo LIKE ? OR categoria LIKE ?
+                ORDER BY nome
+                LIMIT ? OFFSET ?
+            """)
                 stmt.setString(1, searchTerm)
                 stmt.setString(2, searchTerm)
                 stmt.setString(3, searchTerm)
+                stmt.setInt(4, pageSize)
+                stmt.setInt(5, currentPage * pageSize)
 
                 val rs = stmt.executeQuery()
                 while (rs.next()) {
@@ -2508,6 +2767,7 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
                             descricao = rs.getString("descricao") ?: "",
                             valorUnitario = rs.getDouble("valor_unitario"),
                             categoria = rs.getString("categoria") ?: "",
+                            ehInsumo = rs.getInt("eh_insumo") == 1,
                             unidadeMedida = rs.getString("unidade_medida"),
                             estoqueMinimo = rs.getInt("estoque_minimo"),
                             estoqueAtual = rs.getInt("estoque_atual"),
@@ -2521,7 +2781,13 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
         } catch (e: SQLException) {
             showAlert("Erro na busca", e.message ?: "Erro ao acessar banco de dados")
         }
+
+        // Update pagination controls
+        val paginationBox = bottom as HBox
+        val currentPageLabel = paginationBox.children[2] as Label
+        currentPageLabel.text = "Página ${currentPage + 1} de ${Math.ceil(totalItems.toDouble() / pageSize).toInt().coerceAtLeast(1)}"
     }
+
 
     private fun confirmDelete(produto: Produto) {
         val dialog = Dialog<ButtonType>()
