@@ -39,6 +39,8 @@ class Main : Application() {
         val historicoPedidosView = HistoricoPedidosView()
         val configuracoesView = ConfiguracoesView()
         val clientesView = ClientesView()
+        val pedidoWizardView = PedidoWizardView()
+
         val menuView = MenuView { viewName ->
             when (viewName) {
                 "dashboard" -> mainView.setCenterView(dashboardView)
@@ -48,6 +50,7 @@ class Main : Application() {
                 "historicoPedidos" -> mainView.setCenterView(historicoPedidosView)
                 "configuracoes" -> mainView.setCenterView(configuracoesView)
                 "clientes" -> mainView.setCenterView(clientesView)
+                "wizard" -> mainView.setCenterView(pedidoWizardView)
             }
         }
 
