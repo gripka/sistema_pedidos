@@ -20,28 +20,28 @@ class PrinterController {
     private val COMPANY_ADDRESS = "Rua 19 de Dezembro, 347 - Centro"
     private val LINE_WIDTH = 32 // Maximum characters per line for most thermal printers
 
-    // Lista de impressoras térmicas conhecidas (pode ser expandida conforme necessário)
+    // Lista de impressoras termicas conhecidas (pode ser expandida conforme necessario)
     private val knownThermalPrinters = listOf(
         "EPSON TM-T20", "EPSON TM-T88", "Bematech MP-4200", "Daruma DR700", "Elgin i9",
         "POS-80", "Generic / Text Only", "POS58 Printer"
     )
 
     /**
-     * Lista todas as impressoras disponíveis no sistema
+     * Lista todas as impressoras disponiveis no sistema
      */
     fun listarImpressoras(): List<PrintService> {
         return PrintServiceLookup.lookupPrintServices(null, null).toList()
     }
 
     /**
-     * Lista apenas impressoras térmicas disponíveis no sistema
+     * Lista apenas impressoras termicas disponiveis no sistema
      */
     fun listarImpressorasTermicas(): List<PrintService> {
         return listarImpressoras().filter { isThermalPrinter(it) }
     }
 
     /**
-     * Obtém a impressora térmica padrão configurada para impressões
+     * Obtem a impressora termica padrao configurada para impressoes
      */
     fun getImpressoraPadrao(): PrintService? {
         val nomeSalvo = prefs.get(DEFAULT_PRINTER_KEY, null)
@@ -49,24 +49,24 @@ class PrinterController {
         return if (nomeSalvo != null) {
             listarImpressoras().find { it.name == nomeSalvo && isThermalPrinter(it) }
         } else {
-            // Tenta encontrar a primeira impressora térmica disponível
+            // Tenta encontrar a primeira impressora termica disponivel
             listarImpressorasTermicas().firstOrNull()
         }
     }
 
     /**
-     * Define uma impressora térmica como padrão para impressões
+     * Define uma impressora termica como padrao para impressoes
      */
     fun definirImpressoraPadrao(printService: PrintService) {
         if (isThermalPrinter(printService)) {
             prefs.put(DEFAULT_PRINTER_KEY, printService.name)
         } else {
-            throw IllegalArgumentException("A impressora selecionada não é uma impressora térmica")
+            throw IllegalArgumentException("A impressora selecionada nao e uma impressora termica")
         }
     }
 
     /**
-     * Verifica se uma impressora é térmica (baseado no nome ou outras características)
+     * Verifica se uma impressora e termica (baseado no nome ou outras caracteristicas)
      */
     fun isThermalPrinter(printService: PrintService): Boolean {
         val printerName = printService.name.lowercase()
@@ -74,37 +74,54 @@ class PrinterController {
     }
 
     /**
-     * Imprime um pedido na impressora térmica especificada
+     * Imprime um pedido na impressora termica especificada
      */
     fun imprimirPedido(
         printService: PrintService? = null,
         pedidoData: Map<String, Any>
     ) {
         try {
-            // Use a impressora especificada ou obtenha a impressora padrão
+            // Use a impressora especificada ou obtenha a impressora padrao
             val impressora = printService ?: getImpressoraPadrao()
-            ?: throw IOException("Nenhuma impressora térmica encontrada.")
+            ?: throw IOException("Nenhuma impressora termica encontrada.")
 
             if (!isThermalPrinter(impressora)) {
-                throw IOException("A impressora ${impressora.name} não é uma impressora térmica.")
+                throw IOException("A impressora ${impressora.name} nao e uma impressora termica.")
             }
 
-            println("Usando impressora térmica: ${impressora.name}")
+            println("Usando impressora termica: ${impressora.name}")
             imprimirEmTermica(impressora, pedidoData)
-            println("Impressão concluída com sucesso!")
+            println("Impressao concluida com sucesso!")
         } catch (e: Exception) {
             e.printStackTrace()
             println("Erro ao imprimir: ${e.message}")
 
             if (e is IOException) {
-                println("Verifique se a impressora térmica está conectada e ligada")
+                println("Verifique se a impressora termica esta conectada e ligada")
             }
         }
     }
 
     /**
-     * Imprime em impressora térmica usando ESC/POS
+     * Normaliza texto removendo acentos e caracteres especiais
      */
+    private fun normalizarTexto(texto: String): String {
+        return texto.replace("[áàâã]".toRegex(), "a")
+            .replace("[éèê]".toRegex(), "e")
+            .replace("[íìî]".toRegex(), "i")
+            .replace("[óòôõ]".toRegex(), "o")
+            .replace("[úùû]".toRegex(), "u")
+            .replace("[ÁÀÂÃ]".toRegex(), "A")
+            .replace("[ÉÈÊ]".toRegex(), "E")
+            .replace("[ÍÌÎ]".toRegex(), "I")
+            .replace("[ÓÒÔÕ]".toRegex(), "O")
+            .replace("[ÚÙÛ]".toRegex(), "U")
+            .replace("[ç]".toRegex(), "c")
+            .replace("[Ç]".toRegex(), "C")
+            .replace("[ñ]".toRegex(), "n")
+            .replace("[Ñ]".toRegex(), "N")
+    }
+
     private fun imprimirEmTermica(
         impressora: PrintService,
         pedidoData: Map<String, Any>
@@ -140,18 +157,17 @@ class PrinterController {
                     .setBold(true)
                     .setJustification(EscPosConst.Justification.Center)
 
-                val linhaDiv = "--------------------------------"
+                val linhaDiv = "------------------------------------------------"
 
-                // Cabeçalho da empresa
-                escpos.write(boldCenter, COMPANY_NAME)
+                // Cabecalho da empresa
+                escpos.write(boldCenter, normalizarTexto(COMPANY_NAME))
                     .feed(1)
-                    .write(center, COMPANY_ADDRESS)
+                    .write(center, normalizarTexto(COMPANY_ADDRESS))
                     .feed(1)
-                    .write(center, "Tel: $COMPANY_PHONE")
+                    .write(center, normalizarTexto("Tel: $COMPANY_PHONE"))
                     .feed(1)
                     .writeLF(linhaDiv)
 
-                // Detalhes do pedido
                 val numeroPedido = pedidoData["numero"] as String
                 val dataPedido = formatarData(pedidoData["data_pedido"] as String)
                 val statusPedido = pedidoData["status_pedido"] as String
@@ -166,7 +182,7 @@ class PrinterController {
                     .writeLF(linhaDiv)
 
                 val clienteInfo = pedidoData["cliente"] as? Map<String, Any>
-                val telefoneContato = pedidoData["telefone_contato"] as? String ?: ""
+                val telefoneContato = normalizarTexto(pedidoData["telefone_contato"] as? String ?: "")
 
                 escpos.write(bold, "CLIENTE:")
                     .feed(1)
@@ -175,13 +191,13 @@ class PrinterController {
                 if (clienteInfo != null) {
                     val tipoCliente = clienteInfo["tipo"] as? String
                     if (tipoCliente == "PESSOA_FISICA") {
-                        val nome = clienteInfo["nome"] as? String ?: ""
-                        val sobrenome = clienteInfo["sobrenome"] as? String ?: ""
+                        val nome = normalizarTexto(clienteInfo["nome"] as? String ?: "")
+                        val sobrenome = normalizarTexto(clienteInfo["sobrenome"] as? String ?: "")
                         val nomeCompleto = "$nome $sobrenome"
                         imprimirTextoComWrapping(escpos, "Nome: $nomeCompleto")
                     } else {
-                        val razaoSocial = clienteInfo["razao_social"] as? String ?: ""
-                        val nomeFantasia = clienteInfo["nome_fantasia"] as? String ?: ""
+                        val razaoSocial = normalizarTexto(clienteInfo["razao_social"] as? String ?: "")
+                        val nomeFantasia = normalizarTexto(clienteInfo["nome_fantasia"] as? String ?: "")
                         imprimirTextoComWrapping(escpos, "Empresa: $razaoSocial")
                         if (nomeFantasia.isNotEmpty()) {
                             imprimirTextoComWrapping(escpos, "Nome Fantasia: $nomeFantasia")
@@ -195,7 +211,7 @@ class PrinterController {
                 val observacao = pedidoData["observacao"] as? String ?: ""
                 if (observacao.isNotEmpty()) {
                     escpos.feed(1)
-                    imprimirTextoComWrapping(escpos, "Observação: $observacao")
+                    imprimirTextoComWrapping(escpos, "Observacao: $observacao")
                 }
 
                 escpos.feed(1)
@@ -208,7 +224,7 @@ class PrinterController {
 
                 val itens = pedidoData["itens"] as? List<Map<String, Any>> ?: emptyList()
 
-                // Cabeçalho da tabela de itens
+                // Cabecalho da tabela de itens
                 escpos.writeLF("QTD PRODUTO             VALOR   TOTAL")
 
                 itens.forEach { item ->
@@ -239,7 +255,7 @@ class PrinterController {
                 val valorTotal = formatarValor(pedidoData["valor_total"] as Number)
                 val valorDesconto = formatarValor(pedidoData["valor_desconto"] as? Number ?: 0)
                 val tipoDesconto = pedidoData["tipo_desconto"] as? String ?: ""
-                val formaPagamento = pedidoData["forma_pagamento"] as? String ?: "Não informado"
+                val formaPagamento = pedidoData["forma_pagamento"] as? String ?: "Nao informado"
                 val valorTrocoPara = pedidoData["valor_troco_para"] as? Number
                 val valorTroco = pedidoData["valor_troco"] as? Number
 
@@ -279,7 +295,7 @@ class PrinterController {
                     escpos.write(bold, "PEDIDO #$numeroPedido")
                         .feed(1)
                     val nomeDestinatario = entrega["nome_destinatario"] as? String ?: ""
-                    imprimirTextoComWrapping(escpos, "Destinatário: $nomeDestinatario")
+                    imprimirTextoComWrapping(escpos, "Destinatario: $nomeDestinatario")
 
                     val telefone = entrega["telefone_destinatario"] as? String ?: ""
                     if (telefone.isNotEmpty()) {
@@ -288,11 +304,11 @@ class PrinterController {
 
                     val numero = (entrega["numero"] as? String)?.takeIf { it.isNotBlank() } ?: "S/N"
                     val endereco = "${entrega["endereco"]}, $numero"
-                    imprimirTextoComWrapping(escpos, "Endereço: $endereco")
+                    imprimirTextoComWrapping(escpos, "Endereco: $endereco")
 
                     val referencia = entrega["referencia"] as? String ?: ""
                     if (referencia.isNotEmpty()) {
-                        imprimirTextoComWrapping(escpos, "Referência: $referencia")
+                        imprimirTextoComWrapping(escpos, "Referencia: $referencia")
                     }
 
                     val bairro = entrega["bairro"] as? String ?: ""
@@ -315,7 +331,7 @@ class PrinterController {
 
                     escpos.writeLF("Data/Hora: $dataEntrega $horaEntrega")
                 } else {
-                    // Informações de retirada
+                    // Informacoes de retirada
                     val dataRetirada = pedidoData["data_retirada"] as? String
                     val horaRetirada = pedidoData["hora_retirada"] as? String
 
@@ -330,12 +346,12 @@ class PrinterController {
                 escpos.feed(1)
                     .writeLF(linhaDiv)
 
-                // Rodapé
+                // Rodape
                 escpos.feed(1)
-                    .write(center, "Obrigado pela preferência!")
+                    .write(center, "Obrigado pela preferencia!")
                     .feed(1)
                     .writeLF("Impresso em: " + SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(Date()))
-                    .feed(3)
+                    .feed(6)  // Increased from 3 to 6 for more space before cutting
                     .cut(CutMode.FULL)
             }
         }

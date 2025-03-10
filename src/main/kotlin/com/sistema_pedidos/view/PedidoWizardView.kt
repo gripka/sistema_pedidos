@@ -11,11 +11,14 @@ import javafx.scene.Node
 import javafx.scene.layout.Priority
 import javafx.scene.control.*
 import javafx.scene.layout.*
-import com.sistema_pedidos.controller.NovoPedidoController
+import com.sistema_pedidos.controller.PedidoWizardController
 import javafx.scene.image.ImageView
 import javafx.scene.image.Image
+import javafx.scene.shape.Rectangle
+import javafx.scene.paint.Color
 
 class PedidoWizardView : BorderPane() {
+    val controller = PedidoWizardController()
 
     // Main tab pane to hold multiple order tabs
     private val tabPane = TabPane()
@@ -74,7 +77,7 @@ class PedidoWizardView : BorderPane() {
      * Inner class representing the content of each order tab
      */
     private inner class OrderTabContent : BorderPane() {
-        // Step indicators
+        private lateinit var entregaClienteRadio: RadioButton
         private val stepIndicators = ArrayList<StackPane>()
         private val stepLabels = listOf("Cliente", "Produtos", "Pagamento", "Entrega", "Confirmação")
 
@@ -101,6 +104,27 @@ class PedidoWizardView : BorderPane() {
 
             // Start with first step
             showStep(0)
+
+            // Initialize delivery step indicator as disabled since it starts unchecked
+            updateStepIndicators(false)
+        }
+
+        // Add this method to the OrderTabContent class
+        private fun updateStepIndicators(isDeliveryEnabled: Boolean) {
+            // Update the delivery step indicator (index 3)
+            if (!isDeliveryEnabled) {
+                // If delivery is disabled, always show it as skipped
+                stepIndicators[3].styleClass.removeAll("current-step", "past-step", "future-step")
+                stepIndicators[3].styleClass.add("skipped-step")
+            } else {
+                // If delivery is enabled, show according to current step
+                stepIndicators[3].styleClass.removeAll("skipped-step")
+                when {
+                    currentStep < 3 -> stepIndicators[3].styleClass.add("future-step")
+                    currentStep == 3 -> stepIndicators[3].styleClass.add("current-step")
+                    else -> stepIndicators[3].styleClass.add("past-step")
+                }
+            }
         }
 
         private fun createStepContainers() {
@@ -182,10 +206,31 @@ class PedidoWizardView : BorderPane() {
                 prefHeight = 40.0
                 isDisable = true
                 setOnAction {
-                    if (currentStep > 0) {
+                    // When going back, check if coming from confirmation and delivery is disabled
+                    if (currentStep == 4 && ::entregaClienteRadio.isInitialized && !entregaClienteRadio.isSelected) {
+                        showStep(2)  // Go back to payment step
+                    } else if (currentStep > 0) {
                         showStep(currentStep - 1)
                     }
                 }
+            }
+
+            // Add total value display in the center
+            val totalContainer = HBox().apply {
+                styleClass.add("total-nav-display")
+                alignment = Pos.CENTER
+                children.addAll(
+                    Label("Total:").apply {
+                        styleClass.add("total-nav-label")
+                        style = "-fx-font-weight: bold; -fx-font-size: 16px;"
+                    },
+                    Label("R$ 0,00").apply {
+                        styleClass.add("total-nav-value")
+                        style = "-fx-font-weight: bold; -fx-font-size: 16px; -fx-padding: 0 0 0 10px;"
+                        // Set this label to be updated by the controller
+                        controller.setTotalLabel(this)
+                    }
+                )
             }
 
             nextButton = Button("Avançar").apply {
@@ -195,7 +240,12 @@ class PedidoWizardView : BorderPane() {
                 prefHeight = 40.0
                 setOnAction {
                     if (currentStep < stepContainers.size - 1) {
-                        showStep(currentStep + 1)
+                        // If on payment step and delivery is not selected, skip to confirmation
+                        if (currentStep == 2 && ::entregaClienteRadio.isInitialized && !entregaClienteRadio.isSelected) {
+                            showStep(4)  // Skip to confirmation step
+                        } else {
+                            showStep(currentStep + 1)
+                        }
                     }
                 }
             }
@@ -219,6 +269,8 @@ class PedidoWizardView : BorderPane() {
                 children.addAll(
                     prevButton,
                     Region().apply { HBox.setHgrow(this, Priority.ALWAYS) },
+                    totalContainer,
+                    Region().apply { HBox.setHgrow(this, Priority.ALWAYS) },
                     nextButton,
                     finishButton
                 )
@@ -227,17 +279,23 @@ class PedidoWizardView : BorderPane() {
 
         private fun showStep(step: Int) {
             // Update step indicators
+            var targetStep = step
+
+            // Skip delivery step if not delivering to customer's address
+            if (step == 3 && ::entregaClienteRadio.isInitialized && !entregaClienteRadio.isSelected) {
+                targetStep = 4  // Skip to confirmation step
+            }
             for (i in stepIndicators.indices) {
                 stepIndicators[i].styleClass.removeAll("current-step", "past-step", "future-step")
                 when {
-                    i < step -> stepIndicators[i].styleClass.add("past-step")
-                    i == step -> stepIndicators[i].styleClass.add("current-step")
+                    i < targetStep -> stepIndicators[i].styleClass.add("past-step")
+                    i == targetStep -> stepIndicators[i].styleClass.add("current-step")
                     else -> stepIndicators[i].styleClass.add("future-step")
                 }
             }
 
             // Show appropriate container with fade effect
-            val container = stepContainers[step]
+            val container = stepContainers[targetStep]
             val fadeTransition = FadeTransition(Duration.millis(300.0), container)
             fadeTransition.fromValue = 0.0
             fadeTransition.toValue = 1.0
@@ -247,11 +305,11 @@ class PedidoWizardView : BorderPane() {
             fadeTransition.play()
 
             // Update navigation buttons
-            prevButton.isDisable = step == 0
-            nextButton.isVisible = step < stepContainers.size - 1
-            finishButton.isVisible = step == stepContainers.size - 1
+            prevButton.isDisable = targetStep == 0
+            nextButton.isVisible = targetStep < stepContainers.size - 1
+            finishButton.isVisible = targetStep == stepContainers.size - 1
 
-            currentStep = step
+            currentStep = targetStep
         }
 
         // The existing step creation methods remain the same but are moved to the OrderTabContent class
@@ -606,7 +664,6 @@ class PedidoWizardView : BorderPane() {
         private fun createProductsStep(): Pane {
             val section = createSectionHeader("Produtos")
 
-            val controller = NovoPedidoController()
 
             // Get the productos container from the controller
             val produtosContainer = controller.getProdutosContainer().apply {
@@ -682,155 +739,486 @@ class PedidoWizardView : BorderPane() {
         private fun createPaymentStep(): Pane {
             val section = createSectionHeader("Forma de Pagamento")
 
-            val paymentOptions = HBox(10.0).apply {
-                alignment = Pos.CENTER
-                children.addAll(
-                    createPaymentOption("Dinheiro", true),
-                    createPaymentOption("Cartão de Crédito", false),
-                    createPaymentOption("Cartão de Débito", false),
-                    createPaymentOption("PIX", false),
-                    createPaymentOption("Voucher", false)
+            // Main container using GridPane for better space utilization
+            val mainGrid = GridPane().apply {
+                hgap = 20.0
+                vgap = 15.0
+                padding = Insets(20.0)
+                columnConstraints.addAll(
+                    ColumnConstraints().apply { percentWidth = 50.0 },
+                    ColumnConstraints().apply { percentWidth = 50.0 }
                 )
             }
 
-            val discountBox = HBox(20.0).apply {
+            // Payment method selection - taking full width in first row
+            val paymentToggleGroup = ToggleGroup().apply {
+                selectedToggleProperty().addListener { _, oldToggle, newToggle ->
+                    if (newToggle == null && oldToggle != null) {
+                        // If all toggles were deselected, reselect the previously selected toggle
+                        selectToggle(oldToggle)
+                    }
+                }
+            }
+
+            // Create horizontal layout for payment and delivery options
+            val topRow = HBox(20.0).apply {
+                alignment = Pos.CENTER_LEFT
+            }
+
+            val paymentBox = VBox(10.0).apply {
+                style = "-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 5; -fx-border-color: #e9ecef; -fx-border-radius: 5;"
+                HBox.setHgrow(this, Priority.ALWAYS)
                 children.addAll(
-                    VBox(10.0).apply {
-                        children.addAll(
-                            Label("Tipo de Desconto").apply { styleClass.add("field-label") },
-                            HBox(15.0).apply {
-                                alignment = Pos.CENTER_LEFT
-                                children.addAll(
-                                    RadioButton("Valor (R$)").apply {
-                                        styleClass.add("custom-radio")
-                                        isSelected = true
-                                    },
-                                    RadioButton("Percentual (%)").apply {
-                                        styleClass.add("custom-radio")
-                                    }
-                                )
-                            }
-                        )
+                    Label("Forma de Pagamento").apply {
+                        styleClass.add("field-label")
+                        style = "-fx-font-size: 15px; -fx-font-weight: bold;"
                     },
-                    VBox(10.0).apply {
+                    FlowPane().apply {
+                        hgap = 10.0
+                        vgap = 10.0
+                        alignment = Pos.CENTER_LEFT
+                        prefWrapLength = 500.0 // Adjust based on testing
+                        padding = Insets(10.0, 0.0, 0.0, 0.0)
                         children.addAll(
-                            Label("Valor do Desconto").apply { styleClass.add("field-label") },
-                            TextField("R$ 0,00").apply {
-                                styleClass.add("text-field")
-                                prefWidth = 150.0
-                                alignment = Pos.CENTER_RIGHT
-                            }
+                            createPaymentToggleButton("Dinheiro", true, paymentToggleGroup, "icons/moneyp.png"),
+                            createPaymentToggleButton("Cartão de Crédito", false, paymentToggleGroup, "icons/credit-cardp.png"),
+                            createPaymentToggleButton("Cartão de Débito", false, paymentToggleGroup, "icons/debit-cardp.png"),
+                            createPaymentToggleButton("PIX", false, paymentToggleGroup, "icons/pixp.png"),
+                            createPaymentToggleButton("Voucher", false, paymentToggleGroup, "icons/voucherp.png")
                         )
                     }
                 )
             }
 
-            val trocoBox = HBox(20.0).apply {
+            // Create delivery option box
+            val entregaBox = VBox(10.0).apply {
+                style = "-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 5; -fx-border-color: #e9ecef; -fx-border-radius: 5;"
+                minWidth = 300.0
                 children.addAll(
-                    VBox(10.0).apply {
-                        children.addAll(
-                            Label("Troco Para").apply { styleClass.add("field-label") },
-                            TextField("R$ 0,00").apply {
-                                styleClass.add("text-field")
-                                prefWidth = 150.0
-                                alignment = Pos.CENTER_RIGHT
-                            }
-                        )
+                    Label("Opção de Entrega").apply {
+                        styleClass.add("field-label")
+                        style = "-fx-font-size: 15px; -fx-font-weight: bold;"
                     },
-                    VBox(10.0).apply {
-                        children.addAll(
-                            Label("Troco a Devolver").apply { styleClass.add("field-label") },
-                            Label("R$ 0,00").apply {
-                                styleClass.add("troco-label")
-                                prefWidth = 150.0
-                                alignment = Pos.CENTER_RIGHT
-                            }
-                        )
+                    // Store reference to this radio button
+                    RadioButton("Entregar no endereço do cliente").apply {
+                        entregaClienteRadio = this  // Save reference
+                        styleClass.add("custom-radio")
+                        padding = Insets(10.0, 0.0, 0.0, 0.0)
+
+                        // Create delivery details section
+                        val entregaDetails = VBox(10.0).apply {
+                            isVisible = false
+                            isManaged = false
+                            padding = Insets(10.0, 0.0, 0.0, 0.0)
+
+                            children.addAll(
+                                TextField().apply {
+                                    styleClass.add("text-field")
+                                    promptText = "Endereço de entrega"
+                                },
+                                HBox(10.0).apply {
+                                    children.addAll(
+                                        TextField().apply {
+                                            styleClass.add("text-field")
+                                            HBox.setHgrow(this, Priority.ALWAYS)
+                                            promptText = "Taxa de entrega (R$)"
+                                            prefWidth = 150.0
+                                            alignment = Pos.CENTER_RIGHT
+                                            controller.formatarMoeda(this)
+                                        },
+                                        Button("Calcular").apply {
+                                            styleClass.add("button_estilo2")
+                                            prefHeight = 36.0
+                                        }
+                                    )
+                                }
+                            )
+                        }
+
+                        // Add the details to the parent VBox
+                        (parent as? VBox)?.children?.add(entregaDetails)
+
+                        // Toggle visibility of delivery details when checkbox is clicked
+                        selectedProperty().addListener { _, _, isSelected ->
+                            entregaDetails.isVisible = isSelected
+                            entregaDetails.isManaged = isSelected
+                            updateStepIndicators(isSelected)
+                        }
                     }
                 )
+            }
+
+            topRow.children.addAll(paymentBox, entregaBox)
+            mainGrid.add(topRow, 0, 0, 2, 1) // Span 2 columns
+
+            // Column 1: Discount and Change
+            val leftColumn = VBox(15.0)
+
+            // Discount section
+            val descontoToggleGroup = ToggleGroup()
+            controller.setDescontoToggleGroup(descontoToggleGroup)
+
+            val valorRadioButton = RadioButton("Valor (R$)").apply {
+                toggleGroup = descontoToggleGroup
+                isSelected = true
+                styleClass.add("custom-radio")
+                id = "valor"
+            }
+
+            val percentualRadioButton = RadioButton("Percentual (%)").apply {
+                toggleGroup = descontoToggleGroup
+                styleClass.add("custom-radio")
+                id = "percentual"
+            }
+
+            val descontoField = TextField().apply {
+                styleClass.add("text-field")
+                prefWidth = 150.0
+                alignment = Pos.CENTER_RIGHT
+                promptText = "R$ 0,00"
+                var currentTextListener = controller.formatarMoeda(this)
+
+                descontoToggleGroup.selectedToggleProperty().addListener { _, _, newToggle ->
+                    val isValor = (newToggle as? RadioButton)?.id == "valor"
+                    textProperty().removeListener(currentTextListener)
+                    text = ""
+
+                    if (isValor) {
+                        promptText = "R$ 0,00"
+                        currentTextListener = controller.formatarMoeda(this)
+                    } else {
+                        promptText = "0,00"
+                        currentTextListener = controller.formatarPercentual(this)
+                    }
+                }
+            }
+            controller.setDescontoField(descontoField)
+
+            val discountBox = VBox(10.0).apply {
+                style = "-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 5; -fx-border-color: #e9ecef; -fx-border-radius: 5;"
+                children.addAll(
+                    Label("Desconto").apply {
+                        styleClass.add("field-label")
+                        style = "-fx-font-size: 15px; -fx-font-weight: bold;"
+                    },
+                    GridPane().apply {
+                        hgap = 15.0
+                        vgap = 10.0
+                        padding = Insets(10.0, 0.0, 0.0, 0.0)
+                        add(Label("Tipo de Desconto").apply { styleClass.add("field-label") }, 0, 0)
+                        add(HBox(15.0).apply {
+                            alignment = Pos.CENTER_LEFT
+                            children.addAll(valorRadioButton, percentualRadioButton)
+                        }, 0, 1)
+                        add(Label("Valor do Desconto").apply { styleClass.add("field-label") }, 1, 0)
+                        add(descontoField, 1, 1)
+                    }
+                )
+            }
+            leftColumn.children.add(discountBox)
+
+            // Troco section (only visible for cash payment)
+            val trocoParaField = TextField().apply {
+                styleClass.add("text-field")
+                prefWidth = 150.0
+                alignment = Pos.CENTER_RIGHT
+                promptText = "R$ 0,00"
+                controller.formatarMoeda(this)
+                Tooltip.install(this, Tooltip("Digite o valor recebido para calcular o troco"))
+            }
+            controller.setTrocoParaField(trocoParaField)
+
+            val trocoCalculadoLabel = Label("R$ 0,00").apply {
+                styleClass.add("troco-label")
+                prefWidth = 150.0
+                alignment = Pos.CENTER_RIGHT
+                style = "-fx-background-color: white; -fx-border-color: #dfe4ea;"
+            }
+            controller.setTrocoCalculadoLabel(trocoCalculadoLabel)
+
+            paymentToggleGroup.selectedToggleProperty().addListener { _, _, newToggle ->
+                val selectedButton = newToggle as? ToggleButton
+                trocoParaField.isDisable = selectedButton?.text != "Dinheiro"
+                trocoCalculadoLabel.isDisable = selectedButton?.text != "Dinheiro"
+            }
+
+            val trocoBox = VBox(10.0).apply {
+                style = "-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 5; -fx-border-color: #e9ecef; -fx-border-radius: 5;"
+                children.addAll(
+                    Label("Troco").apply {
+                        styleClass.add("field-label")
+                        style = "-fx-font-size: 15px; -fx-font-weight: bold;"
+                    },
+                    GridPane().apply {
+                        hgap = 15.0
+                        vgap = 10.0
+                        padding = Insets(10.0, 0.0, 0.0, 0.0)
+                        add(Label("Troco Para").apply { styleClass.add("field-label") }, 0, 0)
+                        add(trocoParaField, 0, 1)
+                        add(Label("Troco a Devolver").apply { styleClass.add("field-label") }, 1, 0)
+                        add(trocoCalculadoLabel, 1, 1)
+                    }
+                )
+            }
+            leftColumn.children.add(trocoBox)
+
+            mainGrid.add(leftColumn, 0, 1)
+
+            // Column 2: Status and Pickup scheduling
+            val rightColumn = VBox(15.0)
+
+            // Status section
+            val statusToggleGroup = ToggleGroup().apply {
+                selectedToggleProperty().addListener { _, oldToggle, newToggle ->
+                    if (newToggle == null && oldToggle != null) {
+                        // If all toggles were deselected, reselect the previously selected toggle
+                        selectToggle(oldToggle)
+                    }
+                }
+            }
+            val pendingToggle = ToggleButton("Pendente").apply {
+                toggleGroup = statusToggleGroup
+                styleClass.addAll("status-toggle", "payment-toggle-button")
+                prefWidth = 120.0
+                prefHeight = 35.0
+                isSelected = true
+                val iconUrl = javaClass.getResource("/icons/pendingp.png")
+                val image = Image(iconUrl.toString(), 0.0, 0.0, true, true) // Preserves quality
+                graphic = ImageView(image).apply {
+                    fitWidth = 20.0
+                    fitHeight = 20.0
+                    isPreserveRatio = true
+                    isSmooth = true
+                }
+
+                selectedProperty().addListener { _, _, isSelected ->
+                    val selectedIconUrl = if (isSelected) {
+                        javaClass.getResource("/icons/pending.png")
+                    } else {
+                        javaClass.getResource("/icons/pendingp.png")
+                    }
+                    val selectedImage = Image(selectedIconUrl.toString(), 0.0, 0.0, true, true)
+                    graphic = ImageView(selectedImage).apply {
+                        fitWidth = 20.0
+                        fitHeight = 20.0
+                        isPreserveRatio = true
+                        isSmooth = true
+                    }
+                }
+            }
+
+            val paidToggle = ToggleButton("Pago").apply {
+                toggleGroup = statusToggleGroup
+                styleClass.addAll("status-toggle", "payment-toggle-button")
+                prefWidth = 120.0
+                prefHeight = 35.0
+                val iconUrl = javaClass.getResource("/icons/paidp.png")
+                val image = Image(iconUrl.toString(), 0.0, 0.0, true, true) // Preserves quality
+                graphic = ImageView(image).apply {
+                    fitWidth = 20.0
+                    fitHeight = 20.0
+                    isPreserveRatio = true
+                    isSmooth = true
+                }
+
+                selectedProperty().addListener { _, _, isSelected ->
+                    val selectedIconUrl = if (isSelected) {
+                        javaClass.getResource("/icons/paid.png")
+                    } else {
+                        javaClass.getResource("/icons/paidp.png")
+                    }
+                    val selectedImage = Image(selectedIconUrl.toString(), 0.0, 0.0, true, true)
+                    graphic = ImageView(selectedImage).apply {
+                        fitWidth = 20.0
+                        fitHeight = 20.0
+                        isPreserveRatio = true
+                        isSmooth = true
+                    }
+                }
             }
 
             val statusBox = VBox(10.0).apply {
+                style = "-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 5; -fx-border-color: #e9ecef; -fx-border-radius: 5;"
+                minHeight = 145.0 // Added fixed height for consistency
                 children.addAll(
-                    Label("Status do Pagamento").apply { styleClass.add("field-label") },
-                    HBox(10.0).apply {
-                        children.addAll(
-                            ToggleButton("Pendente").apply {
-                                styleClass.add("status-toggle")
-                                prefWidth = 120.0
-                                prefHeight = 35.0
-                                isSelected = true
-                            },
-                            ToggleButton("Pago").apply {
-                                styleClass.add("status-toggle")
-                                prefWidth = 120.0
-                                prefHeight = 35.0
-                            }
-                        )
-                    }
-                )
-            }
-
-            val retiradaBox = HBox(20.0).apply {
-                children.addAll(
-                    VBox(10.0).apply {
-                        children.addAll(
-                            Label("Data de Retirada").apply { styleClass.add("field-label") },
-                            DatePicker().apply {
-                                styleClass.add("date-picker")
-                                prefWidth = 150.0
-                            }
-                        )
+                    Label("Status do Pagamento").apply {
+                        styleClass.add("field-label")
+                        style = "-fx-font-size: 15px; -fx-font-weight: bold;"
                     },
-                    VBox(10.0).apply {
-                        children.addAll(
-                            Label("Hora da Retirada").apply { styleClass.add("field-label") },
-                            HBox(5.0).apply {
-                                alignment = Pos.CENTER_LEFT
-                                children.addAll(
-                                    ComboBox<String>().apply {
-                                        styleClass.add("time-picker")
-                                        prefWidth = 70.0
-                                        value = "08"
-                                    },
-                                    Label(":").apply { styleClass.add("time-separator") },
-                                    ComboBox<String>().apply {
-                                        styleClass.add("time-picker")
-                                        prefWidth = 70.0
-                                        value = "00"
-                                    }
-                                )
-                            }
-                        )
+                    HBox(10.0).apply {
+                        padding = Insets(10.0, 0.0, 0.0, 0.0)
+                        VBox.setVgrow(this, Priority.ALWAYS) // Allow HBox to grow vertically
+                        alignment = Pos.CENTER_LEFT // Center content vertically
+                        children.addAll(pendingToggle, paidToggle)
                     }
                 )
             }
 
-            return createContentPane(section, VBox(30.0).apply {
-                padding = Insets(20.0)
-                children.addAll(
-                    paymentOptions,
-                    discountBox,
-                    trocoBox,
-                    statusBox,
-                    retiradaBox
+            // Set initial icon state for pending toggle which is selected by default
+            val iconUrl = javaClass.getResource("/icons/pending.png")
+            if (iconUrl != null) {
+                val image = Image(iconUrl.toExternalForm())
+                val imageView = ImageView(image)
+                imageView.fitWidth = 20.0
+                imageView.fitHeight = 20.0
+                imageView.isPreserveRatio = true
+                pendingToggle.graphic = imageView
+            }
+            rightColumn.children.add(statusBox)
+
+// Retirada section
+            val dataPicker = DatePicker().apply {
+                value = java.time.LocalDate.now()
+                styleClass.add("date-picker")
+                prefWidth = 150.0
+                promptText = "dd/mm/aaaa"
+                converter = javafx.util.converter.LocalDateStringConverter(
+                    java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+                    java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
                 )
-            })
+            }
+
+            val retiradaBox = VBox(10.0).apply {
+                id = "retirada-fields"
+                style = "-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 5; -fx-border-color: #e9ecef; -fx-border-radius: 5;"
+                minHeight = 140.0 // Added fixed height for consistency
+                children.addAll(
+                    Label("Agendamento para Retirada").apply {
+                        styleClass.add("field-label")
+                        style = "-fx-font-size: 15px; -fx-font-weight: bold;"
+                    },
+                    GridPane().apply {
+                        hgap = 15.0
+                        vgap = 10.0
+                        padding = Insets(10.0, 0.0, 0.0, 0.0)
+                        VBox.setVgrow(this, Priority.ALWAYS) // Allow GridPane to grow vertically
+                        alignment = Pos.CENTER_LEFT // Center content vertically
+                        add(Label("Data de Retirada").apply { styleClass.add("field-label") }, 0, 0)
+                        add(dataPicker, 0, 1)
+                        add(Label("Hora da Retirada").apply { styleClass.add("field-label") }, 1, 0)
+                        add(HBox(5.0).apply {
+                            alignment = Pos.CENTER_LEFT
+                            children.addAll(
+                                ComboBox<String>().apply {
+                                    styleClass.add("time-picker")
+                                    prefWidth = 70.0
+                                    maxWidth = 70.0
+                                    isEditable = true
+                                    items.addAll((0..23).map { String.format("%02d", it) })
+                                    value = "08"
+                                },
+                                Label(":").apply {
+                                    styleClass.add("field-label")
+                                    style = "-fx-padding: 5 0 0 0;"
+                                },
+                                ComboBox<String>().apply {
+                                    styleClass.add("time-picker")
+                                    prefWidth = 70.0
+                                    maxWidth = 70.0
+                                    isEditable = true
+                                    items.addAll((0..59 step 15).map { String.format("%02d", it) })
+                                    value = "00"
+                                }
+                            )
+                        }, 1, 1)
+                    }
+                )
+            }
+            rightColumn.children.add(retiradaBox)
+
+            mainGrid.add(rightColumn, 1, 1)
+
+            return createContentPane(section, mainGrid)
         }
 
+        private fun safeLoadImageView(resourcePath: String, width: Double, height: Double): ImageView {
+            return try {
+                val imageUrl = javaClass.getResource(resourcePath)
+                if (imageUrl != null) {
+                    val image = Image(imageUrl.toString(), width, height, true, true)
+                    ImageView(image).apply {
+                        this.fitWidth = width
+                        this.fitHeight = height
+                    }
+                } else {
+                    println("Resource not found: $resourcePath")
+                    ImageView().apply {
+                        this.fitWidth = width
+                        this.fitHeight = height
+                    }
+                }
+            } catch (e: Exception) {
+                println("Failed to load image from $resourcePath: ${e.message}")
+                ImageView().apply {
+                    this.fitWidth = width
+                    this.fitHeight = height
+                }
+            }
+        }
+
+        private fun createPaymentToggleButton(
+            text: String,
+            selected: Boolean = false,
+            toggleGroup: ToggleGroup,
+            iconPath: String? = null
+        ): ToggleButton {
+            return ToggleButton(text).apply {
+                styleClass.add("payment-toggle-button")
+                isSelected = selected
+                this.toggleGroup = toggleGroup
+
+                // Set width based on text length
+                when (text) {
+                    "Cartão de Crédito" -> prefWidth = 180.0 // Wider for longer text
+                    "Cartão de Débito" -> prefWidth = 170.0  // Wider for longer text
+                    else -> prefWidth = 130.0                // Default width
+                }
+
+                prefHeight = 40.0
+
+                iconPath?.let {
+                    // Extract base path and extension to create paths for both versions
+                    val pathParts = it.split(".")
+                    val basePath = pathParts[0]
+                    val extension = if (pathParts.size > 1) ".${pathParts[1]}" else ""
+
+                    // Create both versions of icon paths
+                    val normalIconPath = "/${basePath}${extension}"
+                    val selectedIconPath = "/${basePath.removeSuffix("p")}${extension}"
+
+                    // Create image views for both states
+                    val normalIcon = ImageView(Image(javaClass.getResourceAsStream(normalIconPath)))
+                    val selectedIcon = ImageView(Image(javaClass.getResourceAsStream(selectedIconPath)))
+
+                    // Configure both icons
+                    normalIcon.fitHeight = 25.0
+                    normalIcon.fitWidth = 25.0
+                    normalIcon.isPreserveRatio = true
+
+                    selectedIcon.fitHeight = 25.0
+                    selectedIcon.fitWidth = 25.0
+                    selectedIcon.isPreserveRatio = true
+
+                    // Set initial icon based on selected state
+                    graphic = if (selected) selectedIcon else normalIcon
+                    contentDisplay = ContentDisplay.LEFT
+                    graphicTextGap = 10.0
+
+                    // Add listener to change icon when selection state changes
+                    selectedProperty().addListener { _, _, newValue ->
+                        graphic = if (newValue) selectedIcon else normalIcon
+                    }
+                }
+            }
+        }
+
+        // Step 4: Entrega
         private fun createDeliveryStep(): Pane {
             val section = createSectionHeader("Informações de Entrega")
 
             val enableDeliveryBox = HBox(10.0).apply {
                 alignment = Pos.CENTER_LEFT
-                padding = Insets(0.0, 0.0, 20.0, 0.0)
-                children.addAll(
-                    Label("Ativar Entrega:").apply {
-                        styleClass.add("field-label")
-                        style = "-fx-font-size: 16px;"
-                    },
-
-                )
+                padding = Insets(0.0, 0.0, 0.0, 0.0)
             }
 
             val deliveryForm = VBox(20.0).apply {
