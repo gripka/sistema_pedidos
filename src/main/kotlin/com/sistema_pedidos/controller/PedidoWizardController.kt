@@ -33,6 +33,26 @@ class PedidoWizardController {
     private lateinit var trocoCalculadoLabel: Label
     private lateinit var contentContainer: VBox
 
+    // Add this method to your PedidoWizardController class
+    fun updateRemoveButtonsVisibility() {
+        // Get all product rows from the container
+        val productRows = produtosContainer.children
+            .filterIsInstance<HBox>()
+            .filter { it.styleClass.contains("product-row") }
+
+        // Hide remove button if only one product remains
+        val shouldShowRemoveButtons = productRows.size > 1
+
+        // Update visibility of each remove button
+        productRows.forEach { row ->
+            // Find the remove button (it's the last child in the row)
+            row.children.lastOrNull()?.apply {
+                isVisible = shouldShowRemoveButtons
+                isManaged = shouldShowRemoveButtons
+            }
+        }
+    }
+
     fun incrementQuantity(textField: TextField) {
         val value = textField.text.toInt()
         if (value < 999) textField.text = (value + 1).toString()
@@ -92,6 +112,7 @@ class PedidoWizardController {
 
     private fun createProdutosHBox(produto: Produto): HBox {
         return HBox(10.0).apply {
+            styleClass.add("product-row")
             alignment = Pos.CENTER_LEFT
             val quantidadeField = createQuantidadeSection(produto)
             val valorField = createValorSection(produto)
@@ -102,11 +123,17 @@ class PedidoWizardController {
                 quantidadeField,
                 createProdutoSection(),
                 valorField,
-                subtotalField
+                subtotalField,
+                createRemoveButton(this, produto)  // Always add the button
             )
 
-            if (listaProdutos.size > 1) {
-                children.add(createRemoveButton(this, produto))
+            // Set the visibility of the remove button based on the number of products
+            val lastChild = children.last()
+            if (lastChild is Button && lastChild.styleClass.contains("remove-button")) {
+                Platform.runLater {
+                    lastChild.isVisible = listaProdutos.size > 1
+                    lastChild.isManaged = listaProdutos.size > 1
+                }
             }
 
             val updateSubtotal = {
@@ -322,12 +349,11 @@ class PedidoWizardController {
                     produtosContainer.children.remove(produtoHBox)
                     listaProdutos.remove(produto)
                     atualizarNumeracao()
-                    atualizarBotoesRemover()
+                    updateRemoveButtonsVisibility()  // Call this instead of atualizarBotoesRemover()
                 }
             }
         }
     }
-
 
     private fun atualizarNumeracao() {
         produtosContainer.children.forEachIndexed { index, node ->
@@ -364,22 +390,11 @@ class PedidoWizardController {
         )
         listaProdutos.add(novoProduto)
         produtosContainer.children.add(createProdutosHBox(novoProduto))
-        atualizarBotoesRemover()
+        updateRemoveButtonsVisibility()
     }
 
     private fun atualizarBotoesRemover() {
-        produtosContainer.children.forEach { node ->
-            val produtoHBox = node as HBox
-            val botaoRemover = produtoHBox.children.find { it is Button } as? Button
-            if (listaProdutos.size > 1) {
-                if (botaoRemover == null) {
-                    val produto = listaProdutos[produtosContainer.children.indexOf(produtoHBox)]
-                    produtoHBox.children.add(createRemoveButton(produtoHBox, produto))
-                }
-            } else {
-                botaoRemover?.let { produtoHBox.children.remove(it) }
-            }
-        }
+        updateRemoveButtonsVisibility()
     }
 
 

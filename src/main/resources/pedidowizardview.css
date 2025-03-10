@@ -813,12 +813,10 @@
     -fx-scale-y: 0.98;
 }
 
-scrollPane.apply {
-    style = """
-        -fx-padding: 0;
-        -fx-background-insets: 0;
-    """
-}
+/*scrollPane.apply {
+    styleClass.add("content-scroll-pane")
+    isFitToWidth = true
+}*/
 
 .payment-toggle-button {
     -fx-background-color: white;
@@ -826,7 +824,7 @@ scrollPane.apply {
     -fx-border-radius: 5px;
     -fx-background-radius: 5px;
     -fx-cursor: hand;
-    -fx-min-width: 150px; /* Increased from default */
+    -fx-min-width: 150px;
     -fx-padding: 8px 12px;
 }
 

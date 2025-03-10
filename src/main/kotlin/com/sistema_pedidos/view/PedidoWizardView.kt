@@ -18,7 +18,10 @@ import javafx.scene.shape.Rectangle
 import javafx.scene.paint.Color
 
 class PedidoWizardView : BorderPane() {
-    val controller = PedidoWizardController()
+
+    private val produtosContainer = VBox().apply {
+        spacing = 15.0
+    }
 
     // Main tab pane to hold multiple order tabs
     private val tabPane = TabPane()
@@ -73,10 +76,9 @@ class PedidoWizardView : BorderPane() {
         return tab
     }
 
-    /**
-     * Inner class representing the content of each order tab
-     */
     private inner class OrderTabContent : BorderPane() {
+        // Create dedicated controller for this tab
+        private val controller = PedidoWizardController()
         private lateinit var entregaClienteRadio: RadioButton
         private val stepIndicators = ArrayList<StackPane>()
         private val stepLabels = listOf("Cliente", "Produtos", "Pagamento", "Entrega", "Confirmação")
