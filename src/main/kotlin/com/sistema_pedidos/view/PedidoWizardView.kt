@@ -9,15 +9,11 @@ import javafx.scene.shape.Circle
 import javafx.util.Duration
 import javafx.scene.Node
 import javafx.scene.layout.Priority
-import javafx.scene.control.*
-import javafx.scene.layout.*
 import com.sistema_pedidos.controller.PedidoWizardController
 import javafx.application.Platform
+import javafx.scene.Parent
 import javafx.scene.image.ImageView
 import javafx.scene.image.Image
-import javafx.scene.shape.Rectangle
-import javafx.scene.paint.Color
-import java.awt.event.KeyEvent
 import java.time.LocalDate
 
 class PedidoWizardView : BorderPane() {
@@ -124,11 +120,22 @@ class PedidoWizardView : BorderPane() {
         private lateinit var cartaoDebitoButton: ToggleButton
         private lateinit var voucherButton: ToggleButton
 
-        // Also save status buttons
         private lateinit var pendingToggle: ToggleButton
         private lateinit var paidToggle: ToggleButton
 
+        private lateinit var nomeDestinatarioField: TextField
+        private lateinit var telefoneDestinatarioField: TextField
+        private lateinit var enderecoEntregaField: TextField
+        private lateinit var numeroEntregaField: TextField
+        private lateinit var referenciaEntregaField: TextField
+        private lateinit var cidadeEntregaField: TextField
+        private lateinit var bairroEntregaField: TextField
+        private lateinit var cepEntregaField: TextField
+        private lateinit var valorEntregaField: TextField
 
+        private lateinit var dataEntregaPicker: DatePicker
+        private lateinit var horaEntregaCombo: ComboBox<String>
+        private lateinit var minutoEntregaCombo: ComboBox<String>
 
         private val controller = PedidoWizardController()
         private lateinit var entregaClienteRadio: RadioButton
@@ -558,73 +565,77 @@ class PedidoWizardView : BorderPane() {
         private fun getEntregaInfo(): List<Pair<String, String>> {
             val entregaInfo = mutableListOf<Pair<String, String>>()
 
-            // Check if delivery step is active/applicable
-            if (!entregaClienteRadio.isSelected) {
-                // Delivery is not selected, return empty list
+            try {
+                println("Starting delivery info collection...")
+
+                // First check if delivery is enabled
+                if (!::entregaClienteRadio.isInitialized || !entregaClienteRadio.isSelected) {
+                    entregaInfo.add("Entrega" to "Não")
+                    return entregaInfo
+                }
+
+                // Delivery is enabled
+                entregaInfo.add("Entrega" to "Sim")
+
+                // Use direct field references
+                if (::nomeDestinatarioField.isInitialized && !nomeDestinatarioField.text.isNullOrBlank())
+                    entregaInfo.add("Nome do Destinatário" to nomeDestinatarioField.text)
+
+                if (::telefoneDestinatarioField.isInitialized && !telefoneDestinatarioField.text.isNullOrBlank())
+                    entregaInfo.add("Telefone" to telefoneDestinatarioField.text)
+
+                if (::enderecoEntregaField.isInitialized && !enderecoEntregaField.text.isNullOrBlank())
+                    entregaInfo.add("Endereço" to enderecoEntregaField.text)
+
+                if (::numeroEntregaField.isInitialized && !numeroEntregaField.text.isNullOrBlank())
+                    entregaInfo.add("Número" to numeroEntregaField.text)
+
+                if (::referenciaEntregaField.isInitialized && !referenciaEntregaField.text.isNullOrBlank())
+                    entregaInfo.add("Referência" to referenciaEntregaField.text)
+
+                if (::cidadeEntregaField.isInitialized && !cidadeEntregaField.text.isNullOrBlank())
+                    entregaInfo.add("Cidade" to cidadeEntregaField.text)
+
+                if (::bairroEntregaField.isInitialized && !bairroEntregaField.text.isNullOrBlank())
+                    entregaInfo.add("Bairro" to bairroEntregaField.text)
+
+                if (::cepEntregaField.isInitialized && !cepEntregaField.text.isNullOrBlank())
+                    entregaInfo.add("CEP" to cepEntregaField.text)
+
+                if (::valorEntregaField.isInitialized && !valorEntregaField.text.isNullOrBlank())
+                    entregaInfo.add("Valor" to valorEntregaField.text)
+
+                // Date and time (already working)
+                if (::dataEntregaPicker.isInitialized && dataEntregaPicker.value != null) {
+                    val formattedDate = dataEntregaPicker.value.format(
+                        java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                    )
+                    entregaInfo.add("Data" to formattedDate)
+                }
+
+                if (::horaEntregaCombo.isInitialized && ::minutoEntregaCombo.isInitialized) {
+                    val hora = horaEntregaCombo.value?.toString() ?: "00"
+                    val minuto = minutoEntregaCombo.value?.toString() ?: "00"
+                    entregaInfo.add("Horário" to "$hora:$minuto")
+                }
+
+                println("Delivery info collection finished: ${entregaInfo.size} items")
                 return entregaInfo
+            } catch (e: Exception) {
+                println("Error collecting delivery info: ${e.message}")
+                e.printStackTrace()
+                return listOf("Entrega" to "Sim", "Erro" to "Falha ao carregar dados: ${e.message}")
             }
+        }
 
-            // Get delivery address fields
-            val enderecoField = this.lookup("#enderecoEntregaField") as? TextField
-            val numeroField = this.lookup("#numeroEntregaField") as? TextField
-            val complementoField = this.lookup("#complementoEntregaField") as? TextField
-            val bairroField = this.lookup("#bairroEntregaField") as? TextField
-            val cidadeField = this.lookup("#cidadeEntregaField") as? TextField
-            val estadoField = this.lookup("#estadoEntregaField") as? ComboBox<String>
-
-            // Get delivery fee, date and time
-            val valorEntregaField = this.lookup("#valorEntregaField") as? TextField
-            val dataEntregaField = this.lookup("#dataEntregaField") as? DatePicker
-            val horaComboBox = this.lookup("#horaEntregaField") as? ComboBox<String>
-            val minutoComboBox = this.lookupAll("#minutoEntregaField")
-                .filterIsInstance<ComboBox<String>>()
-                .firstOrNull()
-
-            // Build delivery address
-            val endereco = buildString {
-                append(enderecoField?.text ?: "")
-                if (!numeroField?.text.isNullOrBlank()) {
-                    append(", ${numeroField?.text}")
+        // Helper function to recursively collect all nodes
+        private fun collectAllNodes(parent: Node, collected: MutableList<Node>) {
+            collected.add(parent)
+            if (parent is Parent) {
+                parent.childrenUnmodifiable.forEach { child ->
+                    collectAllNodes(child, collected)
                 }
             }
-
-            // Add all delivery information if available
-            entregaInfo.addAll(listOf(
-                "Endereço de Entrega" to endereco.trim(),
-                "Complemento" to (complementoField?.text ?: ""),
-                "Bairro" to (bairroField?.text ?: ""),
-                "Cidade" to (cidadeField?.text ?: ""),
-                "Estado" to (estadoField?.value ?: ""),
-                "Taxa de Entrega" to (valorEntregaField?.text ?: "R$ 0,00")
-            ).filter { it.second.isNotEmpty() })
-
-            // Add delivery date if available
-            val dataEntrega = dataEntregaField?.value?.format(
-                java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
-            )
-            if (!dataEntrega.isNullOrEmpty()) {
-                entregaInfo.add("Data de Entrega" to dataEntrega)
-            }
-
-            // Add delivery time if available
-            val horaEntrega = if (horaComboBox != null && minutoComboBox != null) {
-                val hora = horaComboBox.value ?: "00"
-                val minuto = minutoComboBox.value ?: "00"
-                "$hora:$minuto"
-            } else {
-                ""
-            }
-            if (horaEntrega.isNotEmpty()) {
-                entregaInfo.add("Horário de Entrega" to horaEntrega)
-            }
-
-            // Add any special delivery instructions
-            val obsEntregaField = scene.lookup("#obsEntregaField") as? TextField
-            if (obsEntregaField != null && !obsEntregaField.text.isNullOrEmpty()) {
-                entregaInfo.add("Instruções de Entrega" to obsEntregaField.text)
-            }
-
-            return entregaInfo
         }
 
         // Step 1: Cliente
@@ -1662,16 +1673,28 @@ class PedidoWizardView : BorderPane() {
             }
         }
 
-        // Step 4: Entrega
         private fun createDeliveryStep(): Pane {
             val section = createSectionHeader("Informações de Entrega")
 
             val enableDeliveryBox = HBox(10.0).apply {
                 alignment = Pos.CENTER_LEFT
                 padding = Insets(0.0, 0.0, 0.0, 0.0)
+
+                // Add delivery toggle option
+                entregaClienteRadio = RadioButton("Entregar no endereço").apply {
+                    id = "entregaClienteRadio"
+                    styleClass.add("custom-radio")
+                    isSelected = true
+                    selectedProperty().addListener { _, _, isSelected ->
+                        updateStepIndicators(isSelected)
+                    }
+                }
+
+                children.add(entregaClienteRadio)
             }
 
             val deliveryForm = VBox(20.0).apply {
+                id = "delivery-form"
                 children.addAll(
                     HBox(10.0).apply {
                         children.addAll(
@@ -1680,8 +1703,11 @@ class PedidoWizardView : BorderPane() {
                                 children.addAll(
                                     Label("Nome do Destinatário").apply { styleClass.add("field-label") },
                                     TextField().apply {
+                                        id = "nomeDestinatarioField"
                                         styleClass.add("text-field")
                                         maxWidth = Double.POSITIVE_INFINITY
+                                        // Assign to class property
+                                        this@OrderTabContent.nomeDestinatarioField = this
                                     }
                                 )
                             },
@@ -1689,9 +1715,12 @@ class PedidoWizardView : BorderPane() {
                                 children.addAll(
                                     Label("Telefone do Destinatário").apply { styleClass.add("field-label") },
                                     TextField().apply {
+                                        id = "telefoneDestinatarioField"
                                         styleClass.add("text-field")
                                         prefWidth = 200.0
                                         promptText = "(XX) XXXXX-XXXX"
+                                        // Assign to class property
+                                        this@OrderTabContent.telefoneDestinatarioField = this
 
                                         // Add input mask for phone number
                                         textProperty().addListener { _, oldValue, newValue ->
@@ -1741,8 +1770,11 @@ class PedidoWizardView : BorderPane() {
                                 children.addAll(
                                     Label("Endereço de Entrega").apply { styleClass.add("field-label") },
                                     TextField().apply {
+                                        id = "enderecoEntregaField"
                                         styleClass.add("text-field")
                                         maxWidth = Double.POSITIVE_INFINITY
+                                        // Assign to class property
+                                        this@OrderTabContent.enderecoEntregaField = this
                                     }
                                 )
                             },
@@ -1750,8 +1782,11 @@ class PedidoWizardView : BorderPane() {
                                 children.addAll(
                                     Label("Número").apply { styleClass.add("field-label") },
                                     TextField().apply {
+                                        id = "numeroEntregaField"
                                         styleClass.add("text-field")
                                         prefWidth = 80.0
+                                        // Assign to class property
+                                        this@OrderTabContent.numeroEntregaField = this
                                     }
                                 )
                             }
@@ -1761,15 +1796,18 @@ class PedidoWizardView : BorderPane() {
                     HBox(10.0).apply {
                         children.addAll(
                             VBox(10.0).apply {
-                                HBox.setHgrow(this, Priority.ALWAYS)  // Make the entire VBox grow
+                                HBox.setHgrow(this, Priority.ALWAYS)
                                 children.addAll(
                                     Label("Referência").apply { styleClass.add("field-label") },
                                     TextField().apply {
+                                        id = "referenciaEntregaField"
                                         styleClass.add("text-field")
-                                        prefWidth = 300.0  // Set preferred width to 300px
-                                        minWidth = 250.0   // Set minimum width to 250px
+                                        prefWidth = 300.0
+                                        minWidth = 250.0
                                         maxWidth = Double.POSITIVE_INFINITY
                                         HBox.setHgrow(this, Priority.ALWAYS)
+                                        // Assign to class property
+                                        this@OrderTabContent.referenciaEntregaField = this
                                     }
                                 )
                             }
@@ -1782,8 +1820,11 @@ class PedidoWizardView : BorderPane() {
                                 children.addAll(
                                     Label("Cidade").apply { styleClass.add("field-label") },
                                     TextField().apply {
+                                        id = "cidadeEntregaField"
                                         styleClass.add("text-field")
                                         HBox.setHgrow(this, Priority.ALWAYS)
+                                        // Assign to class property
+                                        this@OrderTabContent.cidadeEntregaField = this
                                     }
                                 )
                             },
@@ -1791,8 +1832,11 @@ class PedidoWizardView : BorderPane() {
                                 children.addAll(
                                     Label("Bairro").apply { styleClass.add("field-label") },
                                     TextField().apply {
+                                        id = "bairroEntregaField"
                                         styleClass.add("text-field")
                                         prefWidth = 200.0
+                                        // Assign to class property
+                                        this@OrderTabContent.bairroEntregaField = this
                                     }
                                 )
                             },
@@ -1800,10 +1844,13 @@ class PedidoWizardView : BorderPane() {
                                 children.addAll(
                                     Label("CEP").apply { styleClass.add("field-label") },
                                     TextField().apply {
+                                        id = "cepEntregaField"
                                         styleClass.add("text-field")
                                         prefWidth = 120.0
                                         promptText = "00000-000"
                                         controller.formatarCep(this)
+                                        // Assign to class property
+                                        this@OrderTabContent.cepEntregaField = this
                                     }
                                 )
                             }
@@ -1816,11 +1863,14 @@ class PedidoWizardView : BorderPane() {
                                 children.addAll(
                                     Label("Valor da Entrega").apply { styleClass.add("field-label") },
                                     TextField("R$ 0,00").apply {
+                                        id = "valorEntregaField"
                                         styleClass.add("text-field")
                                         prefWidth = 150.0
                                         alignment = Pos.CENTER_RIGHT
                                         controller.setValorEntregaField(this)
                                         controller.formatarMoeda(this)
+                                        // Assign to class property
+                                        this@OrderTabContent.valorEntregaField = this
                                         textProperty().addListener { _, _, _ ->
                                             controller.setValorEntregaTotal(controller.parseMoneyValue(text))
                                             controller.calculateTotal()
@@ -1832,8 +1882,11 @@ class PedidoWizardView : BorderPane() {
                                 children.addAll(
                                     Label("Data da Entrega").apply { styleClass.add("field-label") },
                                     DatePicker(LocalDate.now()).apply {
+                                        id = "dataEntregaField"
                                         styleClass.add("date-picker")
                                         prefWidth = 150.0
+                                        // Assign to class property
+                                        this@OrderTabContent.dataEntregaPicker = this
                                     }
                                 )
                             },
@@ -1844,24 +1897,30 @@ class PedidoWizardView : BorderPane() {
                                         alignment = Pos.CENTER_LEFT
                                         children.addAll(
                                             ComboBox<String>().apply {
+                                                id = "horaEntregaField"
                                                 styleClass.add("time-picker")
                                                 prefWidth = 70.0
                                                 maxWidth = 70.0
                                                 isEditable = true
                                                 items.addAll((0..23).map { String.format("%02d", it) })
                                                 value = "00"
+                                                // Assign to class property
+                                                this@OrderTabContent.horaEntregaCombo = this
                                             },
                                             Label(":").apply {
                                                 styleClass.add("field-label")
                                                 style = "-fx-padding: 5 0 0 0;"
                                             },
                                             ComboBox<String>().apply {
+                                                id = "minutoEntregaField"
                                                 styleClass.add("time-picker")
                                                 prefWidth = 70.0
                                                 maxWidth = 70.0
                                                 isEditable = true
                                                 items.addAll((0..59 step 15).map { String.format("%02d", it) })
                                                 value = "00"
+                                                // Assign to class property
+                                                this@OrderTabContent.minutoEntregaCombo = this
                                             }
                                         )
                                     }
@@ -1874,10 +1933,8 @@ class PedidoWizardView : BorderPane() {
 
             return createContentPane(section, VBox(20.0).apply {
                 padding = Insets(20.0)
-                children.addAll(
-                    enableDeliveryBox,
-                    deliveryForm
-                )
+                spacing = 15.0
+                children.addAll(enableDeliveryBox, deliveryForm)
             })
         }
 
@@ -1972,44 +2029,11 @@ class PedidoWizardView : BorderPane() {
                 val entregaInfo = getEntregaInfo()
                 println("Entrega info items: ${entregaInfo.size}")
 
-                // Client info section
                 if (clientInfo.isNotEmpty()) {
-                    val clientSection = VBox(10.0).apply {
-                        styleClass.add("summary-section")
-                        children.add(Label("Informações do Cliente").apply {
-                            styleClass.add("summary-section-header")
-                        })
+                    val filteredClientInfo = clientInfo.filter { it.second.isNotEmpty() }
+                    if (filteredClientInfo.isNotEmpty()) {
+                        container.children.add(createSummarySection("Cliente", filteredClientInfo))
                     }
-
-                    // Create a grid for client info
-                    val clientGrid = GridPane().apply {
-                        hgap = 20.0
-                        vgap = 10.0
-                        padding = Insets(10.0, 0.0, 0.0, 0.0)
-                        styleClass.add("summary-grid")
-                    }
-
-                    // Add client info to the grid
-                    clientInfo.forEachIndexed { index, (field, value) ->
-                        val isEmptyValue = value.isNullOrBlank() || value == "-"
-
-                        val fieldLabel = Label(field).apply {
-                            styleClass.add("summary-field-name")
-                            if (isEmptyValue) {
-                                style = "-fx-text-fill: #e74c3c;" // Red color for empty fields
-                            }
-                        }
-
-                        val valueLabel = Label(value).apply {
-                            styleClass.add("summary-field-value")
-                        }
-
-                        clientGrid.add(fieldLabel, 0, index)
-                        clientGrid.add(valueLabel, 1, index)
-                    }
-
-                    clientSection.children.add(clientGrid)
-                    container.children.add(clientSection)
                 }
 
                 if (produtosInfo.isNotEmpty()) {
@@ -2024,28 +2048,6 @@ class PedidoWizardView : BorderPane() {
                     container.children.add(createSummarySection("Entrega", entregaInfo))
                 }
 
-                // Get the current total
-                val totalLabel = lookup(".total-nav-value") as? Label
-                val totalValue = totalLabel?.text ?: "R$ 0,00"
-
-                // Add total summary
-                container.children.add(
-                    HBox().apply {
-                        styleClass.add("total-summary")
-                        padding = Insets(15.0)
-                        alignment = Pos.CENTER_RIGHT
-
-                        children.addAll(
-                            Label("TOTAL DO PEDIDO:").apply {
-                                styleClass.add("total-summary-label")
-                            },
-                            Label(totalValue).apply {
-                                styleClass.add("total-summary-value")
-                                padding = Insets(0.0, 0.0, 0.0, 15.0)
-                            }
-                        )
-                    }
-                )
             } catch (e: Exception) {
                 container.children.add(
                     Label("Erro ao carregar dados: ${e.message}").apply {
