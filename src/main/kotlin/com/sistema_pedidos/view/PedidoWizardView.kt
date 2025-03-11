@@ -16,6 +16,8 @@ import javafx.scene.image.ImageView
 import javafx.scene.image.Image
 import javafx.scene.shape.Rectangle
 import javafx.scene.paint.Color
+import java.awt.event.KeyEvent
+import java.time.LocalDate
 
 class PedidoWizardView : BorderPane() {
 
@@ -400,7 +402,36 @@ class PedidoWizardView : BorderPane() {
                                         styleClass.add("text-field")
                                         prefWidth = 150.0
                                         promptText = "000.000.000-00"
-                                        // Add CPF formatter here if needed
+
+                                        // CPF formatter implementation
+                                        textProperty().addListener { _, oldValue, newValue ->
+                                            if (newValue == null) {
+                                                text = oldValue
+                                                return@addListener
+                                            }
+
+                                            // Remove non-digits
+                                            var value = newValue.replace(Regex("[^0-9]"), "")
+
+                                            // Limit to 11 digits (CPF length)
+                                            if (value.length > 11) {
+                                                value = value.substring(0, 11)
+                                            }
+
+                                            // Format with dots and dash
+                                            if (value.length > 9) {
+                                                value = "${value.substring(0, 3)}.${value.substring(3, 6)}.${value.substring(6, 9)}-${value.substring(9)}"
+                                            } else if (value.length > 6) {
+                                                value = "${value.substring(0, 3)}.${value.substring(3, 6)}.${value.substring(6)}"
+                                            } else if (value.length > 3) {
+                                                value = "${value.substring(0, 3)}.${value.substring(3)}"
+                                            }
+
+                                            if (value != newValue) {
+                                                text = value
+                                                positionCaret(text.length)
+                                            }
+                                        }
                                     }
                                 )
                             }
@@ -456,7 +487,43 @@ class PedidoWizardView : BorderPane() {
                                         styleClass.add("text-field")
                                         prefWidth = 180.0
                                         promptText = "00.000.000/0000-00"
-                                        // Add CNPJ formatter if needed
+
+                                        // CNPJ formatter implementation
+                                        textProperty().addListener { _, oldValue, newValue ->
+                                            if (newValue != null && newValue != oldValue) {
+                                                val digits = newValue.replace(Regex("[^0-9]"), "")
+                                                if (digits.length > 14) {
+                                                    // Don't allow more than 14 digits
+                                                    text = oldValue
+                                                    return@addListener
+                                                }
+
+                                                val formatted = when {
+                                                    digits.length <= 2 -> digits
+                                                    digits.length <= 5 -> "${digits.substring(0, 2)}.${digits.substring(2)}"
+                                                    digits.length <= 8 -> "${digits.substring(0, 2)}.${digits.substring(2, 5)}.${digits.substring(5)}"
+                                                    digits.length <= 12 -> "${digits.substring(0, 2)}.${digits.substring(2, 5)}.${digits.substring(5, 8)}/${digits.substring(8)}"
+                                                    else -> "${digits.substring(0, 2)}.${digits.substring(2, 5)}.${digits.substring(5, 8)}/${digits.substring(8, 12)}-${digits.substring(12)}"
+                                                }
+
+                                                if (formatted != newValue) {
+                                                    val caretPosition = caretPosition
+                                                    text = formatted
+
+                                                    // Calculate the new position based on added formatting characters
+                                                    val newPosition = caretPosition + (formatted.length - newValue.length)
+                                                    if (newPosition >= 0 && newPosition <= formatted.length) {
+                                                        positionCaret(newPosition)
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        addEventFilter(javafx.scene.input.KeyEvent.KEY_TYPED) { event ->
+                                            if (event.character == " " || text.replace(Regex("[^0-9]"), "").length >= 14) {
+                                                event.consume()
+                                            }
+                                        }
                                     }
                                 )
                             },
@@ -467,6 +534,7 @@ class PedidoWizardView : BorderPane() {
                                         id = "ieField"
                                         styleClass.add("text-field")
                                         prefWidth = 150.0
+                                        controller.formatarInscricaoEstadual(this)
                                     }
                                 )
                             }
@@ -488,7 +556,36 @@ class PedidoWizardView : BorderPane() {
                                         styleClass.add("text-field")
                                         prefWidth = 150.0
                                         promptText = "(00) 00000-0000"
-                                        // Add phone formatter if needed
+
+                                        // Add phone formatter
+                                        textProperty().addListener { _, oldValue, newValue ->
+                                            if (newValue == null) {
+                                                text = oldValue
+                                                return@addListener
+                                            }
+
+                                            // Allow only numbers
+                                            val digits = newValue.replace(Regex("[^0-9]"), "")
+
+                                            // Format based on the length
+                                            val formatted = when {
+                                                digits.length <= 2 -> {
+                                                    if (digits.isNotEmpty()) "($digits" else ""
+                                                }
+                                                digits.length <= 7 -> {
+                                                    "(${digits.substring(0, 2)}) ${digits.substring(2)}"
+                                                }
+                                                else -> {
+                                                    val len = digits.length.coerceAtMost(11)
+                                                    "(${digits.substring(0, 2)}) ${digits.substring(2, 7)}-${digits.substring(7, len)}"
+                                                }
+                                            }
+
+                                            if (formatted != newValue) {
+                                                text = formatted
+                                                positionCaret(text.length)
+                                            }
+                                        }
                                     }
                                 )
                             },
@@ -536,14 +633,14 @@ class PedidoWizardView : BorderPane() {
                                     styleClass.add("text-field")
                                     prefWidth = 120.0
                                     promptText = "00000-000"
-                                    // Add CEP formatter if needed
+                                    controller.formatarCep(this)
                                 }
                             )
                         },
                         VBox(5.0).apply {
                             HBox.setHgrow(this, Priority.ALWAYS)
                             children.addAll(
-                                Label("Logradouro").apply { styleClass.add("field-label") },
+                                Label("Endereço").apply { styleClass.add("field-label") },
                                 TextField().apply {
                                     id = "logradouroField"
                                     styleClass.add("text-field")
@@ -703,23 +800,6 @@ class PedidoWizardView : BorderPane() {
                 )
             }
 
-            val totalBox = HBox().apply {
-                styleClass.add("total-summary")
-                padding = Insets(15.0)
-                alignment = Pos.CENTER_RIGHT
-                spacing = 20.0
-
-                children.addAll(
-                    Label("Total:").apply {
-                        styleClass.add("total-summary-label")
-                    },
-                    Label("R$ 0,00").apply {
-                        styleClass.add("total-summary-value")
-                        controller.setTotalLabel(this)
-                    }
-                )
-            }
-
             val buttonBar = HBox(10.0).apply {
                 alignment = Pos.CENTER_LEFT
                 children.add(addButton)
@@ -732,7 +812,6 @@ class PedidoWizardView : BorderPane() {
                     produtosContainer,
                     buttonBar,
                     observacaoBox,
-                    totalBox
                 )
             })
         }
@@ -878,7 +957,14 @@ class PedidoWizardView : BorderPane() {
                 prefWidth = 150.0
                 alignment = Pos.CENTER_RIGHT
                 promptText = "R$ 0,00"
+                controller.setDescontoField(this)
                 var currentTextListener = controller.formatarMoeda(this)
+
+                // Add a listener to update the total when text changes
+                textProperty().addListener { _, _, _ ->
+                    // Calculate new total with discount
+                    controller.aplicarDesconto()
+                }
 
                 descontoToggleGroup.selectedToggleProperty().addListener { _, _, newToggle ->
                     val isValor = (newToggle as? RadioButton)?.id == "valor"
@@ -892,9 +978,11 @@ class PedidoWizardView : BorderPane() {
                         promptText = "0,00"
                         currentTextListener = controller.formatarPercentual(this)
                     }
+
+                    // Trigger discount recalculation when toggle changes
+                    controller.aplicarDesconto()
                 }
             }
-            controller.setDescontoField(descontoField)
 
             val discountBox = VBox(10.0).apply {
                 style = "-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 5; -fx-border-color: #e9ecef; -fx-border-radius: 5;"
@@ -956,7 +1044,10 @@ class PedidoWizardView : BorderPane() {
                         vgap = 10.0
                         padding = Insets(10.0, 0.0, 0.0, 0.0)
                         add(Label("Troco Para").apply { styleClass.add("field-label") }, 0, 0)
-                        add(trocoParaField, 0, 1)
+                        add(trocoParaField.apply {
+                            // Add a listener to update troco calculation when text changes
+                            textProperty().addListener { _, _, _ -> controller.calcularTroco() }
+                        }, 0, 1)
                         add(Label("Troco a Devolver").apply { styleClass.add("field-label") }, 1, 0)
                         add(trocoCalculadoLabel, 1, 1)
                     }
@@ -1107,7 +1198,7 @@ class PedidoWizardView : BorderPane() {
                                     maxWidth = 70.0
                                     isEditable = true
                                     items.addAll((0..23).map { String.format("%02d", it) })
-                                    value = "08"
+                                    value = "00"
                                 },
                                 Label(":").apply {
                                     styleClass.add("field-label")
@@ -1131,31 +1222,6 @@ class PedidoWizardView : BorderPane() {
             mainGrid.add(rightColumn, 1, 1)
 
             return createContentPane(section, mainGrid)
-        }
-
-        private fun safeLoadImageView(resourcePath: String, width: Double, height: Double): ImageView {
-            return try {
-                val imageUrl = javaClass.getResource(resourcePath)
-                if (imageUrl != null) {
-                    val image = Image(imageUrl.toString(), width, height, true, true)
-                    ImageView(image).apply {
-                        this.fitWidth = width
-                        this.fitHeight = height
-                    }
-                } else {
-                    println("Resource not found: $resourcePath")
-                    ImageView().apply {
-                        this.fitWidth = width
-                        this.fitHeight = height
-                    }
-                }
-            } catch (e: Exception) {
-                println("Failed to load image from $resourcePath: ${e.message}")
-                ImageView().apply {
-                    this.fitWidth = width
-                    this.fitHeight = height
-                }
-            }
         }
 
         private fun createPaymentToggleButton(
@@ -1244,6 +1310,42 @@ class PedidoWizardView : BorderPane() {
                                         styleClass.add("text-field")
                                         prefWidth = 200.0
                                         promptText = "(XX) XXXXX-XXXX"
+
+                                        // Add input mask for phone number
+                                        textProperty().addListener { _, oldValue, newValue ->
+                                            if (newValue == null) {
+                                                text = oldValue
+                                                return@addListener
+                                            }
+
+                                            // Keep only digits
+                                            val digits = newValue.replace(Regex("[^\\d]"), "")
+
+                                            // Format as phone number
+                                            val formatted = when {
+                                                digits.isEmpty() -> ""
+                                                digits.length <= 2 -> "(" + digits
+                                                digits.length <= 7 -> "(${digits.substring(0, 2)}) ${digits.substring(2)}"
+                                                else -> {
+                                                    val len = digits.length
+                                                    val maxDigits = 11 // Allow up to 11 digits (including DDD)
+                                                    val truncated = digits.substring(0, minOf(len, maxDigits))
+
+                                                    if (truncated.length <= 10) {
+                                                        // Format as (XX) XXXX-XXXX for 10 digits
+                                                        "(${truncated.substring(0, 2)}) ${truncated.substring(2, 6)}-${truncated.substring(6)}"
+                                                    } else {
+                                                        // Format as (XX) XXXXX-XXXX for 11 digits
+                                                        "(${truncated.substring(0, 2)}) ${truncated.substring(2, 7)}-${truncated.substring(7)}"
+                                                    }
+                                                }
+                                            }
+
+                                            if (formatted != newValue) {
+                                                text = formatted
+                                                positionCaret(text.length)
+                                            }
+                                        }
                                     }
                                 )
                             }
@@ -1255,7 +1357,7 @@ class PedidoWizardView : BorderPane() {
                             VBox(10.0).apply {
                                 HBox.setHgrow(this, Priority.ALWAYS)
                                 children.addAll(
-                                    Label("Endereço").apply { styleClass.add("field-label") },
+                                    Label("Endereço de Entrega").apply { styleClass.add("field-label") },
                                     TextField().apply {
                                         styleClass.add("text-field")
                                         maxWidth = Double.POSITIVE_INFINITY
@@ -1277,10 +1379,13 @@ class PedidoWizardView : BorderPane() {
                     HBox(10.0).apply {
                         children.addAll(
                             VBox(10.0).apply {
+                                HBox.setHgrow(this, Priority.ALWAYS)  // Make the entire VBox grow
                                 children.addAll(
                                     Label("Referência").apply { styleClass.add("field-label") },
                                     TextField().apply {
                                         styleClass.add("text-field")
+                                        prefWidth = 300.0  // Set preferred width to 300px
+                                        minWidth = 250.0   // Set minimum width to 250px
                                         maxWidth = Double.POSITIVE_INFINITY
                                         HBox.setHgrow(this, Priority.ALWAYS)
                                     }
@@ -1315,7 +1420,8 @@ class PedidoWizardView : BorderPane() {
                                     TextField().apply {
                                         styleClass.add("text-field")
                                         prefWidth = 120.0
-                                        promptText = "XXXXX-XXX"
+                                        promptText = "00000-000"
+                                        controller.formatarCep(this)
                                     }
                                 )
                             }
@@ -1331,13 +1437,19 @@ class PedidoWizardView : BorderPane() {
                                         styleClass.add("text-field")
                                         prefWidth = 150.0
                                         alignment = Pos.CENTER_RIGHT
+                                        controller.setValorEntregaField(this)
+                                        controller.formatarMoeda(this)
+                                        textProperty().addListener { _, _, _ ->
+                                            controller.setValorEntregaTotal(controller.parseMoneyValue(text))
+                                            controller.calculateTotal()
+                                        }
                                     }
                                 )
                             },
                             VBox(10.0).apply {
                                 children.addAll(
                                     Label("Data da Entrega").apply { styleClass.add("field-label") },
-                                    DatePicker().apply {
+                                    DatePicker(LocalDate.now()).apply {
                                         styleClass.add("date-picker")
                                         prefWidth = 150.0
                                     }
@@ -1352,12 +1464,21 @@ class PedidoWizardView : BorderPane() {
                                             ComboBox<String>().apply {
                                                 styleClass.add("time-picker")
                                                 prefWidth = 70.0
-                                                value = "08"
+                                                maxWidth = 70.0
+                                                isEditable = true
+                                                items.addAll((0..23).map { String.format("%02d", it) })
+                                                value = "00"
                                             },
-                                            Label(":").apply { styleClass.add("time-separator") },
+                                            Label(":").apply {
+                                                styleClass.add("field-label")
+                                                style = "-fx-padding: 5 0 0 0;"
+                                            },
                                             ComboBox<String>().apply {
                                                 styleClass.add("time-picker")
                                                 prefWidth = 70.0
+                                                maxWidth = 70.0
+                                                isEditable = true
+                                                items.addAll((0..59 step 15).map { String.format("%02d", it) })
                                                 value = "00"
                                             }
                                         )
@@ -1378,6 +1499,7 @@ class PedidoWizardView : BorderPane() {
             })
         }
 
+        // Step 5: Confirmação
         private fun createConfirmationStep(): Pane {
             val section = createSectionHeader("Confirme seu Pedido")
 
@@ -1432,6 +1554,12 @@ class PedidoWizardView : BorderPane() {
                 styleClass.add("remove-button")
                 minWidth = 30.0
                 minHeight = 30.0
+                setOnAction {
+                    // Get the parent row
+                    val productRow = this.parent as HBox
+                    // Call controller method to remove and update numbers
+                    controller.removeProduct(productRow)
+                }
             }
 
             return HBox(15.0).apply {

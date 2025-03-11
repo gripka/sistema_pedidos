@@ -7,6 +7,7 @@ import javafx.scene.image.Image
 import javafx.scene.image.ImageView
 import javafx.application.Platform
 import com.sistema_pedidos.model.Produto
+import javafx.beans.property.SimpleObjectProperty
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
 import javafx.geometry.Insets
@@ -21,6 +22,7 @@ import javafx.geometry.Side
 import javafx.scene.input.KeyCode
 import javafx.stage.StageStyle
 import java.sql.Connection
+import javafx.beans.property.SimpleStringProperty
 
 class PedidoWizardController {
     private val produtosContainer = VBox(10.0)
@@ -32,35 +34,88 @@ class PedidoWizardController {
     private lateinit var trocoParaField: TextField
     private lateinit var trocoCalculadoLabel: Label
     private lateinit var contentContainer: VBox
+    private var subtotalValue: Double = 0.0
+    private var valorDesconto: Double = 0.0
+    private var valorEntregaTotal: Double = 0.0
+    private val tipoDesconto = SimpleStringProperty("valor") // Default to "valor"
 
-    // Add this method to your PedidoWizardController class
-    fun updateRemoveButtonsVisibility() {
-        // Get all product rows from the container
-        val productRows = produtosContainer.children
-            .filterIsInstance<HBox>()
-            .filter { it.styleClass.contains("product-row") }
+    val horaEntregaProperty = SimpleObjectProperty<String>()
 
-        // Hide remove button if only one product remains
-        val shouldShowRemoveButtons = productRows.size > 1
+    private fun updateRemoveButtonsVisibility() {
+        // Only show remove buttons if there's more than one product
+        val shouldShowButtons = produtosContainer.children.size > 1
 
-        // Update visibility of each remove button
-        productRows.forEach { row ->
-            // Find the remove button (it's the last child in the row)
-            row.children.lastOrNull()?.apply {
-                isVisible = shouldShowRemoveButtons
-                isManaged = shouldShowRemoveButtons
+        produtosContainer.children.forEach { node ->
+            val hBox = node as HBox
+            val lastChild = hBox.children.last()
+            if (lastChild is Button && lastChild.styleClass.contains("remove-button")) {
+                lastChild.isVisible = shouldShowButtons
+                lastChild.isManaged = shouldShowButtons
             }
         }
     }
 
-    fun incrementQuantity(textField: TextField) {
-        val value = textField.text.toInt()
-        if (value < 999) textField.text = (value + 1).toString()
+    private fun incrementQuantity(quantityField: TextField) {
+        try {
+            val currentValue = quantityField.text.toInt()
+            // Set upper limit to prevent unreasonably large quantities
+            if (currentValue < 999) {
+                quantityField.text = (currentValue + 1).toString()
+
+                // Find the row container
+                val row = quantityField.parent.parent.parent as HBox
+                // Update product subtotal
+                updateProductSubtotal(row)
+                // Recalculate the total
+                calculateTotal()
+            }
+        } catch (e: NumberFormatException) {
+            // If the text isn't a valid number, reset to 1
+            quantityField.text = "1"
+        }
     }
 
-    fun decrementQuantity(textField: TextField) {
-        val value = textField.text.toInt()
-        if (value > 1) textField.text = (value - 1).toString()
+    private fun decrementQuantity(quantityField: TextField) {
+        try {
+            val currentValue = quantityField.text.toInt()
+            // Don't allow quantity less than 1
+            if (currentValue > 1) {
+                quantityField.text = (currentValue - 1).toString()
+
+                // Find the row container
+                val row = quantityField.parent.parent.parent as HBox
+                // Update product subtotal
+                updateProductSubtotal(row)
+                // Recalculate the total
+                calculateTotal()
+            }
+        } catch (e: NumberFormatException) {
+            // If the text isn't a valid number, reset to 1
+            quantityField.text = "1"
+        }
+    }
+
+    private fun updateProductSubtotal(row: HBox) {
+        // Extract quantity field
+        val quantityContainer = (row.children[1] as VBox).children[1] as HBox
+        val quantityField = quantityContainer.children[1] as TextField
+        val quantity = quantityField.text.toIntOrNull() ?: 1
+
+        // Extract unit price field
+        val unitPriceField = ((row.children[3] as VBox).children[1] as TextField)
+        val unitPrice = parseMoneyValue(unitPriceField.text)
+
+        // Calculate subtotal
+        val subtotal = quantity * unitPrice
+
+        // Format subtotal and update field
+        val formattedSubtotal = String.format("R$ %,.2f", subtotal)
+            .replace(",", ".")
+            .replace(".", ",", ignoreCase = true)
+            .replaceFirst(",", ".")
+
+        val subtotalField = ((row.children[4] as VBox).children[1] as TextField)
+        subtotalField.text = formattedSubtotal
     }
 
     fun validateQuantity(textField: TextField, newValue: String) {
@@ -81,6 +136,98 @@ class PedidoWizardController {
 
     fun setContentContainer(container: VBox) {
         contentContainer = container
+    }
+
+    fun formatarInscricaoEstadual(textField: TextField) {
+        val maxLength = 14 // Most state registrations won't exceed this length
+
+        textField.textProperty().addListener { _, oldValue, newValue ->
+            if (newValue == null) {
+                textField.text = oldValue
+                return@addListener
+            }
+
+            // Allow only numbers, letters and dots/dashes
+            val cleanValue = newValue.replace(Regex("[^0-9A-Za-z.-]"), "")
+
+            // If the user is deleting characters, don't reformat
+            if (cleanValue.length < oldValue.length) {
+                textField.text = cleanValue
+                return@addListener
+            }
+
+            // Restrict to maximum length
+            var value = if (cleanValue.length > maxLength) {
+                cleanValue.substring(0, maxLength)
+            } else {
+                cleanValue
+            }
+
+            // Don't try to format if already contains separators
+            if (!value.contains('.') && !value.contains('-') && value.length > 3) {
+                // For most Brazilian states, common format is XXX.XXX.XXX
+                val sb = StringBuilder()
+                for (i in value.indices) {
+                    if (i > 0 && i % 3 == 0 && i < value.length - 1) {
+                        sb.append('.')
+                    }
+                    sb.append(value[i])
+                }
+                value = sb.toString()
+            }
+
+            if (value != newValue) {
+                textField.text = value
+                textField.positionCaret(textField.text.length)
+            }
+        }
+    }
+
+    fun formatarCnpj(textField: TextField) {
+        val maxLength = 14
+
+        textField.textProperty().addListener { _, oldValue, newValue ->
+            if (newValue == null) {
+                textField.text = oldValue
+                return@addListener
+            }
+
+            // Extract only digits
+            var value = newValue.replace(Regex("[^0-9]"), "")
+
+            // Limit to max length
+            if (value.length > maxLength) {
+                value = value.substring(0, maxLength)
+            }
+
+            // Format with masks
+            val formatted = when {
+                value.length <= 2 -> value
+                value.length <= 5 -> "${value.substring(0, 2)}.${value.substring(2)}"
+                value.length <= 8 -> "${value.substring(0, 2)}.${value.substring(2, 5)}.${value.substring(5)}"
+                value.length <= 12 -> "${value.substring(0, 2)}.${value.substring(2, 5)}.${value.substring(5, 8)}/${value.substring(8)}"
+                else -> "${value.substring(0, 2)}.${value.substring(2, 5)}.${value.substring(5, 8)}/${value.substring(8, 12)}-${value.substring(12)}"
+            }
+
+            // Update text if it changed
+            if (formatted != newValue) {
+                val caretPosition = textField.caretPosition
+                val oldLength = newValue.length
+                textField.text = formatted
+
+                // Adjust caret position after formatting
+                if (caretPosition + (formatted.length - oldLength) > 0) {
+                    textField.positionCaret(caretPosition + (formatted.length - oldLength))
+                }
+            }
+        }
+
+        // Block space input
+        textField.addEventFilter(javafx.scene.input.KeyEvent.KEY_TYPED) { event ->
+            if (event.character == " ") {
+                event.consume()
+            }
+        }
     }
 
     fun formatarTelefone(textField: TextField) {
@@ -335,7 +482,7 @@ class PedidoWizardController {
         return Button().apply {
             styleClass.add("remove-button")
             graphic =
-                ImageView(Image(NovoPedidoController::class.java.getResourceAsStream("/icons/closered.png"))).apply {
+                ImageView(Image(PedidoWizardController::class.java.getResourceAsStream("/icons/closered.png"))).apply {
                     fitHeight = 15.0
                     fitWidth = 15.0
                     isPreserveRatio = true
@@ -369,11 +516,19 @@ class PedidoWizardController {
         listaProdutos.addAll(updatedProducts)
     }
 
+    fun setValorEntregaTotal(valor: Double) {
+        valorEntregaTotal = valor
+        calculateTotal() // Recalculate the total when the delivery value changes
+    }
+
     fun setValorEntregaField(field: TextField) {
         valorEntregaField = field
     }
 
     fun addNovoProduto() {
+        val produtosContainer = getProdutosContainer()
+
+        updateProductNumbers()
         val novoProduto = Produto(
             id = (listaProdutos.size + 1).toLong(),
             codigo = "",
@@ -391,8 +546,12 @@ class PedidoWizardController {
         listaProdutos.add(novoProduto)
         produtosContainer.children.add(createProdutosHBox(novoProduto))
         updateRemoveButtonsVisibility()
-    }
 
+        // Add this line to ensure the total is recalculated immediately
+        Platform.runLater {
+            calculateTotal()
+        }
+    }
     private fun atualizarBotoesRemover() {
         updateRemoveButtonsVisibility()
     }
@@ -837,10 +996,29 @@ class PedidoWizardController {
 
     fun setDescontoField(field: TextField) {
         descontoField = field
+
+        // Add change listener to update total when discount changes
+        field.textProperty().addListener { _, _, _ ->
+            aplicarDesconto()
+        }
     }
 
     fun setDescontoToggleGroup(group: ToggleGroup) {
         descontoToggleGroup = group
+
+        // Add listener that safely checks if descontoField is initialized
+        group.selectedToggleProperty().addListener { _, _, newToggle ->
+            if (::descontoField.isInitialized) {
+                val isValor = (newToggle as? RadioButton)?.id == "valor"
+                descontoField.text = ""
+                if (isValor) {
+                    descontoField.promptText = "R$ 0,00"
+                } else {
+                    descontoField.promptText = "0,00"
+                }
+                tipoDesconto.set(if (isValor) "valor" else "percentual")
+            }
+        }
     }
 
     fun setTrocoParaField(field: TextField) {
@@ -920,6 +1098,38 @@ class PedidoWizardController {
         return textListener
     }
 
+    fun updateProductNumbers() {
+        val container = getProdutosContainer()
+
+        // For each product row, update the number label
+        for (i in 0 until container.children.size) {
+            val productRow = container.children[i] as? HBox
+            productRow?.let { row ->
+                // Find the product number label (first child in the HBox)
+                val numberLabel = row.children.first() as? Label
+                numberLabel?.text = "${i + 1}"
+            }
+        }
+    }
+
+    fun removeProduct(productRow: HBox) {
+        // Remove the row from its parent container
+        val container = productRow.parent as VBox
+        container.children.remove(productRow)
+
+        // Renumber remaining product rows
+        container.children.forEachIndexed { index, child ->
+            if (child is HBox) {
+                // Update the product number label (first child of the HBox)
+                val numberLabel = child.children[0] as Label
+                numberLabel.text = "${index + 1}"
+            }
+        }
+
+        // Recalculate totals
+        calculateTotal()
+    }
+
     fun formatarCep(textField: TextField) {
         val maxLength = 8
 
@@ -954,7 +1164,7 @@ class PedidoWizardController {
             }
         }
 
-// Reset date pickers and time pickers
+        // Reset date pickers and time pickers
         contentContainer.lookupAll(".date-picker").forEach { node ->
             if (node is DatePicker) {
                 // Force a visual update by temporarily setting to null
@@ -998,8 +1208,9 @@ class PedidoWizardController {
             descontoToggleGroup.toggles.find { (it as RadioButton).id == "valor" }
         )
 
-        val deliverySwitch = contentContainer.lookup(".switch") as? StackPane
-        deliverySwitch?.let {
+        // Fix: Look for the delivery switch directly in contentContainer instead of a non-existent deliveryContainer
+        val entregaSwitch = contentContainer.lookup(".switch") as? StackPane
+        entregaSwitch?.let {
             val checkbox = it.children.find { node -> node is CheckBox } as? CheckBox
             checkbox?.isSelected = false
         }
@@ -1019,15 +1230,19 @@ class PedidoWizardController {
             "R$ 0,00" else "0,00"
     }
 
-    private fun parseMoneyValue(value: String): Double {
-        var cleanValue = value.replace(Regex("[R$\\s]"), "")
+    fun parseMoneyValue(text: String): Double {
+        // Remove non-numeric characters except for decimal separator
+        var cleanValue = text.replace(Regex("[R$\\s]"), "")
 
+        // Replace dot used as thousand separator
         cleanValue = cleanValue.replace(".", "")
 
+        // Replace comma with dot for decimal parsing
         cleanValue = cleanValue.replace(",", ".")
 
         return try {
-            if (!value.contains(",")) {
+            if (!text.contains(",")) {
+                // If no comma was present, treat as cents
                 cleanValue.toDouble() / 100
             } else {
                 cleanValue.toDouble()
@@ -1429,6 +1644,94 @@ class PedidoWizardController {
         } catch (e: Exception) {
             e.printStackTrace()
             return false
+        }
+    }
+
+    fun calculateTotal() {
+        if (!::totalLabelRef.isInitialized) return
+
+        // Calculate the sum of all product subtotals
+        var subtotal = 0.0
+        produtosContainer.children.forEach { node ->
+            val hBox = node as? HBox
+            val subtotalField = ((hBox?.children?.get(4) as? VBox)?.children?.get(1) as? TextField)
+            subtotalField?.let {
+                subtotal += parseMoneyValue(it.text)
+            }
+        }
+
+        // Add delivery value if any
+        if (::valorEntregaField.isInitialized) {
+            valorEntregaTotal = parseMoneyValue(valorEntregaField.text)
+            subtotal += valorEntregaTotal
+        }
+
+        // Store subtotal before applying discount
+        subtotalValue = subtotal
+
+        // Calculate the discount separately
+        aplicarDesconto()
+    }
+
+    fun aplicarDesconto() {
+        if (!::descontoToggleGroup.isInitialized || !::totalLabelRef.isInitialized) return
+
+        // Calculate current subtotal if it's null or zero
+        if (subtotalValue == null || subtotalValue == 0.0) {
+            var currentSubtotal = 0.0
+            produtosContainer.children.forEach { node ->
+                val hBox = node as? HBox
+                val subtotalField = ((hBox?.children?.get(4) as? VBox)?.children?.get(1) as? TextField)
+                subtotalField?.let {
+                    currentSubtotal += parseMoneyValue(it.text)
+                }
+            }
+
+            // Add delivery value if any
+            if (::valorEntregaField.isInitialized) {
+                valorEntregaTotal = parseMoneyValue(valorEntregaField.text)
+                currentSubtotal += valorEntregaTotal
+            }
+
+            subtotalValue = currentSubtotal
+        }
+
+        // Now proceed with discount calculation
+        val tipoDesconto = if ((descontoToggleGroup.selectedToggle as? RadioButton)?.id == "valor") "valor" else "percentual"
+        val subtotal = subtotalValue ?: 0.0
+
+        try {
+            if (tipoDesconto == "valor") {
+                // Parse currency value
+                valorDesconto = parseMoneyValue(descontoField.text)
+                // Ensure discount doesn't exceed subtotal
+                valorDesconto = minOf(valorDesconto, subtotal)
+            } else {
+                // Parse percentage and calculate actual discount
+                val percentualText = descontoField.text.replace("%", "").replace(",", ".")
+                val percentual = percentualText.toDoubleOrNull() ?: 0.0
+                valorDesconto = (subtotal * percentual / 100)
+            }
+
+            // Calculate new total
+            val novoTotal = subtotal - valorDesconto
+
+            // Format and update total label
+            val formattedTotal = String.format("%,.2f", novoTotal)
+                .replace(",", ".")
+                .replace(".", ",")
+                .replaceFirst(",", ".")
+
+            Platform.runLater {
+                totalLabelRef.text = "R$ $formattedTotal"
+
+                // Also update troco calculation if needed
+                if (::trocoParaField.isInitialized && ::trocoCalculadoLabel.isInitialized) {
+                    calcularTroco()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
