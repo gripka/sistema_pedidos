@@ -12,6 +12,7 @@ import javafx.scene.layout.Priority
 import javafx.scene.control.*
 import javafx.scene.layout.*
 import com.sistema_pedidos.controller.PedidoWizardController
+import javafx.application.Platform
 import javafx.scene.image.ImageView
 import javafx.scene.image.Image
 import javafx.scene.shape.Rectangle
@@ -20,10 +21,45 @@ import java.awt.event.KeyEvent
 import java.time.LocalDate
 
 class PedidoWizardView : BorderPane() {
+    // Add these field references as class properties
+    private lateinit var nomeField: TextField
+    private lateinit var sobrenomeField: TextField
+    private lateinit var cpfField: TextField
+    private lateinit var razaoSocialField: TextField
+    private lateinit var nomeFantasiaField: TextField
+    private lateinit var cnpjField: TextField
+    private lateinit var ieField: TextField
+    private lateinit var telefoneField: TextField
+    private lateinit var emailField: TextField
+    private lateinit var observacaoField: TextField
+    private lateinit var logradouroField: TextField
+    private lateinit var numeroField: TextField
+    private lateinit var complementoField: TextField
+    private lateinit var bairroField: TextField
+    private lateinit var cidadeField: TextField
+    private lateinit var estadoField: ComboBox<String>
+    private lateinit var cepField: TextField
+
+    private var descontoField: TextField? = null
+    private var valorRadio: RadioButton? = null
+    private var percentualRadio: RadioButton? = null
+
+    private lateinit var horaRetiradaCombo: ComboBox<String>
+    private lateinit var minutoRetiradaCombo: ComboBox<String>
+    private lateinit var dataRetiradaPicker: DatePicker
 
     private val produtosContainer = VBox().apply {
         spacing = 15.0
     }
+
+    fun initializeDiscountFields() {
+        if (scene != null) {
+            descontoField = scene.lookup("#descontoField") as? TextField
+            valorRadio = scene.lookup("#valor") as? RadioButton
+            percentualRadio = scene.lookup("#percentual") as? RadioButton
+        }
+    }
+
 
     // Main tab pane to hold multiple order tabs
     private val tabPane = TabPane()
@@ -79,11 +115,27 @@ class PedidoWizardView : BorderPane() {
     }
 
     private inner class OrderTabContent : BorderPane() {
-        // Create dedicated controller for this tab
+        private var clienteData = mutableMapOf<String, String>()
+        private var isPessoaFisicaSelected = true
+
+        private lateinit var dinheiroButton: ToggleButton
+        private lateinit var pixButton: ToggleButton
+        private lateinit var cartaoCreditoButton: ToggleButton
+        private lateinit var cartaoDebitoButton: ToggleButton
+        private lateinit var voucherButton: ToggleButton
+
+        // Also save status buttons
+        private lateinit var pendingToggle: ToggleButton
+        private lateinit var paidToggle: ToggleButton
+
+
+
         private val controller = PedidoWizardController()
         private lateinit var entregaClienteRadio: RadioButton
         private val stepIndicators = ArrayList<StackPane>()
         private val stepLabels = listOf("Cliente", "Produtos", "Pagamento", "Entrega", "Confirmação")
+
+        private lateinit var customerTypeToggle: ToggleGroup
 
         // Content containers for each step
         private val stepContainers = ArrayList<Pane>()
@@ -282,30 +334,25 @@ class PedidoWizardView : BorderPane() {
         }
 
         private fun showStep(step: Int) {
-            // Update step indicators
             var targetStep = step
+
+            if (currentStep == 0 && step > 0) {
+                saveClienteData()
+            }
 
             // Skip delivery step if not delivering to customer's address
             if (step == 3 && ::entregaClienteRadio.isInitialized && !entregaClienteRadio.isSelected) {
                 targetStep = 4  // Skip to confirmation step
             }
-            for (i in stepIndicators.indices) {
-                stepIndicators[i].styleClass.removeAll("current-step", "past-step", "future-step")
-                when {
-                    i < targetStep -> stepIndicators[i].styleClass.add("past-step")
-                    i == targetStep -> stepIndicators[i].styleClass.add("current-step")
-                    else -> stepIndicators[i].styleClass.add("future-step")
-                }
-            }
 
-            // Show appropriate container with fade effect
+            // Set the new content first, then update confirmation later
             val container = stepContainers[targetStep]
+            center = container
+
+            // Then handle transition effects and other UI updates
             val fadeTransition = FadeTransition(Duration.millis(300.0), container)
             fadeTransition.fromValue = 0.0
             fadeTransition.toValue = 1.0
-
-            // Set the new content
-            center = container
             fadeTransition.play()
 
             // Update navigation buttons
@@ -314,14 +361,274 @@ class PedidoWizardView : BorderPane() {
             finishButton.isVisible = targetStep == stepContainers.size - 1
 
             currentStep = targetStep
+
+            // Always update confirmation step when showing it
+            if (targetStep == 4) {
+                Platform.runLater {
+                    Thread.sleep(100)
+                    updateConfirmationStep()
+                }
+            }
+
+            // Update step indicators
+            for (i in stepIndicators.indices) {
+                stepIndicators[i].styleClass.removeAll("current-step", "past-step", "future-step")
+                when {
+                    i < targetStep -> stepIndicators[i].styleClass.add("past-step")
+                    i == targetStep -> stepIndicators[i].styleClass.add("current-step")
+                    else -> stepIndicators[i].styleClass.add("future-step")
+                }
+            }
         }
 
-        // The existing step creation methods remain the same but are moved to the OrderTabContent class
-        // For brevity, I'm not duplicating all of them here, but they would be copied as-is
+        private fun saveClienteData() {
+            clienteData.clear()
+            isPessoaFisicaSelected = customerTypeToggle.selectedToggle?.userData == "PESSOA_FISICA"
+
+            try {
+                if (isPessoaFisicaSelected) {
+                    if (::nomeField.isInitialized) clienteData["nome"] = nomeField.text ?: ""
+                    if (::sobrenomeField.isInitialized) clienteData["sobrenome"] = sobrenomeField.text ?: ""
+                    if (::cpfField.isInitialized) clienteData["cpf"] = cpfField.text ?: ""
+                } else {
+                    if (::razaoSocialField.isInitialized) clienteData["razaoSocial"] = razaoSocialField.text ?: ""
+                    if (::nomeFantasiaField.isInitialized) clienteData["nomeFantasia"] = nomeFantasiaField.text ?: ""
+                    if (::cnpjField.isInitialized) clienteData["cnpj"] = cnpjField.text ?: ""
+                    if (::ieField.isInitialized) clienteData["ie"] = ieField.text ?: ""
+                }
+
+                // Common fields
+                if (::telefoneField.isInitialized) clienteData["telefone"] = telefoneField.text ?: ""
+                if (::emailField.isInitialized) clienteData["email"] = emailField.text ?: ""
+                if (::observacaoField.isInitialized) clienteData["observacao"] = observacaoField.text ?: ""
+                if (::logradouroField.isInitialized) clienteData["logradouro"] = logradouroField.text ?: ""
+                if (::numeroField.isInitialized) clienteData["numero"] = numeroField.text ?: ""
+                if (::complementoField.isInitialized) clienteData["complemento"] = complementoField.text ?: ""
+                if (::bairroField.isInitialized) clienteData["bairro"] = bairroField.text ?: ""
+                if (::cidadeField.isInitialized) clienteData["cidade"] = cidadeField.text ?: ""
+                if (::estadoField.isInitialized) clienteData["estado"] = estadoField.value ?: ""
+                if (::cepField.isInitialized) clienteData["cep"] = cepField.text ?: ""
+
+                println("Client data saved: ${clienteData.entries.joinToString { "${it.key}=${it.value}" }}")
+            } catch (e: Exception) {
+                println("Error saving client data: ${e.message}")
+                e.printStackTrace()
+            }
+        }
+
+        //Step 0
+        private fun getClienteInfo(): List<Pair<String, String>> {
+            val commonInfo = mutableListOf<Pair<String, String>>()
+
+            try {
+                println("Getting client info from stored data, isPessoaFisica: $isPessoaFisicaSelected")
+
+                if (isPessoaFisicaSelected) {
+                    commonInfo.add("Nome" to (clienteData["nome"] ?: "-"))
+                    commonInfo.add("Sobrenome" to (clienteData["sobrenome"] ?: "-"))
+                    commonInfo.add("CPF" to (clienteData["cpf"] ?: "-"))
+                    commonInfo.add("Tipo" to "Pessoa Física")
+                } else {
+                    commonInfo.add("Razão Social" to (clienteData["razaoSocial"] ?: "-"))
+                    commonInfo.add("Nome Fantasia" to (clienteData["nomeFantasia"] ?: "-"))
+                    commonInfo.add("CNPJ" to (clienteData["cnpj"] ?: "-"))
+                    commonInfo.add("Inscrição Estadual" to (clienteData["ie"] ?: "-"))
+                    commonInfo.add("Tipo" to "Pessoa Jurídica")
+                }
+
+                // Add common fields from stored data
+                commonInfo.addAll(listOf(
+                    "Telefone" to (clienteData["telefone"] ?: "-"),
+                    "Email" to (clienteData["email"] ?: "-"),
+                    "Observação" to (clienteData["observacao"] ?: "-"),
+                    "Logradouro" to (clienteData["logradouro"] ?: "-"),
+                    "Número" to (clienteData["numero"] ?: "-"),
+                    "Complemento" to (clienteData["complemento"] ?: "-"),
+                    "Bairro" to (clienteData["bairro"] ?: "-"),
+                    "Cidade" to (clienteData["cidade"] ?: "-"),
+                    "Estado" to (clienteData["estado"] ?: "-"),
+                    "CEP" to (clienteData["cep"] ?: "-")
+                ))
+
+                println("Client data retrieved: ${commonInfo.size} fields")
+                return commonInfo
+            } catch (e: Exception) {
+                println("Error in getClienteInfo: ${e.message}")
+                e.printStackTrace()
+                return listOf("Erro" to "Falha ao carregar dados do cliente: ${e.message}")
+            }
+        }
+
+        private fun getProdutosInfo(): List<Pair<String, String>> {
+            val produtos = mutableListOf<Pair<String, String>>()
+
+            controller.getProdutosContainer().children.forEach { node ->
+                val hBox = node as HBox
+                val qtdField = ((hBox.children[1] as VBox).children[1] as HBox).children[1] as TextField
+                val prodField = ((hBox.children[2] as VBox).children[1] as TextField)
+                val valorField = ((hBox.children[3] as VBox).children[1] as TextField)
+                val subtotalField = ((hBox.children[4] as VBox).children[1] as TextField)
+
+                produtos.add("Produto ${produtos.size + 1}" to
+                        "${qtdField.text}x ${prodField.text} (${valorField.text}) = ${subtotalField.text}")
+            }
+
+            return produtos
+        }
+
+        private fun getPagamentoInfo(): List<Pair<String, String>> {
+            val pagamentoInfo = mutableListOf<Pair<String, String>>()
+
+            try {
+                println("Getting payment info...")
+
+                // Use direct references instead of lookup
+                println("Payment buttons found: " +
+                        "dinheiro=${::dinheiroButton.isInitialized}, " +
+                        "pix=${::pixButton.isInitialized}, " +
+                        "crédito=${::cartaoCreditoButton.isInitialized}, " +
+                        "débito=${::cartaoDebitoButton.isInitialized}, " +
+                        "voucher=${::voucherButton.isInitialized}")
+
+                // Find which button is selected
+                val selectedPaymentMethod = when {
+                    ::dinheiroButton.isInitialized && dinheiroButton.isSelected -> "Dinheiro"
+                    ::pixButton.isInitialized && pixButton.isSelected -> "PIX"
+                    ::cartaoCreditoButton.isInitialized && cartaoCreditoButton.isSelected -> "Cartão de Crédito"
+                    ::cartaoDebitoButton.isInitialized && cartaoDebitoButton.isSelected -> "Cartão de Débito"
+                    ::voucherButton.isInitialized && voucherButton.isSelected -> "Voucher"
+                    else -> "Não especificado"
+                }
+                pagamentoInfo.add("Forma de Pagamento" to selectedPaymentMethod)
+
+                // Get payment method - use direct class-based lookup
+                val paymentButtons = lookupAll(".payment-toggle-button").filterIsInstance<ToggleButton>()
+                println("Found ${paymentButtons.size} payment buttons, selected: $selectedPaymentMethod")
+
+                // Get payment status - use direct class-based lookup
+                val statusButtons = listOf(pendingToggle, paidToggle)
+                val selectedStatus = statusButtons.find { it.isSelected }?.text ?: "Pendente"
+                println("Found ${statusButtons.size} status buttons, selected: $selectedStatus")
+                pagamentoInfo.add("Status do Pagamento" to selectedStatus)
+
+                // Get discount information - use class fields directly, not lookup
+                println("Discount field found: ${descontoField != null}, value: ${descontoField?.text}")
+                println("Valor radio found: ${valorRadio != null}, selected: ${valorRadio?.isSelected}")
+                println("Percentual radio found: ${percentualRadio != null}, selected: ${percentualRadio?.isSelected}")
+
+                if (descontoField != null && !descontoField!!.text.isNullOrBlank()) {
+                    val tipoDesconto = if (valorRadio?.isSelected == true) "Valor" else "Percentual"
+                    pagamentoInfo.add("Tipo de Desconto" to tipoDesconto)
+                    pagamentoInfo.add("Valor do Desconto" to descontoField!!.text)
+                    println("Discount added to payment info: $tipoDesconto - ${descontoField!!.text}")
+                } else {
+                    println("Discount field empty or null")
+                }
+
+                // Get pickup schedule information if delivery is not selected
+                if (::entregaClienteRadio.isInitialized && !entregaClienteRadio.isSelected) {
+                    // Use class field references instead of lookup
+                    if (::dataRetiradaPicker.isInitialized && ::horaRetiradaCombo.isInitialized && ::minutoRetiradaCombo.isInitialized) {
+                        val formattedDate = dataRetiradaPicker.value?.format(
+                            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                        ) ?: LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+
+                        val hora = horaRetiradaCombo.value ?: "00"
+                        val minuto = minutoRetiradaCombo.value ?: "00"
+
+                        pagamentoInfo.add("Data de Retirada" to formattedDate)
+                        pagamentoInfo.add("Horário de Retirada" to "$hora:$minuto")
+                    }
+                }
+
+                // Get total after discount
+                val totalLabel = lookup(".total-nav-value") as? Label
+                if (totalLabel != null && totalLabel.text != "R$ 0,00") {
+                    pagamentoInfo.add("Total" to totalLabel.text)
+                }
+
+                return pagamentoInfo
+            } catch (e: Exception) {
+                println("Error getting payment info: ${e.message}")
+                e.printStackTrace()
+                return listOf("Erro" to "Falha ao carregar dados de pagamento: ${e.message}")
+            }
+        }
+
+        private fun getEntregaInfo(): List<Pair<String, String>> {
+            val entregaInfo = mutableListOf<Pair<String, String>>()
+
+            // Check if delivery step is active/applicable
+            if (!entregaClienteRadio.isSelected) {
+                // Delivery is not selected, return empty list
+                return entregaInfo
+            }
+
+            // Get delivery address fields
+            val enderecoField = this.lookup("#enderecoEntregaField") as? TextField
+            val numeroField = this.lookup("#numeroEntregaField") as? TextField
+            val complementoField = this.lookup("#complementoEntregaField") as? TextField
+            val bairroField = this.lookup("#bairroEntregaField") as? TextField
+            val cidadeField = this.lookup("#cidadeEntregaField") as? TextField
+            val estadoField = this.lookup("#estadoEntregaField") as? ComboBox<String>
+
+            // Get delivery fee, date and time
+            val valorEntregaField = this.lookup("#valorEntregaField") as? TextField
+            val dataEntregaField = this.lookup("#dataEntregaField") as? DatePicker
+            val horaComboBox = this.lookup("#horaEntregaField") as? ComboBox<String>
+            val minutoComboBox = this.lookupAll("#minutoEntregaField")
+                .filterIsInstance<ComboBox<String>>()
+                .firstOrNull()
+
+            // Build delivery address
+            val endereco = buildString {
+                append(enderecoField?.text ?: "")
+                if (!numeroField?.text.isNullOrBlank()) {
+                    append(", ${numeroField?.text}")
+                }
+            }
+
+            // Add all delivery information if available
+            entregaInfo.addAll(listOf(
+                "Endereço de Entrega" to endereco.trim(),
+                "Complemento" to (complementoField?.text ?: ""),
+                "Bairro" to (bairroField?.text ?: ""),
+                "Cidade" to (cidadeField?.text ?: ""),
+                "Estado" to (estadoField?.value ?: ""),
+                "Taxa de Entrega" to (valorEntregaField?.text ?: "R$ 0,00")
+            ).filter { it.second.isNotEmpty() })
+
+            // Add delivery date if available
+            val dataEntrega = dataEntregaField?.value?.format(
+                java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+            )
+            if (!dataEntrega.isNullOrEmpty()) {
+                entregaInfo.add("Data de Entrega" to dataEntrega)
+            }
+
+            // Add delivery time if available
+            val horaEntrega = if (horaComboBox != null && minutoComboBox != null) {
+                val hora = horaComboBox.value ?: "00"
+                val minuto = minutoComboBox.value ?: "00"
+                "$hora:$minuto"
+            } else {
+                ""
+            }
+            if (horaEntrega.isNotEmpty()) {
+                entregaInfo.add("Horário de Entrega" to horaEntrega)
+            }
+
+            // Add any special delivery instructions
+            val obsEntregaField = scene.lookup("#obsEntregaField") as? TextField
+            if (obsEntregaField != null && !obsEntregaField.text.isNullOrEmpty()) {
+                entregaInfo.add("Instruções de Entrega" to obsEntregaField.text)
+            }
+
+            return entregaInfo
+        }
 
         // Step 1: Cliente
         private fun createClientStep(): Pane {
-            // Create a container that will hold the ScrollPane
             val mainContainer = BorderPane()
 
             val contentContainer = VBox(15.0).apply {
@@ -339,8 +646,7 @@ class PedidoWizardView : BorderPane() {
                 styleClass.add("section-header")
             }
 
-            // Customer type selection
-            val customerTypeToggle = ToggleGroup()
+            customerTypeToggle = ToggleGroup()
 
             val customerTypeBox = HBox(20.0).apply {
                 alignment = Pos.CENTER_LEFT
@@ -359,10 +665,106 @@ class PedidoWizardView : BorderPane() {
                 )
             }
 
+            // Initialize pessoa física fields
+            nomeField = TextField().apply {
+                id = "nomeField"
+                styleClass.add("text-field")
+                maxWidth = Double.POSITIVE_INFINITY
+                promptText = "Nome"
+            }
+
+            sobrenomeField = TextField().apply {
+                id = "sobrenomeField"
+                styleClass.add("text-field")
+                maxWidth = Double.POSITIVE_INFINITY
+                promptText = "Sobrenome"
+            }
+
+            cpfField = TextField().apply {
+                id = "cpfField"
+                styleClass.add("text-field")
+                prefWidth = 150.0
+                promptText = "000.000.000-00"
+
+                // CPF formatter
+                textProperty().addListener { _, oldValue, newValue ->
+                    if (newValue == null) {
+                        text = oldValue
+                        return@addListener
+                    }
+
+                    val value = newValue.replace(Regex("[^0-9]"), "").take(11)
+
+                    val formattedValue = when {
+                        value.length > 9 -> "${value.substring(0, 3)}.${value.substring(3, 6)}.${value.substring(6, 9)}-${value.substring(9)}"
+                        value.length > 6 -> "${value.substring(0, 3)}.${value.substring(3, 6)}.${value.substring(6)}"
+                        value.length > 3 -> "${value.substring(0, 3)}.${value.substring(3)}"
+                        else -> value
+                    }
+
+                    if (formattedValue != newValue) {
+                        text = formattedValue
+                        positionCaret(text.length)
+                    }
+                }
+            }
+
+            // Initialize pessoa jurídica fields
+            razaoSocialField = TextField().apply {
+                id = "razaoSocialField"
+                styleClass.add("text-field")
+                maxWidth = Double.POSITIVE_INFINITY
+                promptText = "Razão Social"
+            }
+
+            nomeFantasiaField = TextField().apply {
+                id = "nomeFantasiaField"
+                styleClass.add("text-field")
+                maxWidth = Double.POSITIVE_INFINITY
+                promptText = "Nome Fantasia"
+            }
+
+            cnpjField = TextField().apply {
+                id = "cnpjField"
+                styleClass.add("text-field")
+                prefWidth = 150.0
+                promptText = "00.000.000/0000-00"
+
+                // CNPJ formatter
+                textProperty().addListener { _, oldValue, newValue ->
+                    if (newValue == null) {
+                        text = oldValue
+                        return@addListener
+                    }
+
+                    val value = newValue.replace(Regex("[^0-9]"), "").take(14)
+
+                    val formattedValue = when {
+                        value.length > 12 -> "${value.substring(0, 2)}.${value.substring(2, 5)}.${value.substring(5, 8)}/${value.substring(8, 12)}-${value.substring(12)}"
+                        value.length > 8 -> "${value.substring(0, 2)}.${value.substring(2, 5)}.${value.substring(5, 8)}/${value.substring(8)}"
+                        value.length > 5 -> "${value.substring(0, 2)}.${value.substring(2, 5)}.${value.substring(5)}"
+                        value.length > 2 -> "${value.substring(0, 2)}.${value.substring(2)}"
+                        else -> value
+                    }
+
+                    if (formattedValue != newValue) {
+                        text = formattedValue
+                        positionCaret(text.length)
+                    }
+                }
+            }
+
+            ieField = TextField().apply {
+                id = "ieField"
+                styleClass.add("text-field")
+                prefWidth = 150.0
+                promptText = "Inscrição Estadual"
+            }
+
             // Container for pessoa física fields
             val pessoaFisicaFields = VBox(10.0).apply {
                 isVisible = true
-                isManaged = true  // Add this line
+                isManaged = true
                 children.addAll(
                     HBox(10.0).apply {
                         children.addAll(
@@ -370,24 +772,14 @@ class PedidoWizardView : BorderPane() {
                                 HBox.setHgrow(this, Priority.ALWAYS)
                                 children.addAll(
                                     Label("Nome").apply { styleClass.add("field-label") },
-                                    TextField().apply {
-                                        id = "nomeField"
-                                        styleClass.add("text-field")
-                                        maxWidth = Double.POSITIVE_INFINITY
-                                        HBox.setHgrow(this, Priority.ALWAYS)
-                                    }
+                                    nomeField
                                 )
                             },
                             VBox(5.0).apply {
                                 HBox.setHgrow(this, Priority.ALWAYS)
                                 children.addAll(
                                     Label("Sobrenome").apply { styleClass.add("field-label") },
-                                    TextField().apply {
-                                        id = "sobrenomeField"
-                                        styleClass.add("text-field")
-                                        maxWidth = Double.POSITIVE_INFINITY
-                                        HBox.setHgrow(this, Priority.ALWAYS)
-                                    }
+                                    sobrenomeField
                                 )
                             }
                         )
@@ -397,42 +789,7 @@ class PedidoWizardView : BorderPane() {
                             VBox(5.0).apply {
                                 children.addAll(
                                     Label("CPF").apply { styleClass.add("field-label") },
-                                    TextField().apply {
-                                        id = "cpfField"
-                                        styleClass.add("text-field")
-                                        prefWidth = 150.0
-                                        promptText = "000.000.000-00"
-
-                                        // CPF formatter implementation
-                                        textProperty().addListener { _, oldValue, newValue ->
-                                            if (newValue == null) {
-                                                text = oldValue
-                                                return@addListener
-                                            }
-
-                                            // Remove non-digits
-                                            var value = newValue.replace(Regex("[^0-9]"), "")
-
-                                            // Limit to 11 digits (CPF length)
-                                            if (value.length > 11) {
-                                                value = value.substring(0, 11)
-                                            }
-
-                                            // Format with dots and dash
-                                            if (value.length > 9) {
-                                                value = "${value.substring(0, 3)}.${value.substring(3, 6)}.${value.substring(6, 9)}-${value.substring(9)}"
-                                            } else if (value.length > 6) {
-                                                value = "${value.substring(0, 3)}.${value.substring(3, 6)}.${value.substring(6)}"
-                                            } else if (value.length > 3) {
-                                                value = "${value.substring(0, 3)}.${value.substring(3)}"
-                                            }
-
-                                            if (value != newValue) {
-                                                text = value
-                                                positionCaret(text.length)
-                                            }
-                                        }
-                                    }
+                                    cpfField
                                 )
                             }
                         )
@@ -443,7 +800,7 @@ class PedidoWizardView : BorderPane() {
             // Container for pessoa jurídica fields
             val pessoaJuridicaFields = VBox(10.0).apply {
                 isVisible = false
-                isManaged = false  // Add this line
+                isManaged = false
                 children.addAll(
                     HBox(10.0).apply {
                         children.addAll(
@@ -451,12 +808,7 @@ class PedidoWizardView : BorderPane() {
                                 HBox.setHgrow(this, Priority.ALWAYS)
                                 children.addAll(
                                     Label("Razão Social").apply { styleClass.add("field-label") },
-                                    TextField().apply {
-                                        id = "razaoSocialField"
-                                        styleClass.add("text-field")
-                                        maxWidth = Double.POSITIVE_INFINITY
-                                        HBox.setHgrow(this, Priority.ALWAYS)
-                                    }
+                                    razaoSocialField
                                 )
                             }
                         )
@@ -467,12 +819,7 @@ class PedidoWizardView : BorderPane() {
                                 HBox.setHgrow(this, Priority.ALWAYS)
                                 children.addAll(
                                     Label("Nome Fantasia").apply { styleClass.add("field-label") },
-                                    TextField().apply {
-                                        id = "nomeFantasiaField"
-                                        styleClass.add("text-field")
-                                        maxWidth = Double.POSITIVE_INFINITY
-                                        HBox.setHgrow(this, Priority.ALWAYS)
-                                    }
+                                    nomeFantasiaField
                                 )
                             }
                         )
@@ -482,65 +829,61 @@ class PedidoWizardView : BorderPane() {
                             VBox(5.0).apply {
                                 children.addAll(
                                     Label("CNPJ").apply { styleClass.add("field-label") },
-                                    TextField().apply {
-                                        id = "cnpjField"
-                                        styleClass.add("text-field")
-                                        prefWidth = 180.0
-                                        promptText = "00.000.000/0000-00"
-
-                                        // CNPJ formatter implementation
-                                        textProperty().addListener { _, oldValue, newValue ->
-                                            if (newValue != null && newValue != oldValue) {
-                                                val digits = newValue.replace(Regex("[^0-9]"), "")
-                                                if (digits.length > 14) {
-                                                    // Don't allow more than 14 digits
-                                                    text = oldValue
-                                                    return@addListener
-                                                }
-
-                                                val formatted = when {
-                                                    digits.length <= 2 -> digits
-                                                    digits.length <= 5 -> "${digits.substring(0, 2)}.${digits.substring(2)}"
-                                                    digits.length <= 8 -> "${digits.substring(0, 2)}.${digits.substring(2, 5)}.${digits.substring(5)}"
-                                                    digits.length <= 12 -> "${digits.substring(0, 2)}.${digits.substring(2, 5)}.${digits.substring(5, 8)}/${digits.substring(8)}"
-                                                    else -> "${digits.substring(0, 2)}.${digits.substring(2, 5)}.${digits.substring(5, 8)}/${digits.substring(8, 12)}-${digits.substring(12)}"
-                                                }
-
-                                                if (formatted != newValue) {
-                                                    val caretPosition = caretPosition
-                                                    text = formatted
-
-                                                    // Calculate the new position based on added formatting characters
-                                                    val newPosition = caretPosition + (formatted.length - newValue.length)
-                                                    if (newPosition >= 0 && newPosition <= formatted.length) {
-                                                        positionCaret(newPosition)
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        addEventFilter(javafx.scene.input.KeyEvent.KEY_TYPED) { event ->
-                                            if (event.character == " " || text.replace(Regex("[^0-9]"), "").length >= 14) {
-                                                event.consume()
-                                            }
-                                        }
-                                    }
+                                    cnpjField
                                 )
                             },
                             VBox(5.0).apply {
                                 children.addAll(
                                     Label("Inscrição Estadual").apply { styleClass.add("field-label") },
-                                    TextField().apply {
-                                        id = "ieField"
-                                        styleClass.add("text-field")
-                                        prefWidth = 150.0
-                                        controller.formatarInscricaoEstadual(this)
-                                    }
+                                    ieField
                                 )
                             }
                         )
                     }
                 )
+            }
+
+            // Initialize common fields
+            telefoneField = TextField().apply {
+                id = "telefoneField"
+                styleClass.add("text-field")
+                prefWidth = 150.0
+                promptText = "(00) 00000-0000"
+
+                // Phone formatter
+                textProperty().addListener { _, oldValue, newValue ->
+                    if (newValue == null) {
+                        text = oldValue
+                        return@addListener
+                    }
+
+                    val value = newValue.replace(Regex("[^0-9]"), "").take(11)
+
+                    val formattedValue = when {
+                        value.length > 6 -> "(${value.substring(0, 2)}) ${value.substring(2, 7)}-${value.substring(7)}"
+                        value.length > 2 -> "(${value.substring(0, 2)}) ${value.substring(2)}"
+                        else -> value
+                    }
+
+                    if (formattedValue != newValue) {
+                        text = formattedValue
+                        positionCaret(text.length)
+                    }
+                }
+            }
+
+            emailField = TextField().apply {
+                id = "emailField"
+                styleClass.add("text-field")
+                maxWidth = Double.POSITIVE_INFINITY
+                promptText = "email@exemplo.com"
+            }
+
+            observacaoField = TextField().apply {
+                id = "observacaoField"
+                styleClass.add("text-field")
+                maxWidth = Double.POSITIVE_INFINITY
+                promptText = "Observações sobre o cliente"
             }
 
             // Common fields for both customer types
@@ -551,182 +894,172 @@ class PedidoWizardView : BorderPane() {
                             VBox(5.0).apply {
                                 children.addAll(
                                     Label("Telefone").apply { styleClass.add("field-label") },
-                                    TextField().apply {
-                                        id = "telefoneField"
-                                        styleClass.add("text-field")
-                                        prefWidth = 150.0
-                                        promptText = "(00) 00000-0000"
-
-                                        // Add phone formatter
-                                        textProperty().addListener { _, oldValue, newValue ->
-                                            if (newValue == null) {
-                                                text = oldValue
-                                                return@addListener
-                                            }
-
-                                            // Allow only numbers
-                                            val digits = newValue.replace(Regex("[^0-9]"), "")
-
-                                            // Format based on the length
-                                            val formatted = when {
-                                                digits.length <= 2 -> {
-                                                    if (digits.isNotEmpty()) "($digits" else ""
-                                                }
-                                                digits.length <= 7 -> {
-                                                    "(${digits.substring(0, 2)}) ${digits.substring(2)}"
-                                                }
-                                                else -> {
-                                                    val len = digits.length.coerceAtMost(11)
-                                                    "(${digits.substring(0, 2)}) ${digits.substring(2, 7)}-${digits.substring(7, len)}"
-                                                }
-                                            }
-
-                                            if (formatted != newValue) {
-                                                text = formatted
-                                                positionCaret(text.length)
-                                            }
-                                        }
-                                    }
+                                    telefoneField
                                 )
                             },
                             VBox(5.0).apply {
                                 HBox.setHgrow(this, Priority.ALWAYS)
                                 children.addAll(
                                     Label("Email").apply { styleClass.add("field-label") },
-                                    TextField().apply {
-                                        id = "emailField"
-                                        styleClass.add("text-field")
-                                        maxWidth = Double.POSITIVE_INFINITY
-                                        HBox.setHgrow(this, Priority.ALWAYS)
-                                    }
+                                    emailField
                                 )
                             }
                         )
                     },
                     VBox(5.0).apply {
                         children.addAll(
-                            Label("Observação").apply { styleClass.add("field-label") },
-                            TextField().apply {
-                                id = "observacaoField"
-                                styleClass.add("text-field")
-                                maxWidth = Double.POSITIVE_INFINITY
+                            Label("Observações").apply { styleClass.add("field-label") },
+                            observacaoField
+                        )
+                    }
+                )
+            }
+
+            // Initialize address fields
+            logradouroField = TextField().apply {
+                id = "logradouroField"
+                styleClass.add("text-field")
+                maxWidth = Double.POSITIVE_INFINITY
+                promptText = "Rua, Avenida, etc."
+            }
+
+            numeroField = TextField().apply {
+                id = "numeroField"
+                styleClass.add("text-field")
+                prefWidth = 100.0
+                promptText = "Nº"
+            }
+
+            complementoField = TextField().apply {
+                id = "complementoField"
+                styleClass.add("text-field")
+                maxWidth = Double.POSITIVE_INFINITY
+                promptText = "Complemento"
+            }
+
+            bairroField = TextField().apply {
+                id = "bairroField"
+                styleClass.add("text-field")
+                maxWidth = Double.POSITIVE_INFINITY
+                promptText = "Bairro"
+            }
+
+            cidadeField = TextField().apply {
+                id = "cidadeField"
+                styleClass.add("text-field")
+                maxWidth = Double.POSITIVE_INFINITY
+                promptText = "Cidade"
+            }
+
+            estadoField = ComboBox<String>().apply {
+                id = "estadoField"
+                styleClass.add("combo-box")
+                prefWidth = 100.0
+                items.addAll(
+                    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO",
+                    "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI",
+                    "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"
+                )
+            }
+
+            cepField = TextField().apply {
+                id = "cepField"
+                styleClass.add("text-field")
+                prefWidth = 150.0
+                promptText = "00000-000"
+
+                // CEP formatter
+                textProperty().addListener { _, oldValue, newValue ->
+                    if (newValue == null) {
+                        text = oldValue
+                        return@addListener
+                    }
+
+                    val value = newValue.replace(Regex("[^0-9]"), "").take(8)
+
+                    val formattedValue = if (value.length > 5) {
+                        "${value.substring(0, 5)}-${value.substring(5)}"
+                    } else {
+                        value
+                    }
+
+                    if (formattedValue != newValue) {
+                        text = formattedValue
+                        positionCaret(text.length)
+                    }
+                }
+            }
+
+            // Address section
+            val addressSection = VBox(15.0).apply {
+                children.addAll(
+                    Label("Endereço").apply { styleClass.add("section-subheader") },
+                    HBox(10.0).apply {
+                        children.addAll(
+                            VBox(5.0).apply {
+                                HBox.setHgrow(this, Priority.ALWAYS)
+                                children.addAll(
+                                    Label("Logradouro").apply { styleClass.add("field-label") },
+                                    logradouroField
+                                )
+                            },
+                            VBox(5.0).apply {
+                                children.addAll(
+                                    Label("Número").apply { styleClass.add("field-label") },
+                                    numeroField
+                                )
+                            }
+                        )
+                    },
+                    HBox(10.0).apply {
+                        children.addAll(
+                            VBox(5.0).apply {
+                                HBox.setHgrow(this, Priority.ALWAYS)
+                                children.addAll(
+                                    Label("Complemento").apply { styleClass.add("field-label") },
+                                    complementoField
+                                )
+                            }
+                        )
+                    },
+                    HBox(10.0).apply {
+                        children.addAll(
+                            VBox(5.0).apply {
+                                HBox.setHgrow(this, Priority.ALWAYS)
+                                children.addAll(
+                                    Label("Bairro").apply { styleClass.add("field-label") },
+                                    bairroField
+                                )
+                            }
+                        )
+                    },
+                    HBox(10.0).apply {
+                        children.addAll(
+                            VBox(5.0).apply {
+                                HBox.setHgrow(this, Priority.ALWAYS)
+                                children.addAll(
+                                    Label("Cidade").apply { styleClass.add("field-label") },
+                                    cidadeField
+                                )
+                            },
+                            VBox(5.0).apply {
+                                children.addAll(
+                                    Label("Estado").apply { styleClass.add("field-label") },
+                                    estadoField
+                                )
+                            },
+                            VBox(5.0).apply {
+                                children.addAll(
+                                    Label("CEP").apply { styleClass.add("field-label") },
+                                    cepField
+                                )
                             }
                         )
                     }
                 )
             }
 
-            // Address section
-            val addressSection = VBox(15.0).apply {
-                children.add(Label("Endereço").apply {
-                    styleClass.add("section-header")
-                    style = "-fx-font-size: 16px;"
-                })
-
-                children.add(HBox(10.0).apply {
-                    children.addAll(
-                        VBox(5.0).apply {
-                            children.addAll(
-                                Label("CEP").apply { styleClass.add("field-label") },
-                                TextField().apply {
-                                    id = "cepField"
-                                    styleClass.add("text-field")
-                                    prefWidth = 120.0
-                                    promptText = "00000-000"
-                                    controller.formatarCep(this)
-                                }
-                            )
-                        },
-                        VBox(5.0).apply {
-                            HBox.setHgrow(this, Priority.ALWAYS)
-                            children.addAll(
-                                Label("Endereço").apply { styleClass.add("field-label") },
-                                TextField().apply {
-                                    id = "logradouroField"
-                                    styleClass.add("text-field")
-                                    maxWidth = Double.POSITIVE_INFINITY
-                                    HBox.setHgrow(this, Priority.ALWAYS)
-                                }
-                            )
-                        }
-                    )
-                })
-
-                children.add(HBox(10.0).apply {
-                    children.addAll(
-                        VBox(5.0).apply {
-                            children.addAll(
-                                Label("Número").apply { styleClass.add("field-label") },
-                                TextField().apply {
-                                    id = "numeroField"
-                                    styleClass.add("text-field")
-                                    prefWidth = 80.0
-                                }
-                            )
-                        },
-                        VBox(5.0).apply {
-                            HBox.setHgrow(this, Priority.ALWAYS)
-                            children.addAll(
-                                Label("Complemento").apply { styleClass.add("field-label") },
-                                TextField().apply {
-                                    id = "complementoField"
-                                    styleClass.add("text-field")
-                                    maxWidth = Double.POSITIVE_INFINITY
-                                    HBox.setHgrow(this, Priority.ALWAYS)
-                                }
-                            )
-                        }
-                    )
-                })
-
-                children.add(HBox(10.0).apply {
-                    children.addAll(
-                        VBox(5.0).apply {
-                            children.addAll(
-                                Label("Bairro").apply { styleClass.add("field-label") },
-                                TextField().apply {
-                                    id = "bairroField"
-                                    styleClass.add("text-field")
-                                    prefWidth = 200.0
-                                }
-                            )
-                        },
-                        VBox(5.0).apply {
-                            HBox.setHgrow(this, Priority.ALWAYS)
-                            children.addAll(
-                                Label("Cidade").apply { styleClass.add("field-label") },
-                                TextField().apply {
-                                    id = "cidadeField"
-                                    styleClass.add("text-field")
-                                    maxWidth = Double.POSITIVE_INFINITY
-                                    HBox.setHgrow(this, Priority.ALWAYS)
-                                }
-                            )
-                        },
-                        VBox(5.0).apply {
-                            children.addAll(
-                                Label("Estado").apply { styleClass.add("field-label") },
-                                ComboBox<String>().apply {
-                                    id = "estadoField"
-                                    styleClass.addAll("combo-box")
-                                    prefWidth = 80.0
-                                    maxWidth = 80.0
-                                    isEditable = false
-                                    items.addAll(
-                                        "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO",
-                                        "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI",
-                                        "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"
-                                    )
-                                    value = "PR"
-                                }
-                            )
-                        }
-                    )
-                })
-            }
-
             // Toggle between pessoa física and pessoa jurídica
-// Toggle between pessoa física and pessoa jurídica
             customerTypeToggle.selectedToggleProperty().addListener { _, _, newValue ->
                 val isPessoaFisica = (newValue as RadioButton).userData == "PESSOA_FISICA"
                 pessoaFisicaFields.isVisible = isPessoaFisica
@@ -736,26 +1069,20 @@ class PedidoWizardView : BorderPane() {
             }
 
             // Add all components to container
-// Add all components to container
             contentContainer.children.addAll(
                 sectionHeader,
                 customerTypeBox,
                 pessoaFisicaFields,
                 pessoaJuridicaFields,
-                Separator().apply {
-                    padding = Insets(5.0, 0.0, 5.0, 0.0)
-                },
+                Separator(),
                 commonFields,
-                Separator().apply {
-                    padding = Insets(5.0, 0.0, 5.0, 0.0)
-                },
+                Separator(),
                 addressSection
             )
 
             // Set the ScrollPane to the BorderPane's center
             mainContainer.center = scrollPane
 
-            // Return the BorderPane which is a Pane
             return mainContainer
         }
 
@@ -820,6 +1147,18 @@ class PedidoWizardView : BorderPane() {
         private fun createPaymentStep(): Pane {
             val section = createSectionHeader("Forma de Pagamento")
 
+            horaRetiradaCombo = ComboBox<String>().apply {
+                items.addAll((0..23).map { String.format("%02d", it) })
+                value = "12"
+                prefWidth = 70.0
+            }
+
+            minutoRetiradaCombo = ComboBox<String>().apply {
+                items.addAll((0..59).map { String.format("%02d", it) })
+                value = "00"
+                prefWidth = 70.0
+            }
+
             // Main container using GridPane for better space utilization
             val mainGrid = GridPane().apply {
                 hgap = 20.0
@@ -846,6 +1185,27 @@ class PedidoWizardView : BorderPane() {
                 alignment = Pos.CENTER_LEFT
             }
 
+            // Initialize button references first
+            dinheiroButton = createPaymentToggleButton("Dinheiro", true, paymentToggleGroup, "icons/moneyp.png").apply {
+                id = "dinheiroButton"
+            }
+
+            cartaoCreditoButton = createPaymentToggleButton("Cartão de Crédito", false, paymentToggleGroup, "icons/credit-cardp.png").apply {
+                id = "cartaoCreditoButton"
+            }
+
+            cartaoDebitoButton = createPaymentToggleButton("Cartão de Débito", false, paymentToggleGroup, "icons/debit-cardp.png").apply {
+                id = "cartaoDebitoButton"
+            }
+
+            pixButton = createPaymentToggleButton("PIX", false, paymentToggleGroup, "icons/pixp.png").apply {
+                id = "pixButton"
+            }
+
+            voucherButton = createPaymentToggleButton("Voucher", false, paymentToggleGroup, "icons/voucherp.png").apply {
+                id = "voucherButton"
+            }
+
             val paymentBox = VBox(10.0).apply {
                 style = "-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 5; -fx-border-color: #e9ecef; -fx-border-radius: 5;"
                 HBox.setHgrow(this, Priority.ALWAYS)
@@ -861,15 +1221,16 @@ class PedidoWizardView : BorderPane() {
                         prefWrapLength = 500.0 // Adjust based on testing
                         padding = Insets(10.0, 0.0, 0.0, 0.0)
                         children.addAll(
-                            createPaymentToggleButton("Dinheiro", true, paymentToggleGroup, "icons/moneyp.png"),
-                            createPaymentToggleButton("Cartão de Crédito", false, paymentToggleGroup, "icons/credit-cardp.png"),
-                            createPaymentToggleButton("Cartão de Débito", false, paymentToggleGroup, "icons/debit-cardp.png"),
-                            createPaymentToggleButton("PIX", false, paymentToggleGroup, "icons/pixp.png"),
-                            createPaymentToggleButton("Voucher", false, paymentToggleGroup, "icons/voucherp.png")
+                            dinheiroButton,
+                            cartaoCreditoButton,
+                            cartaoDebitoButton,
+                            pixButton,
+                            voucherButton
                         )
                     }
                 )
             }
+
 
             // Create delivery option box
             val entregaBox = VBox(10.0).apply {
@@ -939,20 +1300,21 @@ class PedidoWizardView : BorderPane() {
             val descontoToggleGroup = ToggleGroup()
             controller.setDescontoToggleGroup(descontoToggleGroup)
 
-            val valorRadioButton = RadioButton("Valor (R$)").apply {
+            valorRadio = RadioButton("Valor (R$)").apply {
                 toggleGroup = descontoToggleGroup
                 isSelected = true
                 styleClass.add("custom-radio")
                 id = "valor"
             }
 
-            val percentualRadioButton = RadioButton("Percentual (%)").apply {
+            percentualRadio = RadioButton("Percentual (%)").apply {
                 toggleGroup = descontoToggleGroup
                 styleClass.add("custom-radio")
                 id = "percentual"
             }
 
-            val descontoField = TextField().apply {
+            descontoField = TextField().apply {
+                id = "descontoField"
                 styleClass.add("text-field")
                 prefWidth = 150.0
                 alignment = Pos.CENTER_RIGHT
@@ -960,9 +1322,7 @@ class PedidoWizardView : BorderPane() {
                 controller.setDescontoField(this)
                 var currentTextListener = controller.formatarMoeda(this)
 
-                // Add a listener to update the total when text changes
                 textProperty().addListener { _, _, _ ->
-                    // Calculate new total with discount
                     controller.aplicarDesconto()
                 }
 
@@ -998,7 +1358,7 @@ class PedidoWizardView : BorderPane() {
                         add(Label("Tipo de Desconto").apply { styleClass.add("field-label") }, 0, 0)
                         add(HBox(15.0).apply {
                             alignment = Pos.CENTER_LEFT
-                            children.addAll(valorRadioButton, percentualRadioButton)
+                            children.addAll(valorRadio!!, percentualRadio!!)
                         }, 0, 1)
                         add(Label("Valor do Desconto").apply { styleClass.add("field-label") }, 1, 0)
                         add(descontoField, 1, 1)
@@ -1061,6 +1421,7 @@ class PedidoWizardView : BorderPane() {
             val rightColumn = VBox(15.0)
 
             // Status section
+// Status section
             val statusToggleGroup = ToggleGroup().apply {
                 selectedToggleProperty().addListener { _, oldToggle, newToggle ->
                     if (newToggle == null && oldToggle != null) {
@@ -1069,14 +1430,17 @@ class PedidoWizardView : BorderPane() {
                     }
                 }
             }
-            val pendingToggle = ToggleButton("Pendente").apply {
+
+// Assign directly to the class properties (remove the val keyword)
+            pendingToggle = ToggleButton("Pendente").apply {
+                id = "pendingToggle"
                 toggleGroup = statusToggleGroup
                 styleClass.addAll("status-toggle", "payment-toggle-button")
                 prefWidth = 120.0
                 prefHeight = 35.0
                 isSelected = true
                 val iconUrl = javaClass.getResource("/icons/pendingp.png")
-                val image = Image(iconUrl.toString(), 0.0, 0.0, true, true) // Preserves quality
+                val image = Image(iconUrl.toString(), 0.0, 0.0, true, true)
                 graphic = ImageView(image).apply {
                     fitWidth = 20.0
                     fitHeight = 20.0
@@ -1100,13 +1464,15 @@ class PedidoWizardView : BorderPane() {
                 }
             }
 
-            val paidToggle = ToggleButton("Pago").apply {
+            paidToggle = ToggleButton("Pago").apply {
+                id = "paidToggle"
                 toggleGroup = statusToggleGroup
                 styleClass.addAll("status-toggle", "payment-toggle-button")
                 prefWidth = 120.0
                 prefHeight = 35.0
+                // Fix: Use the correct icon (paidp.png for the initial state)
                 val iconUrl = javaClass.getResource("/icons/paidp.png")
-                val image = Image(iconUrl.toString(), 0.0, 0.0, true, true) // Preserves quality
+                val image = Image(iconUrl.toString(), 0.0, 0.0, true, true)
                 graphic = ImageView(image).apply {
                     fitWidth = 20.0
                     fitHeight = 20.0
@@ -1171,6 +1537,7 @@ class PedidoWizardView : BorderPane() {
                 )
             }
 
+            // Use these in the retiradaBox creation
             val retiradaBox = VBox(10.0).apply {
                 id = "retirada-fields"
                 style = "-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 5; -fx-border-color: #e9ecef; -fx-border-radius: 5;"
@@ -1186,8 +1553,21 @@ class PedidoWizardView : BorderPane() {
                         padding = Insets(10.0, 0.0, 0.0, 0.0)
                         VBox.setVgrow(this, Priority.ALWAYS) // Allow GridPane to grow vertically
                         alignment = Pos.CENTER_LEFT // Center content vertically
+
+                        // Create date picker with reference
+                        dataRetiradaPicker = DatePicker().apply {
+                            value = LocalDate.now()
+                            styleClass.add("date-picker")
+                            prefWidth = 150.0
+                            promptText = "dd/mm/aaaa"
+                            converter = javafx.util.converter.LocalDateStringConverter(
+                                java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+                                java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                            )
+                        }
+
                         add(Label("Data de Retirada").apply { styleClass.add("field-label") }, 0, 0)
-                        add(dataPicker, 0, 1)
+                        add(dataRetiradaPicker, 0, 1)
                         add(Label("Hora da Retirada").apply { styleClass.add("field-label") }, 1, 0)
                         add(HBox(5.0).apply {
                             alignment = Pos.CENTER_LEFT
@@ -1198,7 +1578,8 @@ class PedidoWizardView : BorderPane() {
                                     maxWidth = 70.0
                                     isEditable = true
                                     items.addAll((0..23).map { String.format("%02d", it) })
-                                    value = "00"
+                                    value = "08" // Default to 8 AM
+                                    horaRetiradaCombo = this // Store reference
                                 },
                                 Label(":").apply {
                                     styleClass.add("field-label")
@@ -1211,6 +1592,7 @@ class PedidoWizardView : BorderPane() {
                                     isEditable = true
                                     items.addAll((0..59 step 15).map { String.format("%02d", it) })
                                     value = "00"
+                                    minutoRetiradaCombo = this // Store reference
                                 }
                             )
                         }, 1, 1)
@@ -1503,31 +1885,151 @@ class PedidoWizardView : BorderPane() {
         private fun createConfirmationStep(): Pane {
             val section = createSectionHeader("Confirme seu Pedido")
 
+            // Create the container
             val summaryContainer = VBox(30.0).apply {
                 styleClass.add("summary-container")
                 padding = Insets(20.0)
+                id = "summary-container"
 
-                children.addAll(
-                    createSummarySection("Cliente", listOf(
-                        "Nome" to "João Silva",
-                        "Telefone" to "(11) 98765-4321"
-                    )),
-                    createSummarySection("Produtos", listOf(
-                        "Item 1" to "2x Pizza Grande (R$ 50,00) = R$ 100,00",
-                        "Item 2" to "1x Refrigerante 2L (R$ 12,00) = R$ 12,00"
-                    )),
-                    createSummarySection("Pagamento", listOf(
-                        "Forma de Pagamento" to "Dinheiro",
-                        "Status" to "Pendente",
-                        "Troco para" to "R$ 150,00",
-                        "Troco a devolver" to "R$ 38,00"
-                    )),
-                    createSummarySection("Entrega", listOf(
-                        "Endereço" to "Rua das Flores, 123",
-                        "Bairro" to "Centro",
-                        "Valor da Entrega" to "R$ 10,00"
-                    )),
+                // Add placeholder text during initialization
+                children.add(Label("Os dados do pedido serão exibidos aqui quando você navegar até esta etapa.")
+                    .apply {
+                        style = "-fx-font-style: italic; -fx-text-fill: #888888;"
+                        alignment = Pos.CENTER
+                        maxWidth = Double.MAX_VALUE
+                        padding = Insets(30.0)
+                    })
+            }
 
+            return createContentPane(section, summaryContainer)
+        }
+
+        // Update method to properly handle the summary data
+        private fun updateConfirmationStep() {
+            Platform.runLater {
+                try {
+                    println("Updating confirmation step")
+
+                    // More reliable container lookup with multiple fallback strategies
+                    var summaryContainer: VBox? = lookup("#summary-container") as? VBox
+
+                    if (summaryContainer == null) {
+                        println("First lookup attempt failed, trying alternatives...")
+                        // Try finding by class
+                        summaryContainer = lookupAll(".summary-container").filterIsInstance<VBox>().firstOrNull()
+
+                        if (summaryContainer == null) {
+                            // Last resort - find any VBox inside the confirmation step container
+                            val currentContainer = stepContainers[4]
+                            summaryContainer = currentContainer.lookupAll(".summary-container")
+                                .filterIsInstance<VBox>().firstOrNull()
+                                ?: currentContainer.lookupAll("VBox").filterIsInstance<VBox>().firstOrNull()
+                        }
+                    }
+
+                    if (summaryContainer != null) {
+                        println("Summary container found. Updating contents...")
+                        updateSummaryContainer(summaryContainer)
+                    } else {
+                        println("All attempts to find summary container failed. Creating a new one.")
+                        val newContainer = VBox(30.0).apply {
+                            styleClass.add("summary-container")
+                            padding = Insets(20.0)
+                            id = "summary-container"
+                        }
+
+                        // Replace content in step container
+                        val confirmationStep = stepContainers[4]
+                        if (confirmationStep is BorderPane) {
+                            val scrollContent = (confirmationStep.center as? ScrollPane)?.content as? VBox
+                            scrollContent?.children?.clear()
+                            scrollContent?.children?.add(newContainer)
+                            updateSummaryContainer(newContainer)
+                        }
+                    }
+                } catch (e: Exception) {
+                    println("Error in updateConfirmationStep: ${e.message}")
+                    e.printStackTrace()
+                }
+            }
+        }
+
+        private fun updateSummaryContainer(container: VBox) {
+            // Clear existing content
+            container.children.clear()
+
+            try {
+                // Collect data with debug information
+                val clientInfo = getClienteInfo()
+                println("Client info items: ${clientInfo.size}")
+
+                val produtosInfo = getProdutosInfo()
+                println("Produtos info items: ${produtosInfo.size}")
+
+                val pagamentoInfo = getPagamentoInfo()
+                println("Pagamento info items: ${pagamentoInfo.size}")
+
+                val entregaInfo = getEntregaInfo()
+                println("Entrega info items: ${entregaInfo.size}")
+
+                // Client info section
+                if (clientInfo.isNotEmpty()) {
+                    val clientSection = VBox(10.0).apply {
+                        styleClass.add("summary-section")
+                        children.add(Label("Informações do Cliente").apply {
+                            styleClass.add("summary-section-header")
+                        })
+                    }
+
+                    // Create a grid for client info
+                    val clientGrid = GridPane().apply {
+                        hgap = 20.0
+                        vgap = 10.0
+                        padding = Insets(10.0, 0.0, 0.0, 0.0)
+                        styleClass.add("summary-grid")
+                    }
+
+                    // Add client info to the grid
+                    clientInfo.forEachIndexed { index, (field, value) ->
+                        val isEmptyValue = value.isNullOrBlank() || value == "-"
+
+                        val fieldLabel = Label(field).apply {
+                            styleClass.add("summary-field-name")
+                            if (isEmptyValue) {
+                                style = "-fx-text-fill: #e74c3c;" // Red color for empty fields
+                            }
+                        }
+
+                        val valueLabel = Label(value).apply {
+                            styleClass.add("summary-field-value")
+                        }
+
+                        clientGrid.add(fieldLabel, 0, index)
+                        clientGrid.add(valueLabel, 1, index)
+                    }
+
+                    clientSection.children.add(clientGrid)
+                    container.children.add(clientSection)
+                }
+
+                if (produtosInfo.isNotEmpty()) {
+                    container.children.add(createSummarySection("Produtos", produtosInfo))
+                }
+
+                if (pagamentoInfo.isNotEmpty()) {
+                    container.children.add(createSummarySection("Pagamento", pagamentoInfo))
+                }
+
+                if (entregaInfo.isNotEmpty()) {
+                    container.children.add(createSummarySection("Entrega", entregaInfo))
+                }
+
+                // Get the current total
+                val totalLabel = lookup(".total-nav-value") as? Label
+                val totalValue = totalLabel?.text ?: "R$ 0,00"
+
+                // Add total summary
+                container.children.add(
                     HBox().apply {
                         styleClass.add("total-summary")
                         padding = Insets(15.0)
@@ -1537,16 +2039,21 @@ class PedidoWizardView : BorderPane() {
                             Label("TOTAL DO PEDIDO:").apply {
                                 styleClass.add("total-summary-label")
                             },
-                            Label("R$ 122,00").apply {
+                            Label(totalValue).apply {
                                 styleClass.add("total-summary-value")
                                 padding = Insets(0.0, 0.0, 0.0, 15.0)
                             }
                         )
                     }
                 )
+            } catch (e: Exception) {
+                container.children.add(
+                    Label("Erro ao carregar dados: ${e.message}").apply {
+                        style = "-fx-text-fill: red;"
+                        maxWidth = Double.MAX_VALUE
+                    }
+                )
             }
-
-            return createContentPane(section, summaryContainer)
         }
 
         private fun createProductRow(num: Int): HBox {
@@ -1638,33 +2145,48 @@ class PedidoWizardView : BorderPane() {
         }
 
         private fun createSummarySection(title: String, items: List<Pair<String, String>>): VBox {
-            val section = VBox(10.0).apply {
+            return VBox(5.0).apply {
+                styleClass.add("summary-section")
+                padding = Insets(15.0)
+
+                // Add title
                 children.add(Label(title).apply {
                     styleClass.add("summary-section-title")
                 })
 
+                // Add content in a grid
                 val grid = GridPane().apply {
-                    hgap = 20.0
-                    vgap = 10.0
-                    styleClass.add("summary-grid")
+                    hgap = 15.0
+                    vgap = 8.0
+                    padding = Insets(10.0, 5.0, 0.0, 5.0)
 
-                    items.forEachIndexed { index, (label, value) ->
-                        add(Label(label + ":").apply {
-                            styleClass.add("summary-field-label")
-                        }, 0, index)
+                    // Create two columns
+                    columnConstraints.addAll(
+                        ColumnConstraints().apply {
+                            minWidth = 120.0
+                            prefWidth = 150.0
+                        },
+                        ColumnConstraints().apply {
+                            hgrow = Priority.ALWAYS
+                            setFillWidth(true) // Using setter instead of direct property access
+                        }
+                    )
+                }
 
-                        add(Label(value).apply {
-                            styleClass.add("summary-field-value")
-                        }, 1, index)
+                // Add all items to the grid, including rows with default values
+                items.forEachIndexed { index, (label, value) ->
+                    grid.add(Label("$label:").apply {
+                        styleClass.add("summary-label")
+                    }, 0, index)
 
-                        GridPane.setFillWidth(children.last(), true)
-                    }
+                    grid.add(Label(value).apply {
+                        styleClass.add("summary-value")
+                        isWrapText = true
+                    }, 1, index)
                 }
 
                 children.add(grid)
             }
-
-            return section
         }
 
         private fun createSectionHeader(title: String): HBox {
