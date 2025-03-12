@@ -1676,23 +1676,6 @@ class PedidoWizardView : BorderPane() {
         private fun createDeliveryStep(): Pane {
             val section = createSectionHeader("Informações de Entrega")
 
-            val enableDeliveryBox = HBox(10.0).apply {
-                alignment = Pos.CENTER_LEFT
-                padding = Insets(0.0, 0.0, 0.0, 0.0)
-
-                // Add delivery toggle option
-                entregaClienteRadio = RadioButton("Entregar no endereço").apply {
-                    id = "entregaClienteRadio"
-                    styleClass.add("custom-radio")
-                    isSelected = true
-                    selectedProperty().addListener { _, _, isSelected ->
-                        updateStepIndicators(isSelected)
-                    }
-                }
-
-                children.add(entregaClienteRadio)
-            }
-
             val deliveryForm = VBox(20.0).apply {
                 id = "delivery-form"
                 children.addAll(
@@ -1706,8 +1689,19 @@ class PedidoWizardView : BorderPane() {
                                         id = "nomeDestinatarioField"
                                         styleClass.add("text-field")
                                         maxWidth = Double.POSITIVE_INFINITY
-                                        // Assign to class property
                                         this@OrderTabContent.nomeDestinatarioField = this
+                                    }
+                                )
+                            },
+                            VBox(10.0).apply {
+                                children.addAll(
+                                    Label("Telefone do Destinatário").apply { styleClass.add("field-label") },
+                                    TextField().apply {
+                                        id = "telefoneDestinatarioField"
+                                        styleClass.add("text-field")
+                                        prefWidth = 200.0
+                                        promptText = "(XX) XXXXX-XXXX"
+                                        this@OrderTabContent.telefoneDestinatarioField = this
                                     }
                                 )
                             },
@@ -1934,7 +1928,7 @@ class PedidoWizardView : BorderPane() {
             return createContentPane(section, VBox(20.0).apply {
                 padding = Insets(20.0)
                 spacing = 15.0
-                children.addAll(enableDeliveryBox, deliveryForm)
+                children.add(deliveryForm) // Removed enableDeliveryBox
             })
         }
 

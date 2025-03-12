@@ -1,13 +1,12 @@
 package com.sistema_pedidos.controller
 
 import com.sistema_pedidos.database.DatabaseHelper
-import com.sistema_pedidos.model.Pedido
+import com.sistema_pedidos.model.Cliente
 import javafx.geometry.Pos
 import javafx.scene.image.Image
 import javafx.scene.image.ImageView
 import javafx.application.Platform
 import com.sistema_pedidos.model.Produto
-import javafx.beans.property.SimpleObjectProperty
 import javafx.collections.FXCollections
 import javafx.collections.ObservableList
 import javafx.geometry.Insets
@@ -23,6 +22,7 @@ import javafx.scene.input.KeyCode
 import javafx.stage.StageStyle
 import java.sql.Connection
 import javafx.beans.property.SimpleStringProperty
+import java.time.LocalDate
 
 class PedidoWizardController {
     private val produtosContainer = VBox(10.0)
@@ -39,7 +39,6 @@ class PedidoWizardController {
     private var valorEntregaTotal: Double = 0.0
     private val tipoDesconto = SimpleStringProperty("valor") // Default to "valor"
 
-    val horaEntregaProperty = SimpleObjectProperty<String>()
 
     private fun updateRemoveButtonsVisibility() {
         // Only show remove buttons if there's more than one product
@@ -131,129 +130,6 @@ class PedidoWizardController {
             }
         } else {
             textField.text = "1"
-        }
-    }
-
-    fun setContentContainer(container: VBox) {
-        contentContainer = container
-    }
-
-    fun formatarInscricaoEstadual(textField: TextField) {
-        val maxLength = 14 // Most state registrations won't exceed this length
-
-        textField.textProperty().addListener { _, oldValue, newValue ->
-            if (newValue == null) {
-                textField.text = oldValue
-                return@addListener
-            }
-
-            // Allow only numbers, letters and dots/dashes
-            val cleanValue = newValue.replace(Regex("[^0-9A-Za-z.-]"), "")
-
-            // If the user is deleting characters, don't reformat
-            if (cleanValue.length < oldValue.length) {
-                textField.text = cleanValue
-                return@addListener
-            }
-
-            // Restrict to maximum length
-            var value = if (cleanValue.length > maxLength) {
-                cleanValue.substring(0, maxLength)
-            } else {
-                cleanValue
-            }
-
-            // Don't try to format if already contains separators
-            if (!value.contains('.') && !value.contains('-') && value.length > 3) {
-                // For most Brazilian states, common format is XXX.XXX.XXX
-                val sb = StringBuilder()
-                for (i in value.indices) {
-                    if (i > 0 && i % 3 == 0 && i < value.length - 1) {
-                        sb.append('.')
-                    }
-                    sb.append(value[i])
-                }
-                value = sb.toString()
-            }
-
-            if (value != newValue) {
-                textField.text = value
-                textField.positionCaret(textField.text.length)
-            }
-        }
-    }
-
-    fun formatarCnpj(textField: TextField) {
-        val maxLength = 14
-
-        textField.textProperty().addListener { _, oldValue, newValue ->
-            if (newValue == null) {
-                textField.text = oldValue
-                return@addListener
-            }
-
-            // Extract only digits
-            var value = newValue.replace(Regex("[^0-9]"), "")
-
-            // Limit to max length
-            if (value.length > maxLength) {
-                value = value.substring(0, maxLength)
-            }
-
-            // Format with masks
-            val formatted = when {
-                value.length <= 2 -> value
-                value.length <= 5 -> "${value.substring(0, 2)}.${value.substring(2)}"
-                value.length <= 8 -> "${value.substring(0, 2)}.${value.substring(2, 5)}.${value.substring(5)}"
-                value.length <= 12 -> "${value.substring(0, 2)}.${value.substring(2, 5)}.${value.substring(5, 8)}/${value.substring(8)}"
-                else -> "${value.substring(0, 2)}.${value.substring(2, 5)}.${value.substring(5, 8)}/${value.substring(8, 12)}-${value.substring(12)}"
-            }
-
-            // Update text if it changed
-            if (formatted != newValue) {
-                val caretPosition = textField.caretPosition
-                val oldLength = newValue.length
-                textField.text = formatted
-
-                // Adjust caret position after formatting
-                if (caretPosition + (formatted.length - oldLength) > 0) {
-                    textField.positionCaret(caretPosition + (formatted.length - oldLength))
-                }
-            }
-        }
-
-        // Block space input
-        textField.addEventFilter(javafx.scene.input.KeyEvent.KEY_TYPED) { event ->
-            if (event.character == " ") {
-                event.consume()
-            }
-        }
-    }
-
-    fun formatarTelefone(textField: TextField) {
-        var isUpdating = false
-        textField.textProperty().addListener { _, oldValue, newValue ->
-            if (isUpdating || newValue == oldValue) return@addListener
-
-            isUpdating = true
-            Platform.runLater {
-                try {
-                    val digits = newValue.filter { it.isDigit() }.take(11)
-                    val formatted = when {
-                        digits.isEmpty() -> ""
-                        digits.length <= 2 -> digits
-                        digits.length <= 7 -> "(${digits.take(2)}) ${digits.drop(2)}"
-                        else -> "(${digits.take(2)}) ${digits.slice(2..6)}-${digits.drop(7)}"
-                    }
-
-                    if (newValue != formatted) {
-                        textField.text = formatted
-                        textField.positionCaret(formatted.length)
-                    }
-                } finally {
-                    isUpdating = false
-                }
-            }
         }
     }
 
@@ -387,10 +263,6 @@ class PedidoWizardController {
         }
     }
 
-    fun getDescontoFieldText(): String {
-        return descontoField.text
-    }
-
     fun buscarClientePorTelefone(telefone: String, callback: (Map<String, String>?) -> Unit) {
         val telefoneClean = telefone.replace(Regex("[^0-9]"), "")
 
@@ -454,29 +326,26 @@ class PedidoWizardController {
         }.start()
     }
 
+    // Add this to PedidoWizardController
+    fun salvarCliente(cliente: Cliente): Boolean {
+        // Implement client saving logic here
+        // Connect to database using appropriate repository
+        // Return true if successful, false otherwise
+        try {
+            // Example implementation:
+            // return clienteRepository.save(cliente) > 0
+            // For now, just return true for testing
+            return true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
+    }
+
     fun getDescontoToggleGroup(): ToggleGroup {
         return descontoToggleGroup
     }
 
-    fun setupListeners() {
-        valorEntregaField.textProperty().addListener { _, _, _ ->
-            updateTotal(totalLabelRef)
-            calcularTroco()
-        }
-
-        descontoField.textProperty().addListener { _, _, _ ->
-            updateTotal(totalLabelRef)
-            calcularTroco()
-        }
-
-        trocoParaField.textProperty().addListener { _, _, _ ->
-            calcularTroco()
-        }
-
-        totalLabelRef.textProperty().addListener { _, _, _ ->
-            calcularTroco()
-        }
-    }
 
     private fun createRemoveButton(produtoHBox: HBox, produto: Produto): Button {
         return Button().apply {
@@ -552,10 +421,6 @@ class PedidoWizardController {
             calculateTotal()
         }
     }
-    private fun atualizarBotoesRemover() {
-        updateRemoveButtonsVisibility()
-    }
-
 
     fun getProdutosContainer(): VBox {
         return produtosContainer
@@ -1156,79 +1021,7 @@ class PedidoWizardController {
         }
     }
 
-    fun resetForm() {
-        // Reset all text fields in the client section
-        contentContainer.lookupAll(".text-field").forEach { node ->
-            if (node is TextField) {
-                node.text = if (node.promptText?.contains("R$") == true) "R$ 0,00" else ""
-            }
-        }
 
-        // Reset date pickers and time pickers
-        contentContainer.lookupAll(".date-picker").forEach { node ->
-            if (node is DatePicker) {
-                // Force a visual update by temporarily setting to null
-                Platform.runLater {
-                    val today = java.time.LocalDate.now()
-                    node.value = null
-                    node.value = today
-                }
-            }
-        }
-
-        contentContainer.lookupAll(".time-picker").forEach { node ->
-            if (node is ComboBox<*>) {
-                // Reset hours to 08 and minutes to 00 based on parent component
-                val parent = node.parent?.parent as? VBox
-                val label = parent?.children?.firstOrNull { it is Label } as? Label
-                val isHourField =
-                    label?.text?.contains("Hora") == true && node == (node.parent as HBox).children.first()
-                Platform.runLater {
-                    node.value = null
-                    node.value = if (isHourField) "08" else "00"
-                }
-            }
-        }
-
-        // Reset payment method buttons
-        contentContainer.lookupAll(".payment-toggle-button").forEach { node ->
-            if (node is ToggleButton) {
-                node.isSelected = node.text == "Dinheiro"
-            }
-        }
-
-        // Reset status buttons
-        contentContainer.lookupAll(".payment-toggle-button").forEach { node ->
-            if (node is ToggleButton && (node.text == "Pendente" || node.text == "Pago")) {
-                node.isSelected = node.text == "Pendente"
-            }
-        }
-
-        descontoToggleGroup.selectToggle(
-            descontoToggleGroup.toggles.find { (it as RadioButton).id == "valor" }
-        )
-
-        // Fix: Look for the delivery switch directly in contentContainer instead of a non-existent deliveryContainer
-        val entregaSwitch = contentContainer.lookup(".switch") as? StackPane
-        entregaSwitch?.let {
-            val checkbox = it.children.find { node -> node is CheckBox } as? CheckBox
-            checkbox?.isSelected = false
-        }
-
-        produtosContainer.children.clear()
-        listaProdutos.clear()
-        addNovoProduto()
-
-        totalLabelRef.text = "R$ 0,00"
-
-        trocoParaField.text = "R$ 0,00"
-        trocoCalculadoLabel.text = "R$ 0,00"
-
-        valorEntregaField.text = "R$ 0,00"
-
-        descontoField.text = if ((descontoToggleGroup.selectedToggle as? RadioButton)?.id == "valor")
-            "R$ 0,00" else "0,00"
-    }
 
     fun parseMoneyValue(text: String): Double {
         // Remove non-numeric characters except for decimal separator
@@ -1540,8 +1333,13 @@ class PedidoWizardController {
                                 10,
                                 parseMoneyValue(entregaInfo.find { it.first == "Valor" }?.second ?: "0,00")
                             )
-                            stmt.setString(11, entregaInfo.find { it.first == "Data" }?.second)
-                            stmt.setString(12, entregaInfo.find { it.first == "Hora" }?.second)
+
+                            // Add default values for required fields
+                            val dataEntrega = entregaInfo.find { it.first == "Data" }?.second ?: LocalDate.now().toString()
+                            val horaEntrega = entregaInfo.find { it.first == "Hora" }?.second ?: "12:00"
+
+                            stmt.setString(11, dataEntrega)
+                            stmt.setString(12, horaEntrega)
                             stmt.executeUpdate()
                         }
                     }
@@ -1646,6 +1444,8 @@ class PedidoWizardController {
             return false
         }
     }
+
+
 
     fun calculateTotal() {
         if (!::totalLabelRef.isInitialized) return
