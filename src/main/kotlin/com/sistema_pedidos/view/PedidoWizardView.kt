@@ -320,7 +320,42 @@ class PedidoWizardView : BorderPane() {
                 prefHeight = 40.0
                 isVisible = false
                 setOnAction {
-                    // This would contain the logic to save the order
+                    try {
+                        val clienteInfo = getClienteInfo()
+                        val produtosInfo = getProdutosInfo()
+                        val pagamentoInfo = getPagamentoInfo()
+                        val entregaInfo = getEntregaInfo()
+
+                        // Get total value
+                        val totalLabel = lookup(".total-nav-value") as? Label
+                        val valorTotal = totalLabel?.text ?: "R$ 0,00"
+
+                        // Pass the data to controller to create and save the order
+                        val numeroPedido = controller.salvarPedido(
+                            clienteInfo,
+                            pagamentoInfo,
+                            entregaInfo
+                        )
+
+                        // Show success alert
+                        val alert = Alert(Alert.AlertType.INFORMATION)
+                        alert.title = "Pedido Finalizado"
+                        alert.headerText = "Pedido criado com sucesso!"
+                        alert.contentText = "O pedido foi registrado com o número: $numeroPedido"
+                        alert.showAndWait()
+
+                        tabPane.tabs.add(0, createOrderTab("Novo Pedido"))
+                        tabPane.selectionModel.select(0)
+
+                    } catch (e: Exception) {
+                        // Show error alert
+                        val alert = Alert(Alert.AlertType.ERROR)
+                        alert.title = "Erro"
+                        alert.headerText = "Erro ao finalizar pedido"
+                        alert.contentText = "Ocorreu um erro: ${e.message}"
+                        alert.showAndWait()
+                        e.printStackTrace()
+                    }
                 }
             }
 
@@ -512,11 +547,11 @@ class PedidoWizardView : BorderPane() {
                 val paymentButtons = lookupAll(".payment-toggle-button").filterIsInstance<ToggleButton>()
                 println("Found ${paymentButtons.size} payment buttons, selected: $selectedPaymentMethod")
 
-                // Get payment status - use direct class-based lookup
+// Get payment status - use direct class-based lookup
                 val statusButtons = listOf(pendingToggle, paidToggle)
                 val selectedStatus = statusButtons.find { it.isSelected }?.text ?: "Pendente"
                 println("Found ${statusButtons.size} status buttons, selected: $selectedStatus")
-                pagamentoInfo.add("Status do Pagamento" to selectedStatus)
+                pagamentoInfo.add("Status" to selectedStatus)
 
                 // Get discount information - use class fields directly, not lookup
                 println("Discount field found: ${descontoField != null}, value: ${descontoField?.text}")
@@ -544,7 +579,7 @@ class PedidoWizardView : BorderPane() {
                         val minuto = minutoRetiradaCombo.value ?: "00"
 
                         pagamentoInfo.add("Data de Retirada" to formattedDate)
-                        pagamentoInfo.add("Horário de Retirada" to "$hora:$minuto")
+                        pagamentoInfo.add("Hora de Retirada" to "$hora:$minuto")
                     }
                 }
 
@@ -579,7 +614,7 @@ class PedidoWizardView : BorderPane() {
 
                 // Use direct field references
                 if (::nomeDestinatarioField.isInitialized && !nomeDestinatarioField.text.isNullOrBlank())
-                    entregaInfo.add("Nome do Destinatário" to nomeDestinatarioField.text)
+                    entregaInfo.add("Nome" to nomeDestinatarioField.text)
 
                 if (::telefoneDestinatarioField.isInitialized && !telefoneDestinatarioField.text.isNullOrBlank())
                     entregaInfo.add("Telefone" to telefoneDestinatarioField.text)
@@ -616,7 +651,7 @@ class PedidoWizardView : BorderPane() {
                 if (::horaEntregaCombo.isInitialized && ::minutoEntregaCombo.isInitialized) {
                     val hora = horaEntregaCombo.value?.toString() ?: "00"
                     val minuto = minutoEntregaCombo.value?.toString() ?: "00"
-                    entregaInfo.add("Horário" to "$hora:$minuto")
+                    entregaInfo.add("Hora" to "$hora:$minuto")  // Change "Horário" to "Hora"
                 }
 
                 println("Delivery info collection finished: ${entregaInfo.size} items")
@@ -1431,8 +1466,6 @@ class PedidoWizardView : BorderPane() {
             // Column 2: Status and Pickup scheduling
             val rightColumn = VBox(15.0)
 
-            // Status section
-// Status section
             val statusToggleGroup = ToggleGroup().apply {
                 selectedToggleProperty().addListener { _, oldToggle, newToggle ->
                     if (newToggle == null && oldToggle != null) {
@@ -1575,6 +1608,7 @@ class PedidoWizardView : BorderPane() {
                                 java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"),
                                 java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
                             )
+                            isEditable = false  // Disables manual editing so that the date can only be selected from the calendar
                         }
 
                         add(Label("Data de Retirada").apply { styleClass.add("field-label") }, 0, 0)
@@ -1690,18 +1724,6 @@ class PedidoWizardView : BorderPane() {
                                         styleClass.add("text-field")
                                         maxWidth = Double.POSITIVE_INFINITY
                                         this@OrderTabContent.nomeDestinatarioField = this
-                                    }
-                                )
-                            },
-                            VBox(10.0).apply {
-                                children.addAll(
-                                    Label("Telefone do Destinatário").apply { styleClass.add("field-label") },
-                                    TextField().apply {
-                                        id = "telefoneDestinatarioField"
-                                        styleClass.add("text-field")
-                                        prefWidth = 200.0
-                                        promptText = "(XX) XXXXX-XXXX"
-                                        this@OrderTabContent.telefoneDestinatarioField = this
                                     }
                                 )
                             },
@@ -1879,7 +1901,7 @@ class PedidoWizardView : BorderPane() {
                                         id = "dataEntregaField"
                                         styleClass.add("date-picker")
                                         prefWidth = 150.0
-                                        // Assign to class property
+                                        isEditable = false  // Disable text editing
                                         this@OrderTabContent.dataEntregaPicker = this
                                     }
                                 )

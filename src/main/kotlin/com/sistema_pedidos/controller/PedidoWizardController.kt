@@ -1024,18 +1024,11 @@ class PedidoWizardController {
 
 
     fun parseMoneyValue(text: String): Double {
-        // Remove non-numeric characters except for decimal separator
         var cleanValue = text.replace(Regex("[R$\\s]"), "")
-
-        // Replace dot used as thousand separator
         cleanValue = cleanValue.replace(".", "")
-
-        // Replace comma with dot for decimal parsing
         cleanValue = cleanValue.replace(",", ".")
-
         return try {
             if (!text.contains(",")) {
-                // If no comma was present, treat as cents
                 cleanValue.toDouble() / 100
             } else {
                 cleanValue.toDouble()
@@ -1173,6 +1166,8 @@ class PedidoWizardController {
         }
     }
 
+
+
     fun salvarPedido(
         clienteInfo: List<Pair<String, String>>,
         pagamentoInfo: List<Pair<String, String>>,
@@ -1180,56 +1175,86 @@ class PedidoWizardController {
     ): Boolean {
         try {
             val telefoneContato = clienteInfo.find { it.first == "Telefone" }?.second ?: ""
-            val observacao = clienteInfo.find { it.first == "Observação" }?.second
+            val observacaoClient = clienteInfo.find { it.first == "Observação" }?.second
             val status = pagamentoInfo.find { it.first == "Status" }?.second ?: "Pendente"
-
             val valorTotal = parseMoneyValue(pagamentoInfo.find { it.first == "Total do Pedido" }?.second ?: "0,00")
-
             val descontoPair = pagamentoInfo.find { it.first.startsWith("Desconto") }
             val tipoDesconto = if ((descontoToggleGroup.selectedToggle as? RadioButton)?.id == "valor")
                 "valor" else "percentual"
-            val valorDescontoStr = descontoPair?.second?.trim() ?: "0,00"
             val valorDesconto = if (tipoDesconto == "valor") {
                 parseMoneyValue(descontoField.text)
             } else {
-                // For percentual type
                 val percentualText = descontoField.text.replace("%", "").replace(",", ".")
                 val percentual = percentualText.toDoubleOrNull() ?: 0.0
                 (valorTotal * percentual / 100)
             }
             println("Saving discount: $valorDesconto of type $tipoDesconto")
+            val calculatedTotal = (subtotalValue ?: 0.0) - valorDesconto
             val formaPagamento = pagamentoInfo.find { it.first == "Forma de Pagamento" }?.second
             val valorTrocoPara = parseMoneyValue(trocoParaField.text)
             val valorTroco = parseMoneyValue(trocoCalculadoLabel.text)
+
+            // Extract client fields from clienteInfo
+            var tipoCliente = clienteInfo.find { it.first == "tipo" }?.second ?: ""
+            if (tipoCliente != "PESSOA_FISICA" && tipoCliente != "PESSOA_JURIDICA") {
+                // Set a default acceptable value
+                tipoCliente = "PESSOA_FISICA"
+            }
+            val nome = clienteInfo.find { it.first == "Nome" }?.second ?: ""
+            val sobrenome = clienteInfo.find { it.first == "Sobrenome" }?.second ?: ""
+            val cpf = clienteInfo.find { it.first == "CPF" }?.second
+            val razaoSocial = clienteInfo.find { it.first == "Razão Social" }?.second
+            val nomeFantasia = clienteInfo.find { it.first == "Nome Fantasia" }?.second
+            val email = clienteInfo.find { it.first == "Email" }?.second
+            val cep = clienteInfo.find { it.first == "CEP" }?.second
+            val logradouro = clienteInfo.find { it.first == "Logradouro" }?.second
+            val numero = clienteInfo.find { it.first == "Número" }?.second
+            val complemento = clienteInfo.find { it.first == "Complemento" }?.second
+            val bairro = clienteInfo.find { it.first == "Bairro" }?.second
+            val cidade = clienteInfo.find { it.first == "Cidade" }?.second
+            val estado = clienteInfo.find { it.first == "Estado" }?.second
+
+            val dataRetirada = pagamentoInfo.find { it.first == "Data de Retirada" }?.second ?: ""
+            val horaRetirada = pagamentoInfo.find { it.first == "Hora de Retirada" }?.second ?: ""
 
             DatabaseHelper().getConnection().use { connection ->
                 connection.autoCommit = false
                 try {
                     var numeroGerado = ""
                     connection.createStatement().use { stmt ->
-                        val rs =
-                            stmt.executeQuery("SELECT COALESCE(MAX(CAST(SUBSTR(numero, 4) AS INTEGER)), 0) + 1 as next_num FROM pedidos")
+                        val rs = stmt.executeQuery("SELECT COALESCE(MAX(CAST(SUBSTR(numero, 4) AS INTEGER)), 0) + 1 as next_num FROM pedidos")
                         if (rs.next()) {
                             numeroGerado = "PED%04d".format(rs.getInt("next_num"))
                         }
                     }
-// Change from val to var clienteId
+
+                    // Attempt to find client by telefone first
                     var clienteId = buscarClienteIdPorTelefone(connection, telefoneContato)
                     if (clienteId == null && telefoneContato.isNotBlank()) {
-                        // Extract name and sobrenome
-                        val nome = clienteInfo.find { it.first == "Nome" }?.second?.split(" ")?.firstOrNull() ?: ""
-                        val sobrenome = clienteInfo.find { it.first == "Nome" }?.second?.split(" ")?.drop(1)?.joinToString(" ") ?: ""
-
-                        // Inserir o cliente novo
+                        // Insert all available client fields
                         connection.prepareStatement(
-                            "INSERT INTO clientes (nome, sobrenome, telefone) VALUES (?, ?, ?)",
-                            Statement.RETURN_GENERATED_KEYS
+                            """
+                        INSERT INTO clientes (tipo, nome, sobrenome, cpf, razao_social, nome_fantasia, telefone, email, observacao, cep, logradouro, numero, complemento, bairro, cidade, estado)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """.trimIndent(), Statement.RETURN_GENERATED_KEYS
                         ).use { stmt ->
-                            stmt.setString(1, nome)
-                            stmt.setString(2, sobrenome)
-                            stmt.setString(3, telefoneContato)
+                            stmt.setString(1, tipoCliente)
+                            stmt.setString(2, nome)
+                            stmt.setString(3, sobrenome)
+                            stmt.setString(4, cpf)
+                            stmt.setString(5, razaoSocial)
+                            stmt.setString(6, nomeFantasia)
+                            stmt.setString(7, telefoneContato)
+                            stmt.setString(8, email)
+                            stmt.setString(9, observacaoClient)
+                            stmt.setString(10, cep)
+                            stmt.setString(11, logradouro)
+                            stmt.setString(12, numero)
+                            stmt.setString(13, complemento)
+                            stmt.setString(14, bairro)
+                            stmt.setString(15, cidade)
+                            stmt.setString(16, estado)
                             stmt.executeUpdate()
-
                             stmt.generatedKeys.use { keys ->
                                 if (keys.next()) {
                                     clienteId = keys.getLong(1)
@@ -1237,46 +1262,47 @@ class PedidoWizardController {
                             }
                         }
                     }
+
+                    // Insert into pedidos table
                     val pedidoQuery = """
-                        INSERT INTO pedidos (numero, cliente_id, telefone_contato, observacao, status,
-                        valor_total, valor_desconto, tipo_desconto, forma_pagamento, valor_troco_para, valor_troco,
-                        data_retirada, hora_retirada)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO pedidos (numero, cliente_id, telefone_contato, observacao, status,
+                    valor_total, valor_desconto, tipo_desconto, forma_pagamento, valor_troco_para, valor_troco,
+                    data_retirada, hora_retirada)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """.trimIndent()
 
-                    val pedidoId =
-                        connection.prepareStatement(pedidoQuery, Statement.RETURN_GENERATED_KEYS).use { stmt ->
-                            stmt.setString(1, numeroGerado)
-                            stmt.setObject(2, clienteId)
-                            stmt.setString(3, telefoneContato)
-                            stmt.setString(4, observacao)
-                            stmt.setString(5, status)
-                            stmt.setDouble(6, valorTotal)
-                            stmt.setDouble(7, valorDesconto)
-                            stmt.setString(8, tipoDesconto)
-                            stmt.setString(9, formaPagamento)
-                            stmt.setDouble(10, valorTrocoPara)
-                            stmt.setDouble(11, valorTroco)
-
-                            // Se houver entrega, define data e hora de retirada como "Entrega"
-                            if (entregaInfo.first().second == "Sim") {
-                                stmt.setString(12, "Entrega")
-                                stmt.setString(13, "Entrega")
-                            } else {
-                                stmt.setString(12, pagamentoInfo.find { it.first == "Data de Retirada" }?.second)
-                                stmt.setString(13, pagamentoInfo.find { it.first == "Hora de Retirada" }?.second)
-                            }
-
-                            stmt.executeUpdate()
-                            stmt.generatedKeys.use { keys ->
-                                if (keys.next()) keys.getLong(1) else throw SQLException("Failed to get pedido ID")
-                            }
+                    val pedidoId = connection.prepareStatement(pedidoQuery, Statement.RETURN_GENERATED_KEYS).use { stmt ->
+                        stmt.setString(1, numeroGerado)
+                        stmt.setObject(2, clienteId)
+                        stmt.setString(3, telefoneContato)
+                        stmt.setString(4, observacaoClient)
+                        stmt.setString(5, status)
+                        stmt.setDouble(6, calculatedTotal)
+                        stmt.setDouble(7, valorDesconto)
+                        stmt.setString(8, tipoDesconto)
+                        stmt.setString(9, formaPagamento)
+                        stmt.setDouble(10, valorTrocoPara)
+                        stmt.setDouble(11, valorTroco)
+                        if (entregaInfo.first().second == "Sim") {
+                            stmt.setString(12, "Entrega")
+                            stmt.setString(13, "Entrega")
+                        } else {
+                            // Use default values if empty
+                            stmt.setString(12, if (dataRetirada.isBlank()) LocalDate.now().toString() else dataRetirada)
+                            stmt.setString(13, if (horaRetirada.isBlank()) java.time.LocalTime.now().toString().substring(0, 5) else horaRetirada)
                         }
+                        stmt.executeUpdate()
+                        stmt.generatedKeys.use { keys ->
+                            if (keys.next()) keys.getLong(1)
+                            else throw SQLException("Failed to get pedido ID")
+                        }
+                    }
 
+                    // Insert items and update stock
                     val itemQuery = """
-                INSERT INTO itens_pedido (pedido_id, produto_id, nome_produto, quantidade, valor_unitario, subtotal)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """.trimIndent()
+                    INSERT INTO itens_pedido (pedido_id, produto_id, nome_produto, quantidade, valor_unitario, subtotal)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """.trimIndent()
 
                     produtosContainer.children.forEach { node ->
                         val hBox = node as HBox
@@ -1284,14 +1310,11 @@ class PedidoWizardController {
                         val produtoField = ((hBox.children[2] as VBox).children[1] as TextField)
                         val valorField = ((hBox.children[3] as VBox).children[1] as TextField)
                         val subtotalField = ((hBox.children[4] as VBox).children[1] as TextField)
-
                         val quantidade = qtdField.text.toInt()
                         val nomeProduto = produtoField.text
                         val valorUnitario = parseMoneyValue(valorField.text)
                         val subtotal = parseMoneyValue(subtotalField.text)
-
                         val produtoId = findProdutoIdByName(connection, nomeProduto)
-
                         connection.prepareStatement(itemQuery).use { stmt ->
                             stmt.setLong(1, pedidoId)
                             stmt.setObject(2, produtoId)
@@ -1301,13 +1324,8 @@ class PedidoWizardController {
                             stmt.setDouble(6, subtotal)
                             stmt.executeUpdate()
                         }
-
-                        // If we found a valid product ID, update inventory
                         if (produtoId != null) {
-                            // Update insumos inventory
                             atualizarEstoqueInsumos(connection, produtoId, quantidade)
-
-                            // Also update the product's own inventory
                             atualizarEstoqueProduto(connection, produtoId, quantidade)
                         }
                     }
@@ -1318,7 +1336,6 @@ class PedidoWizardController {
                         endereco, numero, referencia, cidade, bairro, cep, valor_entrega, data_entrega, hora_entrega)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """.trimIndent()
-
                         connection.prepareStatement(entregaQuery).use { stmt ->
                             stmt.setLong(1, pedidoId)
                             stmt.setString(2, formatarTextoCapitalizado(entregaInfo.find { it.first == "Nome" }?.second ?: ""))
@@ -1329,33 +1346,59 @@ class PedidoWizardController {
                             stmt.setString(7, formatarTextoCapitalizado(entregaInfo.find { it.first == "Cidade" }?.second ?: ""))
                             stmt.setString(8, formatarTextoCapitalizado(entregaInfo.find { it.first == "Bairro" }?.second ?: ""))
                             stmt.setString(9, entregaInfo.find { it.first == "CEP" }?.second)
-                            stmt.setDouble(
-                                10,
-                                parseMoneyValue(entregaInfo.find { it.first == "Valor" }?.second ?: "0,00")
-                            )
+                            stmt.setDouble(10, parseMoneyValue(entregaInfo.find { it.first == "Valor" }?.second ?: "0,00"))
 
-                            // Add default values for required fields
-                            val dataEntrega = entregaInfo.find { it.first == "Data" }?.second ?: LocalDate.now().toString()
-                            val horaEntrega = entregaInfo.find { it.first == "Hora" }?.second ?: "12:00"
+                            val currentDate = LocalDate.now().toString()
+                            val currentTime = java.time.LocalTime.now().toString().substring(0, 5) // HH:MM format
 
-                            stmt.setString(11, dataEntrega)
-                            stmt.setString(12, horaEntrega)
+                            stmt.setString(11, entregaInfo.find { it.first == "Data" }?.second ?: currentDate)
+                            stmt.setString(12, entregaInfo.find { it.first == "Hora" }?.second ?: currentTime)
+
                             stmt.executeUpdate()
                         }
                     }
-
                     connection.commit()
-                    println("Pedido saved successfully. Starting print process...")
-                    val printerController = PrinterController()
 
-                    // Create products list for printing
-                    val produtosList = produtosContainer.children.map { node ->
+                    val fullName = when (tipoCliente) {
+                        "PESSOA_FISICA" -> "$nome $sobrenome"
+                        else -> razaoSocial ?: nomeFantasia ?: nome
+                    }
+                    val pedidoData = mutableMapOf<String, Any>()
+                    pedidoData["numero"] = numeroGerado
+                    pedidoData["observacao"] = observacaoClient ?: ""
+                    pedidoData["telefone_contato"] = telefoneContato
+                    pedidoData["data_pedido"] = java.time.LocalDate.now().toString()
+                    pedidoData["status"] = status
+                    pedidoData["status_pedido"] = "Pendente"
+                    pedidoData["cliente"] = mapOf(
+                        "nome" to fullName,
+                        "tipo" to tipoCliente
+                    )
+                    pedidoData["valor_total"] = calculatedTotal // Use calculatedTotal
+                    println("DEBUG: Total Value: $calculatedTotal")
+                    pedidoData["valor_desconto"] = valorDesconto
+                    if (valorDesconto > 0) {
+                        pedidoData["valor_desconto"] = valorDesconto
+                        pedidoData["tipo_desconto"] = tipoDesconto
+                        // Add debug printing
+                        println("DEBUG: Discount: $valorDesconto ($tipoDesconto)")
+                    }
+                    pedidoData["tipo_desconto"] = tipoDesconto
+                    pedidoData["forma_pagamento"] = formaPagamento ?: ""
+                    if (formaPagamento == "Dinheiro" && valorTrocoPara > 0) {
+                        pedidoData["valor_troco_para"] = valorTrocoPara
+                        pedidoData["valor_troco"] = valorTroco
+                        // Add debug printing
+                        println("DEBUG: Troco para: $valorTrocoPara, Troco: $valorTroco")
+                    }
+                    pedidoData["valor_troco_para"] = valorTrocoPara
+                    pedidoData["valor_troco"] = valorTroco
+                    pedidoData["itens"] = produtosContainer.children.map { node ->
                         val hBox = node as HBox
                         val qtdField = ((hBox.children[1] as VBox).children[1] as HBox).children[1] as TextField
                         val produtoField = ((hBox.children[2] as VBox).children[1] as TextField)
                         val valorField = ((hBox.children[3] as VBox).children[1] as TextField)
                         val subtotalField = ((hBox.children[4] as VBox).children[1] as TextField)
-
                         mapOf(
                             "quantidade" to qtdField.text.toInt(),
                             "nome_produto" to produtoField.text,
@@ -1363,49 +1406,6 @@ class PedidoWizardController {
                             "subtotal" to parseMoneyValue(subtotalField.text)
                         )
                     }
-
-                    // Create pedidoData map with all required information
-                    val pedidoData = mutableMapOf<String, Any>()
-
-                    // Basic order info
-                    pedidoData["numero"] = numeroGerado
-                    pedidoData["observacao"] = observacao ?: ""
-                    pedidoData["telefone_contato"] = telefoneContato
-                    pedidoData["data_pedido"] = java.time.LocalDate.now().toString()
-                    pedidoData["status"] = status
-                    pedidoData["status_pedido"] = "Pendente"
-
-                    val clienteMap = mutableMapOf<String, Any>()
-
-                    val clienteInfoList = clienteInfo
-
-                    if (clienteInfoList.isNotEmpty()) {
-                        clienteInfoList.forEach { (key, value) ->
-                            when(key) {
-                                "Nome" -> clienteMap["nome"] = value
-                                "Telefone" -> pedidoData["telefone_contato"] = value
-                                "Observação" -> pedidoData["observacao"] = value
-                            }
-                        }
-                    } else {
-                        pedidoData["telefone_contato"] = pedidoData["telefone_contato"] ?:
-                                telefoneContato // Replace pedido["telefone_contato"]
-
-                        clienteMap["nome"] = "Cliente"
-                    }
-
-                    pedidoData["cliente"] = clienteMap
-
-                    // Payment info
-                    pedidoData["valor_total"] = valorTotal
-                    pedidoData["valor_desconto"] = valorDesconto
-                    pedidoData["tipo_desconto"] = tipoDesconto
-                    pedidoData["forma_pagamento"] = formaPagamento ?: ""
-                    pedidoData["valor_troco_para"] = valorTrocoPara
-                    pedidoData["valor_troco"] = valorTroco
-
-                    pedidoData["itens"] = produtosList
-
                     if (entregaInfo.isNotEmpty() && entregaInfo.first().second == "Sim") {
                         val entregaMap = mutableMapOf<String, Any>()
                         entregaInfo.forEach { (key, value) ->
@@ -1425,14 +1425,24 @@ class PedidoWizardController {
                         }
                         pedidoData["entrega"] = entregaMap
                     } else {
+                        // Get values with fallbacks to current date/time
                         val dataRetirada = pagamentoInfo.find { it.first == "Data de Retirada" }?.second
+                            ?: LocalDate.now().toString()
                         val horaRetirada = pagamentoInfo.find { it.first == "Hora de Retirada" }?.second
-                        if (dataRetirada != null) pedidoData["data_retirada"] = dataRetirada
-                        if (horaRetirada != null) pedidoData["hora_retirada"] = horaRetirada
+                            ?: java.time.LocalTime.now().toString().substring(0, 5)
+
+                        // Always add to pedidoData, even if they're default values
+                        pedidoData["data_retirada"] = dataRetirada
+                        pedidoData["hora_retirada"] = horaRetirada
+
+                        // Debug the value
+                        println("Hora retirada value: '$horaRetirada'")
                     }
 
-                    printerController.imprimirPedido(pedidoData = pedidoData)
+                    println("Data sent to PrinterController: $pedidoData")
 
+                    val printerController = PrinterController()
+                    printerController.imprimirPedido(pedidoData = pedidoData)
                     return true
                 } catch (e: Exception) {
                     connection.rollback()
@@ -1445,7 +1455,137 @@ class PedidoWizardController {
         }
     }
 
+    private fun formatarTextoCapitalizado(texto: String): String {
+        val excecoes = setOf("de", "da", "do", "das", "dos", "e", "com", "para", "a", "o", "em",
+            "por", "sem", "sob", "sobre", "à", "às", "ao", "aos")
 
+        return texto.lowercase().split(" ").joinToString(" ") { palavra ->
+            if (palavra in excecoes) palavra else palavra.replaceFirstChar { it.uppercase() }
+        }
+    }
+
+    private fun saveOrGetCliente(
+        conn: Connection,
+        clienteInfo: List<Pair<String, String>>,
+        isPessoaFisica: Boolean
+    ): Long? {
+        // Check if customer already exists by phone
+        val telefone = clienteInfo.find { it.first == "Telefone" }?.second
+        if (telefone.isNullOrBlank()) return null
+
+        // Try to find existing customer
+        val checkStmt = conn.prepareStatement("SELECT id FROM clientes WHERE telefone = ?")
+        checkStmt.setString(1, telefone)
+        val rs = checkStmt.executeQuery()
+
+        if (rs.next()) {
+            return rs.getLong("id")
+        }
+
+        // Create new customer
+        val stmt = conn.prepareStatement("""
+        INSERT INTO clientes (
+            tipo, nome, sobrenome, cpf, razao_social, nome_fantasia,
+            cnpj, inscricao_estadual, telefone, email, observacao,
+            cep, logradouro, numero, complemento, bairro, cidade, estado
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, Statement.RETURN_GENERATED_KEYS)
+
+        val tipo = if (isPessoaFisica) "PESSOA_FISICA" else "PESSOA_JURIDICA"
+
+        // Find email with case-insensitive search and different format variations
+        val email = clienteInfo.find {
+            it.first.equals("Email", ignoreCase = true) ||
+                    it.first.equals("E-mail", ignoreCase = true)
+        }?.second ?: ""
+
+        stmt.setString(1, tipo)
+        stmt.setString(2, clienteInfo.find { it.first == "Nome" }?.second ?: "")
+        stmt.setString(3, clienteInfo.find { it.first == "Sobrenome" }?.second ?: "")
+        stmt.setString(4, clienteInfo.find { it.first == "CPF" }?.second ?: "")
+        stmt.setString(5, clienteInfo.find { it.first == "Razão Social" }?.second ?: "")
+        stmt.setString(6, clienteInfo.find { it.first == "Nome Fantasia" }?.second ?: "")
+        stmt.setString(7, clienteInfo.find { it.first == "CNPJ" }?.second ?: "")
+        stmt.setString(8, clienteInfo.find { it.first == "Inscrição Estadual" }?.second ?: "")
+        stmt.setString(9, telefone)
+        stmt.setString(10, email) // Use our more flexible email search
+        stmt.setString(11, clienteInfo.find { it.first == "Observação" }?.second ?: "")
+        stmt.setString(12, clienteInfo.find { it.first == "CEP" }?.second ?: "")
+        stmt.setString(13, clienteInfo.find { it.first == "Logradouro" }?.second ?: "")
+        stmt.setString(14, clienteInfo.find { it.first == "Número" }?.second ?: "")
+        stmt.setString(15, clienteInfo.find { it.first == "Complemento" }?.second ?: "")
+        stmt.setString(16, clienteInfo.find { it.first == "Bairro" }?.second ?: "")
+        stmt.setString(17, clienteInfo.find { it.first == "Cidade" }?.second ?: "")
+        stmt.setString(18, clienteInfo.find { it.first == "Estado" }?.second ?: "")
+
+        stmt.executeUpdate()
+        val generatedKeys = stmt.generatedKeys
+
+        return if (generatedKeys.next()) {
+            generatedKeys.getLong(1)
+        } else null
+    }
+
+    private fun saveProdutos(conn: Connection, pedidoId: Long, produtosInfo: List<Pair<String, String>>) {
+        val stmt = conn.prepareStatement("""
+        INSERT INTO itens_pedido (pedido_id, nome_produto, quantidade, valor_unitario, subtotal)
+        VALUES (?, ?, ?, ?, ?)
+    """)
+
+        produtosInfo.forEach { (_, value) ->
+            val regex = "(\\d+)x (.+) \\(R\\$ ([0-9,.]+)\\) = R\\$ ([0-9,.]+)".toRegex()
+            val matchResult = regex.find(value)
+
+            if (matchResult != null) {
+                val (quantidade, nomeProduto, valorUnitario, subtotal) = matchResult.destructured
+
+                stmt.setLong(1, pedidoId)
+                stmt.setString(2, nomeProduto.trim())
+                stmt.setInt(3, quantidade.toIntOrNull() ?: 1)
+                stmt.setDouble(4, valorUnitario.replace(".", "").replace(",", ".").toDoubleOrNull() ?: 0.0)
+                stmt.setDouble(5, subtotal.replace(".", "").replace(",", ".").toDoubleOrNull() ?: 0.0)
+                stmt.addBatch()
+
+                // Check if product exists and update stock
+                val produtoId = findProdutoIdByName(conn, nomeProduto.trim())
+                if (produtoId != null) {
+                    atualizarEstoqueProduto(conn, produtoId, quantidade.toIntOrNull() ?: 1)
+                    atualizarEstoqueInsumos(conn, produtoId, quantidade.toIntOrNull() ?: 1)
+                }
+            }
+        }
+
+        stmt.executeBatch()
+    }
+
+    private fun saveEntrega(conn: Connection, pedidoId: Long, entregaInfo: List<Pair<String, String>>) {
+        val stmt = conn.prepareStatement("""
+        INSERT INTO entregas (
+            pedido_id, nome_destinatario, telefone_destinatario, endereco,
+            numero, referencia, cidade, bairro, cep, valor_entrega,
+            data_entrega, hora_entrega
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """)
+
+        stmt.setLong(1, pedidoId)
+        stmt.setString(2, entregaInfo.find { it.first == "Nome Destinatário" }?.second ?: "")
+        stmt.setString(3, entregaInfo.find { it.first == "Telefone Destinatário" }?.second ?: "")
+        stmt.setString(4, entregaInfo.find { it.first == "Endereço" }?.second ?: "")
+        stmt.setString(5, entregaInfo.find { it.first == "Número" }?.second ?: "")
+        stmt.setString(6, entregaInfo.find { it.first == "Referência" }?.second ?: "")
+        stmt.setString(7, entregaInfo.find { it.first == "Cidade" }?.second ?: "")
+        stmt.setString(8, entregaInfo.find { it.first == "Bairro" }?.second ?: "")
+        stmt.setString(9, entregaInfo.find { it.first == "CEP" }?.second ?: "")
+
+        val valorEntrega = entregaInfo.find { it.first == "Valor Entrega" }?.second ?: "R$ 0,00"
+        val valorEntregaDb = valorEntrega.replace("R$ ", "").replace(".", "").replace(",", ".").toDoubleOrNull() ?: 0.0
+        stmt.setDouble(10, valorEntregaDb)
+
+        stmt.setString(11, entregaInfo.find { it.first == "Data Entrega" }?.second ?: "")
+        stmt.setString(12, entregaInfo.find { it.first == "Hora Entrega" }?.second ?: "")
+
+        stmt.executeUpdate()
+    }
 
     fun calculateTotal() {
         if (!::totalLabelRef.isInitialized) return
@@ -1472,6 +1612,7 @@ class PedidoWizardController {
         // Calculate the discount separately
         aplicarDesconto()
     }
+    private var calculatedFinalTotal: Double = 0.0
 
     fun aplicarDesconto() {
         if (!::descontoToggleGroup.isInitialized || !::totalLabelRef.isInitialized) return
@@ -1515,6 +1656,7 @@ class PedidoWizardController {
 
             // Calculate new total
             val novoTotal = subtotal - valorDesconto
+            calculatedFinalTotal = novoTotal
 
             // Format and update total label
             val formattedTotal = String.format("%,.2f", novoTotal)
@@ -1532,15 +1674,6 @@ class PedidoWizardController {
             }
         } catch (e: Exception) {
             e.printStackTrace()
-        }
-    }
-
-    private fun formatarTextoCapitalizado(texto: String): String {
-        val excecoes = setOf("de", "da", "do", "das", "dos", "e", "com", "para", "a", "o", "em",
-            "por", "sem", "sob", "sobre", "à", "às", "ao", "aos")
-
-        return texto.lowercase().split(" ").joinToString(" ") { palavra ->
-            if (palavra in excecoes) palavra else palavra.replaceFirstChar { it.uppercase() }
         }
     }
 }

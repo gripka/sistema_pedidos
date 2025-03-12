@@ -173,11 +173,10 @@ class PrinterController {
                 val statusPedido = pedidoData["status_pedido"] as String
                 val statusPagamento = pedidoData["status"] as String
 
-                escpos.write(boldCenter, "PEDIDO #$numeroPedido")
+                escpos.write(boldCenter, normalizarTexto("PEDIDO #$numeroPedido"))
                     .feed(1)
-                    .writeLF("Data: $dataPedido")
-                    .writeLF("Status: $statusPedido")
-                    .writeLF("Pagamento: $statusPagamento")
+                    .writeLF(normalizarTexto("Data: $dataPedido"))
+                    .writeLF(normalizarTexto("Status: $statusPedido"))
                     .feed(1)
                     .writeLF(linhaDiv)
 
@@ -252,8 +251,8 @@ class PrinterController {
                     .writeLF(linhaDiv)
 
                 // Valores e pagamento
-                val valorTotal = formatarValor(pedidoData["valor_total"] as Number)
-                val valorDesconto = formatarValor(pedidoData["valor_desconto"] as? Number ?: 0)
+                val valorTotal = pedidoData["valor_total"] as? Number ?: 0.0
+                val valorDesconto = pedidoData["valor_desconto"] as? Number ?: 0.0
                 val tipoDesconto = pedidoData["tipo_desconto"] as? String ?: ""
                 val formaPagamento = pedidoData["forma_pagamento"] as? String ?: "Nao informado"
                 val valorTrocoPara = pedidoData["valor_troco_para"] as? Number
@@ -264,10 +263,19 @@ class PrinterController {
                 escpos.write(smallFont, "")
                 imprimirTextoComWrapping(escpos, "Forma: $formaPagamento")
 
-                if ((valorDesconto.toDoubleOrNull() ?: 0.0) > 0) {
+                if (((valorDesconto as? Number)?.toDouble() ?: 0.0) > 0) {
                     val descInfo = if (tipoDesconto == "percentual") {
-                        val percentual = pedidoData["valor_desconto"] as Number
-                        "Desconto: ${percentual}%"
+                        // For percentage discounts, we need to calculate the actual percentage
+                        val totalValue = (pedidoData["valor_total"] as? Number)?.toDouble() ?: 1.0
+                        val descontoValue = (valorDesconto as? Number)?.toDouble() ?: 0.0
+
+                        // Avoid division by zero
+                        val percentualCalculado = if (totalValue > 0)
+                            (descontoValue / (totalValue + descontoValue)) * 100
+                        else 0.0
+
+                        val percentualFormatado = String.format("%.2f", percentualCalculado)
+                        "Desconto: ${percentualFormatado}%"
                     } else {
                         "Desconto: R$ $valorDesconto"
                     }
@@ -283,8 +291,10 @@ class PrinterController {
                     escpos.writeLF("Troco para: R$ $valorTrocoParaStr")
                     escpos.writeLF("Troco: R$ $valorTrocoStr")
                 }
-
                 escpos.feed(1)
+                    .writeLF("Pagamento: $statusPagamento") //pagamento
+                escpos.feed(1)
+                    .writeLF(linhaDiv)
                     .writeLF(linhaDiv)
                 escpos.write(Style(), "")
 
@@ -326,21 +336,41 @@ class PrinterController {
                         escpos.writeLF("CEP: $cep")
                     }
 
-                    val dataEntrega = formatarData(entrega["data_entrega"] as String)
-                    val horaEntrega = entrega["hora_entrega"] as String
+                    val dataEntregaRaw = entrega["data_entrega"] as? String
+                    val horaEntregaRaw = entrega["hora_entrega"] as? String
 
-                    escpos.writeLF("Data/Hora: $dataEntrega $horaEntrega")
+                    val dataEntrega = if (!dataEntregaRaw.isNullOrBlank()) formatarData(dataEntregaRaw) else "A combinar"
+                    val horaEntrega = if (!horaEntregaRaw.isNullOrBlank()) horaEntregaRaw else "A combinar"
+
+                    escpos.writeLF("Data: $dataEntrega")
+                    escpos.writeLF("Horario: $horaEntrega")
+
                 } else {
                     // Informacoes de retirada
                     val dataRetirada = pedidoData["data_retirada"] as? String
                     val horaRetirada = pedidoData["hora_retirada"] as? String
 
-                    if (dataRetirada != null && horaRetirada != null) {
-                        escpos.write(bold, "RETIRADA:")
-                            .feed(1)
-                            .writeLF("Data: ${formatarData(dataRetirada)}")
-                            .writeLF("Hora: $horaRetirada")
-                    }
+                    // Always show pickup section if not delivery, even with null/empty date/time
+                    escpos.write(bold, "RETIRADA:")
+                        .feed(1)
+                    //escpos.write(bold, "PEDIDO #$numeroPedido")
+                    //    .feed(1)
+                    //escpos.writeLF("Cliente deve retirar o pedido na loja:")
+
+                    // Format date if available, or show placeholder
+                    val dataFormatada = if (!dataRetirada.isNullOrBlank())
+                        formatarData(dataRetirada)
+                    else "A combinar"
+                    escpos.writeLF("Data: $dataFormatada")
+
+                    // Show time if available, or placeholder
+                    val horaFormatada = if (!horaRetirada.isNullOrBlank())
+                        horaRetirada
+                    else "A combinar"
+                    escpos.writeLF("Horário: $horaFormatada")
+
+                    //escpos.writeLF("Local: ${normalizarTexto(COMPANY_ADDRESS)}")
+                    //escpos.feed(1)
                 }
 
                 escpos.feed(1)
@@ -350,7 +380,7 @@ class PrinterController {
                 escpos.feed(1)
                     .write(center, "Obrigado pela preferencia!")
                     .feed(1)
-                    .writeLF("Impresso em: " + SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(Date()))
+                    .writeLF(center,"Impresso em: " + SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(Date()))
                     .feed(6)  // Increased from 3 to 6 for more space before cutting
                     .cut(CutMode.FULL)
             }

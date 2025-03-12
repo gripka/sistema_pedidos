@@ -44,7 +44,6 @@ class Main : Application() {
         val menuView = MenuView { viewName ->
             when (viewName) {
                 "dashboard" -> mainView.setCenterView(dashboardView)
-                "novoPedido" -> mainView.setCenterView(novoPedidoView)
                 "pedidosAndamento" -> mainView.setCenterView(pedidosEmAndamentoView)
                 "produtos" -> mainView.setCenterView(produtosView)
                 "historicoPedidos" -> mainView.setCenterView(historicoPedidosView)
