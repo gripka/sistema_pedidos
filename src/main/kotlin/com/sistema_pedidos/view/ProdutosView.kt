@@ -53,6 +53,13 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
     private lateinit var rowsPerPageComboBox: ComboBox<Int>
     private var totalItems = 0
 
+    private lateinit var calcularPrecoSugerido: () -> Unit
+    private lateinit var impostoField: TextField
+
+    private lateinit var descontoVolumeField: CheckBox
+    private lateinit var qtdMinimaField: TextField
+    private lateinit var percentualDescontoField: TextField
+
     private fun createStandardSection(title: String): VBox {
         val section = VBox(10.0).apply {
             padding = Insets(10.0)
@@ -81,6 +88,7 @@ class ProdutosView(private val stage: Stage? = null) : BorderPane() {
 
         stylesheets.add(javaClass.getResource("/produtosview.css").toExternalForm())
 
+        verificarColunaTabelaProdutos() // Adicione esta linha
         setupUI()
         loadProducts()
     }
@@ -493,6 +501,36 @@ private fun updatePagination() {
         tfEstoqueMinimo.text = "0"
         tfEstoqueAtual.text = "0"
         cbStatus.value = "Ativo"
+        cbEhInsumo.isSelected = false
+
+        // Reset pricing fields
+        if (::valorCompraField.isInitialized) {
+            valorCompraField.text = "R$ 0,00"
+        }
+
+        if (::impostoField.isInitialized) {
+            impostoField.text = "0"
+        }
+
+        // Clear ingredients list
+        insumosDosProdutos.clear()
+
+        // Recalculate pricing if the function is initialized
+        if (::calcularPrecoSugerido.isInitialized) {
+            Platform.runLater { calcularPrecoSugerido() }
+        }
+
+        if (::descontoVolumeField.isInitialized) {
+            descontoVolumeField.isSelected = false
+        }
+        if (::qtdMinimaField.isInitialized) {
+            qtdMinimaField.text = "10"
+            qtdMinimaField.isDisable = true
+        }
+        if (::percentualDescontoField.isInitialized) {
+            percentualDescontoField.text = "5"
+            percentualDescontoField.isDisable = true
+        }
 
         // Reset focus to first field
         tfNome.requestFocus()
@@ -654,6 +692,324 @@ private fun updatePagination() {
             setContextMenu(contextMenu)
         }
 
+        fun createPricingSection(): VBox {
+            val section = VBox(10.0).apply {
+                padding = Insets(10.0)
+                style = """
+            -fx-background-color: white;
+            -fx-border-color: #dfe1e6;
+            -fx-border-width: 1px;
+            -fx-border-radius: 3px;
+        """
+            }
+
+            val title = Label("Precificação").apply {
+                style = "-fx-font-weight: bold; -fx-font-size: 14px;"
+            }
+
+            // Fields for costs and margins
+            val lblCustoInsumos = Label("R$ 0,00")
+
+            // Campo para valor de compra
+            val tfValorCompra = TextField("R$ 0,00").apply {
+                prefWidth = 120.0
+                formatarMoeda(this)
+                textProperty().addListener { _, _, _ ->
+                    Platform.runLater { calcularPrecoSugerido() }
+                }
+                tooltip = Tooltip("Valor de compra/aquisição do produto")
+            }
+
+            // Campo para impostos
+            val tfImpostos = TextField("0").apply {
+                prefWidth = 80.0
+                textProperty().addListener { _, _, newValue ->
+                    if (!newValue.matches(Regex("\\d*"))) {
+                        text = newValue.replace(Regex("[^\\d]"), "")
+                    }
+                    Platform.runLater { calcularPrecoSugerido() }
+                }
+                tooltip = Tooltip("Percentual de impostos sobre o produto")
+            }
+
+            // Inicialize these fields first before they're referenced
+            val tfQuantidadeMinima = TextField("10").apply {
+                prefWidth = 80.0
+                tooltip = Tooltip("Quantidade mínima para aplicar desconto")
+            }
+
+            val tfPercentualDesconto = TextField("5").apply {
+                prefWidth = 80.0
+                tooltip = Tooltip("Percentual de desconto aplicado por volume")
+            }
+
+            // Campos para desconto por volume
+            val cbDescontoVolume = CheckBox("Aplicar desconto por volume").apply {
+                selectedProperty().addListener { _, _, _ ->
+                    tfQuantidadeMinima.isDisable = !isSelected
+                    tfPercentualDesconto.isDisable = !isSelected
+                    Platform.runLater { calcularPrecoSugerido() }
+                }
+            }
+
+            // Now set these properties after they've been defined
+            tfQuantidadeMinima.apply {
+                isDisable = !cbDescontoVolume.isSelected
+                textProperty().addListener { _, _, newValue ->
+                    if (!newValue.matches(Regex("\\d*"))) {
+                        text = newValue.replace(Regex("[^\\d]"), "")
+                    }
+                    Platform.runLater { calcularPrecoSugerido() }
+                }
+            }
+
+            tfPercentualDesconto.apply {
+                isDisable = !cbDescontoVolume.isSelected
+                textProperty().addListener { _, _, newValue ->
+                    if (!newValue.matches(Regex("\\d*"))) {
+                        text = newValue.replace(Regex("[^\\d]"), "")
+                    }
+                    Platform.runLater { calcularPrecoSugerido() }
+                }
+            }
+
+            val tfMargemLucro = TextField("30").apply {
+                prefWidth = 80.0
+                textProperty().addListener { _, _, newValue ->
+                    if (!newValue.matches(Regex("\\d*"))) {
+                        text = newValue.replace(Regex("[^\\d]"), "")
+                    }
+                    Platform.runLater { calcularPrecoSugerido() }
+                }
+            }
+
+            // Botão para aplicar margem por tipo de produto
+            val btnMargemPorTipo = Button("Margem por Tipo").apply {
+                styleClass.add("small-button")
+                setOnAction {
+                    val categoria = cbCategoria.value?.lowercase() ?: ""
+                    val margemPadrao = when {
+                        categoria.contains("buqu") || categoria.contains("arranjo") -> 50
+                        categoria.contains("flor") -> 35
+                        else -> 30
+                    }
+                    tfMargemLucro.text = margemPadrao.toString()
+                    Platform.runLater { calcularPrecoSugerido() }
+                }
+                tooltip = Tooltip("Buquês/Arranjos: 50%, Flores: 35%, Outros: 30%")
+            }
+
+            val lblPrecoSugerido = Label("R$ 0,00")
+            val lblLucroEstimado = Label("R$ 0,00 (0%)")
+            val lblDescontosAplicados = Label("")
+
+            // Cost display layout
+            val custoBox = HBox(10.0).apply {
+                alignment = Pos.CENTER_LEFT
+                children.addAll(
+                    Label("Custo de Insumos:").apply { prefWidth = 120.0 },
+                    lblCustoInsumos
+                )
+            }
+
+            // Valor de compra layout
+            val compraBox = HBox(10.0).apply {
+                alignment = Pos.CENTER_LEFT
+                children.addAll(
+                    Label("Valor de Compra:").apply { prefWidth = 120.0 },
+                    tfValorCompra
+                )
+            }
+
+            // Layout de impostos
+            val impostosBox = HBox(10.0).apply {
+                alignment = Pos.CENTER_LEFT
+                children.addAll(
+                    Label("Impostos (%):").apply { prefWidth = 120.0 },
+                    tfImpostos,
+                    Label("%")
+                )
+            }
+
+            // Layout de desconto por volume
+            val descontoVolumeBox = VBox(5.0).apply {
+                children.add(cbDescontoVolume)
+
+                val descontoControls = HBox(10.0).apply {
+                    alignment = Pos.CENTER_LEFT
+                    children.addAll(
+                        Label("Qtd mínima:").apply { prefWidth = 85.0 },
+                        tfQuantidadeMinima,
+                        Label("Desconto:").apply { prefWidth = 70.0 },
+                        tfPercentualDesconto,
+                        Label("%")
+                    )
+                    padding = Insets(0.0, 0.0, 0.0, 25.0)
+                }
+
+                children.add(descontoControls)
+                children.add(lblDescontosAplicados)
+            }
+
+            // Profit margin layout
+            val margemBox = HBox(10.0).apply {
+                alignment = Pos.CENTER_LEFT
+                children.addAll(
+                    Label("Margem de Lucro (%):").apply { prefWidth = 120.0 },
+                    tfMargemLucro,
+                    Label("%"),
+                    btnMargemPorTipo
+                )
+            }
+
+            // Suggested price layout
+            val precoSugeridoBox = HBox(10.0).apply {
+                alignment = Pos.CENTER_LEFT
+                children.addAll(
+                    Label("Preço Sugerido:").apply { prefWidth = 120.0 },
+                    lblPrecoSugerido,
+                    Button("Aplicar").apply {
+                        styleClass.add("small-button")
+                        setOnAction {
+                            val precoSugerido = lblPrecoSugerido.text.replace("R$ ", "")
+                                .replace(".", "")
+                                .replace(",", ".")
+                                .toDoubleOrNull() ?: 0.0
+
+                            val formatter = java.text.DecimalFormat("#,##0.00")
+                            tfValorUnitario.text = "R$ " + formatter.format(precoSugerido)
+                                .replace(".", ",")
+                        }
+                    }
+                )
+            }
+
+            // Layout para lucro estimado
+            val lucroBox = HBox(10.0).apply {
+                alignment = Pos.CENTER_LEFT
+                children.addAll(
+                    Label("Lucro Estimado:").apply { prefWidth = 120.0 },
+                    lblLucroEstimado
+                )
+            }
+
+            // Add listener for ingredient changes
+            insumosDosProdutos.addListener(javafx.collections.ListChangeListener {
+                Platform.runLater { calcularPrecoSugerido() }
+            })
+
+            // Add listener for category changes
+            cbCategoria.valueProperty().addListener { _, _, _ ->
+                Platform.runLater { calcularPrecoSugerido() }
+            }
+
+
+
+            // Pricing calculation function
+            fun calcularPrecoSugerido() {
+                var custoInsumos = 0.0
+                val custoCompra = extrairValorMonetario(tfValorCompra.text)
+                val descontosAplicados = mutableListOf<String>()
+
+                // Desconto por volume
+                val aplicarDescontoVolume = cbDescontoVolume.isSelected
+                val qtdMinima = tfQuantidadeMinima.text.toDoubleOrNull() ?: 10.0
+                val percentualDesconto = tfPercentualDesconto.text.toDoubleOrNull() ?: 5.0
+
+                for (insumo in insumosDosProdutos) {
+                    try {
+                        db.getConnection().use { conn ->
+                            val stmt = conn.prepareStatement(
+                                "SELECT valor_unitario FROM produtos WHERE id = ?"
+                            )
+                            stmt.setLong(1, insumo.insumoId)
+                            val rs = stmt.executeQuery()
+
+                            if (rs.next()) {
+                                var valorUnitario = rs.getDouble("valor_unitario")
+                                var custoInsumo = valorUnitario * insumo.quantidade
+
+                                // Aplicar desconto se quantidade for maior que a mínima
+                                if (aplicarDescontoVolume && insumo.quantidade >= qtdMinima) {
+                                    val valorDesconto = custoInsumo * (percentualDesconto / 100.0)
+                                    custoInsumo -= valorDesconto
+                                    descontosAplicados.add("${insumo.nome}: -${percentualDesconto}%")
+                                }
+
+                                custoInsumos += custoInsumo
+                            }
+                        }
+                    } catch (e: SQLException) {
+                        e.printStackTrace()
+                    }
+                }
+
+                // Atualizar label de descontos aplicados
+                if (descontosAplicados.isNotEmpty()) {
+                    lblDescontosAplicados.text = "Descontos: ${descontosAplicados.joinToString(", ")}"
+                    lblDescontosAplicados.style = "-fx-text-fill: green; -fx-font-style: italic;"
+                } else {
+                    lblDescontosAplicados.text = ""
+                }
+
+                // Format and display cost of ingredients
+                val formatter = java.text.DecimalFormat("#,##0.00")
+                lblCustoInsumos.text = "R$ " + formatter.format(custoInsumos)
+                    .replace(".", ",")
+
+                // Calculate total cost (ingredients + purchase)
+                val custoTotal = custoInsumos + custoCompra
+
+                // Adicionar impostos
+                val percentualImpostos = tfImpostos.text.toDoubleOrNull() ?: 0.0
+                val valorImpostos = custoTotal * (percentualImpostos / 100)
+                val custoComImpostos = custoTotal + valorImpostos
+
+                // Calculate suggested price with margin
+                val margem = tfMargemLucro.text.toDoubleOrNull() ?: 30.0
+                val precoSugerido = custoComImpostos * (1 + margem/100)
+
+                // Calcular lucro estimado
+                val lucroEstimado = precoSugerido - custoComImpostos
+                val percentualLucro = if (precoSugerido > 0) (lucroEstimado / precoSugerido) * 100 else 0.0
+
+                lblPrecoSugerido.text = "R$ " + formatter.format(precoSugerido)
+                    .replace(".", ",")
+
+                lblLucroEstimado.text = "R$ " + formatter.format(lucroEstimado)
+                    .replace(".", ",") +
+                        " (" + formatter.format(percentualLucro).replace(".", ",") + "%)"
+            }
+
+            // Force calculation when section is created
+            Platform.runLater {
+                calcularPrecoSugerido()
+            }
+
+            section.children.addAll(
+                title,
+                custoBox,
+                compraBox,
+                impostosBox,
+                descontoVolumeBox,
+                margemBox,
+                precoSugeridoBox,
+                lucroBox
+            )
+
+            // Store reference for later access
+            this.calcularPrecoSugerido = ::calcularPrecoSugerido
+
+            // Store references for use in preencherFormulario
+            this.valorCompraField = tfValorCompra
+            this.impostoField = tfImpostos
+            this.descontoVolumeField = cbDescontoVolume
+            this.qtdMinimaField = tfQuantidadeMinima
+            this.percentualDescontoField = tfPercentualDesconto
+
+            return section
+        }
+
         val categoryButtonsBox = HBox(5.0).apply {
             alignment = Pos.CENTER_RIGHT
 
@@ -744,6 +1100,7 @@ private fun updatePagination() {
         }
 
         val insumosPanel = createInsumosPanel()
+        val pricingSection = createPricingSection()
 
         val scrollPane = ScrollPane().apply {
             isFitToWidth = true
@@ -777,6 +1134,7 @@ private fun updatePagination() {
                 Label("Status:"), cbStatus,
                 Separator().apply { padding = Insets(5.0, 0.0, 5.0, 0.0) },
                 insumosPanel,
+                pricingSection,
                 Separator().apply { padding = Insets(5.0, 0.0, 5.0, 0.0) },
                 HBox(10.0, btnSalvar, btnCancelar).apply {
                     alignment = Pos.CENTER
@@ -1229,6 +1587,7 @@ private fun updatePagination() {
             val estoqueMinimo = tfEstoqueMinimo.text.toIntOrNull() ?: 0
             val estoqueAtual = tfEstoqueAtual.text.toIntOrNull() ?: 0
             val ehInsumo = if (cbEhInsumo.isSelected) 1 else 0
+            val percentualImposto = impostoField.text.toDoubleOrNull() ?: 0.0
 
             try {
                 db.getConnection().use { conn ->
@@ -1246,10 +1605,10 @@ private fun updatePagination() {
 
                     if (produtoId == null) {
                         val sql = """
-                    INSERT INTO produtos (codigo, nome, descricao, valor_unitario, categoria,
-                    unidade_medida, estoque_minimo, estoque_atual, status, eh_insumo)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """
+                        INSERT INTO produtos (codigo, nome, descricao, valor_unitario, categoria,
+                        unidade_medida, estoque_minimo, estoque_atual, status, eh_insumo, percentual_imposto)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """
 
                         val stmt = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)
                         stmt.setString(1, gerarCodigo())
@@ -1262,6 +1621,7 @@ private fun updatePagination() {
                         stmt.setInt(8, estoqueAtual)
                         stmt.setString(9, cbStatus.value)
                         stmt.setInt(10, ehInsumo)
+                        stmt.setDouble(11, percentualImposto)
 
                         stmt.executeUpdate()
 
@@ -1505,6 +1865,7 @@ private fun updatePagination() {
 
         dialog.showAndWait()
     }
+    private lateinit var valorCompraField: TextField
 
     private fun preencherFormulario(produto: Produto) {
         produtoSelecionado = produto
@@ -1513,23 +1874,11 @@ private fun updatePagination() {
         tfNome.text = produto.nome
         taDescricao.text = produto.descricao
 
-        // Apply currency formatting to the value from the database
-        var isUpdating = false
-        isUpdating = true
-        Platform.runLater {
-            try {
-                // Format the value as currency
-                val value = produto.valorUnitario
-                val formattedValue = String.format("%,.2f", value)
-                    .replace(",", ".")
-                    .replace(".", ",", ignoreCase = true)
-                    .replaceFirst(",", ".")
-                tfValorUnitario.text = "R$ $formattedValue"
-            } finally {
-                isUpdating = false
-            }
-        }
+        // Formatação do valor unitário
+        val formato = java.text.NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
+        tfValorUnitario.text = formato.format(produto.valorUnitario)
 
+        // Seleciona categoria ou adiciona se não existir
         if (produto.categoria.isNotEmpty()) {
             if (!cbCategoria.items.contains(produto.categoria)) {
                 cbCategoria.items.add(produto.categoria)
@@ -1545,11 +1894,45 @@ private fun updatePagination() {
         cbStatus.value = produto.status
         cbEhInsumo.isSelected = produto.ehInsumo
 
+        // Carregar valor de compra (se existir)
+        carregarValorCompra(produto.id)
+
+        // Carregar insumos do produto
         carregarInsumosDoProduto(produto.id)
         carregarInsumosDisponiveis()
 
+        // Calcular preço sugerido depois que todos os dados estiverem carregados
+        Platform.runLater {
+            calcularPrecoSugerido()
+        }
+
         btnSalvar.text = "Atualizar"
         btnCancelar.isDisable = false
+    }
+
+    private fun carregarValorCompra(produtoId: Long) {
+        if (!::valorCompraField.isInitialized) return
+
+        try {
+            db.getConnection().use { conn ->
+                val sql = "SELECT valor_compra FROM produtos WHERE id = ?"
+                conn.prepareStatement(sql).use { stmt ->
+                    stmt.setLong(1, produtoId)
+                    val rs = stmt.executeQuery()
+
+                    if (rs.next()) {
+                        val valorCompra = rs.getDouble("valor_compra")
+                        val formatter = java.text.DecimalFormat("#,##0.00")
+                        valorCompraField.text = "R$ " + formatter.format(valorCompra).replace(".", ",")
+                    } else {
+                        valorCompraField.text = "R$ 0,00"
+                    }
+                }
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
+            valorCompraField.text = "R$ 0,00"
+        }
     }
 
     private fun carregarInsumosDoProduto(produtoId: Long) {
@@ -1558,10 +1941,10 @@ private fun updatePagination() {
         try {
             db.getConnection().use { conn ->
                 val sql = """
-                SELECT pi.insumo_id, p.nome, pi.quantidade, p.unidade_medida
-                FROM produto_insumos pi
-                JOIN produtos p ON pi.insumo_id = p.id
-                WHERE pi.produto_id = ?
+            SELECT pi.insumo_id, p.nome, pi.quantidade, p.unidade_medida
+            FROM produto_insumos pi
+            JOIN produtos p ON pi.insumo_id = p.id
+            WHERE pi.produto_id = ?
             """
 
                 conn.prepareStatement(sql).use { stmt ->
@@ -1583,6 +1966,37 @@ private fun updatePagination() {
         } catch (e: SQLException) {
             e.printStackTrace()
             showAlert("Erro ao carregar insumos", e.message ?: "Erro desconhecido")
+        }
+    }
+
+    private fun verificarColunaTabelaProdutos() {
+        try {
+            db.getConnection().use { conn ->
+                val stmt = conn.createStatement()
+                val rs = stmt.executeQuery("PRAGMA table_info(produtos)")
+
+                var colunaCompraExiste = false
+                var colunaImpostoExiste = false
+
+                while (rs.next()) {
+                    val colName = rs.getString("name")
+                    if (colName.equals("valor_compra", ignoreCase = true)) {
+                        colunaCompraExiste = true
+                    } else if (colName.equals("percentual_imposto", ignoreCase = true)) {
+                        colunaImpostoExiste = true
+                    }
+                }
+
+                if (!colunaCompraExiste) {
+                    stmt.execute("ALTER TABLE produtos ADD COLUMN valor_compra DECIMAL(10,2) DEFAULT 0")
+                }
+
+                if (!colunaImpostoExiste) {
+                    stmt.execute("ALTER TABLE produtos ADD COLUMN percentual_imposto DECIMAL(5,2) DEFAULT 0")
+                }
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
         }
     }
 
