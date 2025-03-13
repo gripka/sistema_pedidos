@@ -159,6 +159,7 @@ class PrinterController {
 
                 val linhaDiv = "------------------------------------------------"
 
+
                 // Cabecalho da empresa
                 escpos.write(boldCenter, normalizarTexto(COMPANY_NAME))
                     .feed(1)
@@ -168,10 +169,11 @@ class PrinterController {
                     .feed(1)
                     .writeLF(linhaDiv)
 
-                val numeroPedido = pedidoData["numero"] as String
-                val dataPedido = formatarData(pedidoData["data_pedido"] as String)
-                val statusPedido = pedidoData["status_pedido"] as String
-                val statusPagamento = pedidoData["status"] as String
+                val numeroPedido = normalizarTexto(pedidoData["numero"] as String)
+                val dataPedido = normalizarTexto(formatarData(pedidoData["data_pedido"] as String))
+                val statusPedido = normalizarTexto(pedidoData["status_pedido"] as String)
+                val statusPagamento = normalizarTexto(pedidoData["status"] as String)
+
 
                 escpos.write(boldCenter, normalizarTexto("PEDIDO #$numeroPedido"))
                     .feed(1)
@@ -217,33 +219,75 @@ class PrinterController {
                     .writeLF(linhaDiv)
                 escpos.write(Style(), "")
 
-                // Produtos
+// Produtos
                 escpos.write(bold, "PRODUTOS:")
                     .feed(1)
 
                 val itens = pedidoData["itens"] as? List<Map<String, Any>> ?: emptyList()
 
-                // Cabecalho da tabela de itens
+// Cabecalho da tabela de itens
                 escpos.writeLF("QTD PRODUTO             VALOR   TOTAL")
 
                 itens.forEach { item ->
                     val qtd = (item["quantidade"] as Number).toInt()
-                    val nome = item["nome_produto"] as String
+                    val nome = normalizarTexto(item["nome_produto"] as String)
                     val valorUnit = formatarValor(item["valor_unitario"] as Number)
                     val subtotal = formatarValor(item["subtotal"] as Number)
 
-                    // Formato para primeira linha
-                    escpos.writeLF(
-                        String.format(
-                            "%-3s %-20s %-7s %s",
-                            "${qtd}x", truncateText(nome, 20), valorUnit, subtotal
-                        )
-                    )
+                    // Find the first space before position 20
+                    val palavras = nome.split(" ")
+                    var linhaAtual = ""
+                    var primeiraLinha = true
 
-                    // Se o nome for muito longo, imprimir o resto com wrapping
-                    if (nome.length > 20) {
-                        val restante = nome.substring(20)
-                        imprimirTextoIndentado(escpos, restante, 4)
+                    for (palavra in palavras) {
+                        if (linhaAtual.isEmpty()) {
+                            if ((palavra.length <= 20 && primeiraLinha) || (!primeiraLinha && palavra.length <= 19)) {
+                                linhaAtual = palavra
+                            } else {
+                                if (primeiraLinha) {
+                                    escpos.writeLF(
+                                        String.format(
+                                            "%-3s %-20s %-7s %s",
+                                            "${qtd}x", "", valorUnit, subtotal
+                                        )
+                                    )
+                                }
+                                escpos.writeLF("    $palavra")
+                                primeiraLinha = false
+                                continue
+                            }
+                        } else {
+                            val novaLinha = "$linhaAtual $palavra"
+                            if ((novaLinha.length <= 20 && primeiraLinha) || (!primeiraLinha && novaLinha.length <= 19)) {
+                                linhaAtual = novaLinha
+                            } else {
+                                if (primeiraLinha) {
+                                    escpos.writeLF(
+                                        String.format(
+                                            "%-3s %-20s %-7s %s",
+                                            "${qtd}x", truncateText(linhaAtual, 20), valorUnit, subtotal
+                                        )
+                                    )
+                                    primeiraLinha = false
+                                } else {
+                                    escpos.writeLF("    $linhaAtual")
+                                }
+                                linhaAtual = palavra
+                            }
+                        }
+                    }
+
+                    if (linhaAtual.isNotEmpty()) {
+                        if (primeiraLinha) {
+                            escpos.writeLF(
+                                String.format(
+                                    "%-3s %-20s %-7s %s",
+                                    "${qtd}x", truncateText(linhaAtual, 20), valorUnit, subtotal
+                                )
+                            )
+                        } else {
+                            escpos.writeLF("    $linhaAtual")
+                        }
                     }
                 }
 
@@ -285,12 +329,15 @@ class PrinterController {
                 escpos.write(bold, "TOTAL: R$ $valorTotal")
                     .feed(1)
 
-                if (formaPagamento == "Dinheiro" && valorTrocoPara != null && valorTroco != null) {
+                if (formaPagamento == "Dinheiro" &&
+                    valorTrocoPara != null && valorTrocoPara.toDouble() > 0 &&
+                    valorTroco != null && valorTroco.toDouble() > 0) {
                     val valorTrocoParaStr = formatarValor(valorTrocoPara)
                     val valorTrocoStr = formatarValor(valorTroco)
                     escpos.writeLF("Troco para: R$ $valorTrocoParaStr")
                     escpos.writeLF("Troco: R$ $valorTrocoStr")
                 }
+
                 escpos.feed(1)
                     .writeLF("Pagamento: $statusPagamento") //pagamento
                 escpos.feed(1)
@@ -313,20 +360,72 @@ class PrinterController {
                     }
 
                     val numero = (entrega["numero"] as? String)?.takeIf { it.isNotBlank() } ?: "S/N"
-                    val endereco = "${entrega["endereco"]}, $numero"
-                    imprimirTextoComWrapping(escpos, "Endereco: $endereco")
+                    val endereco = normalizarTexto("${entrega["endereco"]}, $numero")
+                    if (endereco.isNotEmpty()) {
+                        escpos.write(bold, "Endereco:")
+                            .feed(1)
+                        // Process address using word wrapping
+                        val palavras = endereco.split(" ")
+                        var linhaAtual = ""
+                        var primeiraLinha = true
 
-                    val referencia = entrega["referencia"] as? String ?: ""
-                    if (referencia.isNotEmpty()) {
-                        imprimirTextoComWrapping(escpos, "Referencia: $referencia")
+                        for (palavra in palavras) {
+                            if (linhaAtual.isEmpty()) {
+                                linhaAtual = if (primeiraLinha) palavra else "    $palavra"
+                            } else {
+                                val novaLinha = "$linhaAtual $palavra"
+                                if ((novaLinha.length <= LINE_WIDTH && primeiraLinha) ||
+                                    (!primeiraLinha && novaLinha.length <= LINE_WIDTH - 4)) {
+                                    linhaAtual = novaLinha
+                                } else {
+                                    escpos.writeLF(linhaAtual)
+                                    primeiraLinha = false
+                                    linhaAtual = "    $palavra"
+                                }
+                            }
+                        }
+
+                        if (linhaAtual.isNotEmpty()) {
+                            escpos.writeLF(linhaAtual)
+                        }
                     }
 
-                    val bairro = entrega["bairro"] as? String ?: ""
+                    val referencia = normalizarTexto(entrega["referencia"] as? String ?: "")
+                    if (referencia.isNotEmpty()) {
+                        escpos.write(bold, "Referencia:")
+                            .feed(1)
+                        // Process reference using word wrapping
+                        val palavras = referencia.split(" ")
+                        var linhaAtual = ""
+                        var primeiraLinha = true
+
+                        for (palavra in palavras) {
+                            if (linhaAtual.isEmpty()) {
+                                linhaAtual = if (primeiraLinha) palavra else "    $palavra"
+                            } else {
+                                val novaLinha = "$linhaAtual $palavra"
+                                if ((novaLinha.length <= LINE_WIDTH && primeiraLinha) ||
+                                    (!primeiraLinha && novaLinha.length <= LINE_WIDTH - 4)) {
+                                    linhaAtual = novaLinha
+                                } else {
+                                    escpos.writeLF(linhaAtual)
+                                    primeiraLinha = false
+                                    linhaAtual = "    $palavra"
+                                }
+                            }
+                        }
+
+                        if (linhaAtual.isNotEmpty()) {
+                            escpos.writeLF(linhaAtual)
+                        }
+                    }
+
+                    val bairro = normalizarTexto(entrega["bairro"] as? String ?: "")
                     if (bairro.isNotEmpty()) {
                         imprimirTextoComWrapping(escpos, "Bairro: $bairro")
                     }
 
-                    val cidade = entrega["cidade"] as? String ?: ""
+                    val cidade = normalizarTexto(entrega["cidade"] as? String ?: "")
                     if (cidade.isNotEmpty()) {
                         imprimirTextoComWrapping(escpos, "Cidade: $cidade")
                     }
@@ -367,7 +466,7 @@ class PrinterController {
                     val horaFormatada = if (!horaRetirada.isNullOrBlank())
                         horaRetirada
                     else "A combinar"
-                    escpos.writeLF("Horário: $horaFormatada")
+                    escpos.writeLF("Horario: $horaFormatada")
 
                     //escpos.writeLF("Local: ${normalizarTexto(COMPANY_ADDRESS)}")
                     //escpos.feed(1)
@@ -378,7 +477,7 @@ class PrinterController {
 
                 // Rodape
                 escpos.feed(1)
-                    .write(center, "Obrigado pela preferencia!")
+                    .write(center, COMPANY_NAME)
                     .feed(1)
                     .writeLF(center,"Impresso em: " + SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(Date()))
                     .feed(6)  // Increased from 3 to 6 for more space before cutting

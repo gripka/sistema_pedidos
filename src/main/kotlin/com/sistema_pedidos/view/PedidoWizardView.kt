@@ -1213,8 +1213,6 @@ class PedidoWizardView : BorderPane() {
         private fun createProductsStep(): Pane {
             val section = createSectionHeader("Produtos")
 
-
-            // Get the productos container from the controller
             val produtosContainer = controller.getProdutosContainer().apply {
                 styleClass.add("produtos-container")
                 padding = Insets(0.0, 0.0, 10.0, 0.0)
