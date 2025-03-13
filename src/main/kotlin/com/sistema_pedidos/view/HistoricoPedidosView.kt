@@ -430,7 +430,6 @@ class HistoricoPedidosView : VBox(10.0) {
                         val buttonTypeCancel = ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE)
                         dialog.dialogPane.buttonTypes.addAll(buttonTypeOk, buttonTypeCancel)
 
-                        // Apply styles directly to the button bar
                         val buttonBar = dialog.dialogPane.lookup(".button-bar") as ButtonBar
                         buttonBar.apply {
                             buttonOrder = ""

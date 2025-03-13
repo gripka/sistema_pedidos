@@ -1156,6 +1156,61 @@ class PedidoWizardController {
         }
     }
 
+    fun buscarClientePorTelefone(telefone: String): Map<String, String>? {
+        if (telefone.isBlank()) return null
+
+        val clienteData = mutableMapOf<String, String>()
+
+        try {
+            DatabaseHelper().getConnection().use { connection ->
+                connection.prepareStatement("""
+                SELECT * FROM clientes 
+                WHERE telefone = ?
+            """).use { stmt ->
+                    stmt.setString(1, telefone)
+                    val rs = stmt.executeQuery()
+
+                    if (rs.next()) {
+                        // Get client type
+                        clienteData["tipo"] = rs.getString("tipo") ?: "PESSOA_FISICA"
+
+                        // Pessoa Física fields
+                        clienteData["nome"] = rs.getString("nome") ?: ""
+                        clienteData["sobrenome"] = rs.getString("sobrenome") ?: ""
+                        clienteData["cpf"] = rs.getString("cpf") ?: ""
+
+                        // Pessoa Jurídica fields
+                        clienteData["razao_social"] = rs.getString("razao_social") ?: ""
+                        clienteData["nome_fantasia"] = rs.getString("nome_fantasia") ?: ""
+                        clienteData["cnpj"] = rs.getString("cnpj") ?: ""
+                        clienteData["inscricao_estadual"] = rs.getString("inscricao_estadual") ?: ""
+
+                        // Common fields
+                        clienteData["telefone"] = rs.getString("telefone") ?: ""
+                        clienteData["email"] = rs.getString("email") ?: ""
+                        clienteData["observacao"] = rs.getString("observacao") ?: ""
+
+                        // Address fields
+                        clienteData["cep"] = rs.getString("cep") ?: ""
+                        clienteData["logradouro"] = rs.getString("logradouro") ?: ""
+                        clienteData["numero"] = rs.getString("numero") ?: ""
+                        clienteData["complemento"] = rs.getString("complemento") ?: ""
+                        clienteData["bairro"] = rs.getString("bairro") ?: ""
+                        clienteData["cidade"] = rs.getString("cidade") ?: ""
+                        clienteData["estado"] = rs.getString("estado") ?: ""
+
+                        return clienteData
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            println("Erro ao buscar cliente: ${e.message}")
+            e.printStackTrace()
+        }
+
+        return null
+    }
+
     private fun buscarClienteIdPorTelefone(connection: Connection, telefone: String): Long? {
         if (telefone.isBlank()) return null
 
@@ -1165,8 +1220,6 @@ class PedidoWizardController {
             if (rs.next()) rs.getLong("id") else null
         }
     }
-
-
 
     fun salvarPedido(
         clienteInfo: List<Pair<String, String>>,

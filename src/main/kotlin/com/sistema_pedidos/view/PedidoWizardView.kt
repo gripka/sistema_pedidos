@@ -337,23 +337,88 @@ class PedidoWizardView : BorderPane() {
                             entregaInfo
                         )
 
-                        // Show success alert
-                        val alert = Alert(Alert.AlertType.INFORMATION)
-                        alert.title = "Pedido Finalizado"
-                        alert.headerText = "Pedido criado com sucesso!"
-                        alert.contentText = "O pedido foi registrado com o número: $numeroPedido"
-                        alert.showAndWait()
+                        // Create styled success alert with increased height
+                        val successAlert = Alert(Alert.AlertType.INFORMATION).apply {
+                            title = "Sucesso"
+                            headerText = "Sucesso"
+                            contentText = "Pedido criado com sucesso!"
+                            initStyle(javafx.stage.StageStyle.UNDECORATED)
 
-                        tabPane.tabs.add(0, createOrderTab("Novo Pedido"))
-                        tabPane.selectionModel.select(0)
+                            dialogPane.styleClass.add("custom-dialog")
+                            dialogPane.stylesheets.add(javaClass.getResource("/pedidowizardview.css").toExternalForm())
+
+                            // Set width more compact but increase minimum height
+                            dialogPane.prefWidth = 300.0
+                            dialogPane.maxWidth = 300.0
+                            dialogPane.minHeight = 120.0  // Increase minimum height
+
+                            // Remove default icon
+                            dialogPane.graphic = null
+
+                            buttonTypes.setAll(ButtonType.OK)
+                        }
+
+                        // Apply button styling
+                        Platform.runLater {
+                            val button = successAlert.dialogPane.lookupButton(ButtonType.OK)
+                            button.styleClass.add("primary-button")
+
+                            // Get button bar to adjust alignment and padding
+                            val buttonBar = successAlert.dialogPane.lookup(".button-bar") as ButtonBar
+                            buttonBar.buttonOrder = ""
+                            // Increased top padding to move button higher in the dialog
+                            buttonBar.setPadding(Insets(10.0, 20.0, 20.0, 0.0))
+
+                            // Center alignment
+                            val container = buttonBar.lookup(".container") as HBox?
+                            container?.alignment = Pos.CENTER
+                        }
+
+                        successAlert.showAndWait()
+
+                        val currentTab = tabPane.selectionModel.selectedItem
+                        val newOrderTab = createOrderTab("Novo Pedido")
+                        tabPane.tabs.add(0, newOrderTab)
+                        tabPane.selectionModel.select(newOrderTab)
+                        if (currentTab != null) {
+                            tabPane.tabs.remove(currentTab)
+                        }
 
                     } catch (e: Exception) {
-                        // Show error alert
-                        val alert = Alert(Alert.AlertType.ERROR)
-                        alert.title = "Erro"
-                        alert.headerText = "Erro ao finalizar pedido"
-                        alert.contentText = "Ocorreu um erro: ${e.message}"
-                        alert.showAndWait()
+                        // Create styled error alert with increased height
+                        val errorAlert = Alert(Alert.AlertType.ERROR).apply {
+                            title = "Erro"
+                            headerText = "Erro"
+                            contentText = "Ocorreu um erro: ${e.message}"
+                            initStyle(javafx.stage.StageStyle.UNDECORATED)
+
+                            dialogPane.styleClass.add("custom-dialog")
+                            dialogPane.stylesheets.add(javaClass.getResource("/pedidowizardview.css").toExternalForm())
+
+                            dialogPane.prefWidth = 300.0
+                            dialogPane.maxWidth = 300.0
+                            dialogPane.minHeight = 120.0  // Increase minimum height
+
+                            dialogPane.graphic = null
+
+                            buttonTypes.setAll(ButtonType.OK)
+                        }
+
+                        Platform.runLater {
+                            val button = errorAlert.dialogPane.lookupButton(ButtonType.OK)
+                            button.styleClass.add("secondary-button")
+
+                            val buttonBar = errorAlert.dialogPane.lookup(".button-bar") as ButtonBar
+                            buttonBar.buttonOrder = ""
+                            // Increased top padding to move button higher in the dialog
+                            buttonBar.setPadding(Insets(10.0, 20.0, 20.0, 0.0))
+
+                            // Center alignment
+                            val container = buttonBar.lookup(".container") as HBox?
+                            container?.alignment = Pos.CENTER
+                        }
+
+                        errorAlert.showAndWait()
                         e.printStackTrace()
                     }
                 }
@@ -914,6 +979,18 @@ class PedidoWizardView : BorderPane() {
                     if (formattedValue != newValue) {
                         text = formattedValue
                         positionCaret(text.length)
+                    }
+                }
+
+                // Add focus lost listener to search for existing customer
+                focusedProperty().addListener { _, wasFocused, isNowFocused ->
+                    if (wasFocused && !isNowFocused && !text.isNullOrBlank() && text.length >= 14) {
+                        // Only search if we have a complete phone number
+                        val clienteData = controller.buscarClientePorTelefone(text)
+                        if (clienteData != null && this@OrderTabContent.isVisible) {
+                            // Only populate if this tab is visible/active
+                            populateFormFields(clienteData)
+                        }
                     }
                 }
             }
@@ -1707,6 +1784,52 @@ class PedidoWizardView : BorderPane() {
             }
         }
 
+        private fun populateFormFields(clienteData: Map<String, String>) {
+            try {
+                println("Populating form fields in current tab...")
+
+                // Set customer type - only if the toggle exists in this tab
+                val isPessoaFisica = clienteData["tipo"] == "PESSOA_FISICA"
+                if (::customerTypeToggle.isInitialized) {
+                    customerTypeToggle.toggles.forEach { toggle ->
+                        if ((toggle as RadioButton).userData == clienteData["tipo"]) {
+                            customerTypeToggle.selectToggle(toggle)
+                        }
+                    }
+                }
+
+                // Populate fields according to customer type
+                if (isPessoaFisica) {
+                    if (::nomeField.isInitialized) nomeField.text = clienteData["nome"] ?: ""
+                    if (::sobrenomeField.isInitialized) sobrenomeField.text = clienteData["sobrenome"] ?: ""
+                    if (::cpfField.isInitialized) cpfField.text = clienteData["cpf"] ?: ""
+                } else {
+                    if (::razaoSocialField.isInitialized) razaoSocialField.text = clienteData["razao_social"] ?: ""
+                    if (::nomeFantasiaField.isInitialized) nomeFantasiaField.text = clienteData["nome_fantasia"] ?: ""
+                    if (::cnpjField.isInitialized) cnpjField.text = clienteData["cnpj"] ?: ""
+                    if (::ieField.isInitialized) ieField.text = clienteData["inscricao_estadual"] ?: ""
+                }
+
+                // Common fields - check if initialized before setting
+                if (::emailField.isInitialized) emailField.text = clienteData["email"] ?: ""
+                if (::observacaoField.isInitialized) observacaoField.text = clienteData["observacao"] ?: ""
+
+                // Address fields - check if initialized before setting
+                if (::logradouroField.isInitialized) logradouroField.text = clienteData["logradouro"] ?: ""
+                if (::numeroField.isInitialized) numeroField.text = clienteData["numero"] ?: ""
+                if (::complementoField.isInitialized) complementoField.text = clienteData["complemento"] ?: ""
+                if (::bairroField.isInitialized) bairroField.text = clienteData["bairro"] ?: ""
+                if (::cidadeField.isInitialized) cidadeField.text = clienteData["cidade"] ?: ""
+                if (::estadoField.isInitialized) estadoField.value = clienteData["estado"] ?: ""
+                if (::cepField.isInitialized) cepField.text = clienteData["cep"] ?: ""
+
+                println("Form fields populated successfully in current tab")
+            } catch (e: Exception) {
+                println("Error populating form fields: ${e.message}")
+                e.printStackTrace()
+            }
+        }
+
         private fun createDeliveryStep(): Pane {
             val section = createSectionHeader("Informações de Entrega")
 
@@ -1738,31 +1861,26 @@ class PedidoWizardView : BorderPane() {
                                         // Assign to class property
                                         this@OrderTabContent.telefoneDestinatarioField = this
 
-                                        // Add input mask for phone number
                                         textProperty().addListener { _, oldValue, newValue ->
                                             if (newValue == null) {
                                                 text = oldValue
                                                 return@addListener
                                             }
 
-                                            // Keep only digits
                                             val digits = newValue.replace(Regex("[^\\d]"), "")
 
-                                            // Format as phone number
                                             val formatted = when {
                                                 digits.isEmpty() -> ""
                                                 digits.length <= 2 -> "(" + digits
                                                 digits.length <= 7 -> "(${digits.substring(0, 2)}) ${digits.substring(2)}"
                                                 else -> {
                                                     val len = digits.length
-                                                    val maxDigits = 11 // Allow up to 11 digits (including DDD)
+                                                    val maxDigits = 11
                                                     val truncated = digits.substring(0, minOf(len, maxDigits))
 
                                                     if (truncated.length <= 10) {
-                                                        // Format as (XX) XXXX-XXXX for 10 digits
                                                         "(${truncated.substring(0, 2)}) ${truncated.substring(2, 6)}-${truncated.substring(6)}"
                                                     } else {
-                                                        // Format as (XX) XXXXX-XXXX for 11 digits
                                                         "(${truncated.substring(0, 2)}) ${truncated.substring(2, 7)}-${truncated.substring(7)}"
                                                     }
                                                 }
@@ -1789,7 +1907,6 @@ class PedidoWizardView : BorderPane() {
                                         id = "enderecoEntregaField"
                                         styleClass.add("text-field")
                                         maxWidth = Double.POSITIVE_INFINITY
-                                        // Assign to class property
                                         this@OrderTabContent.enderecoEntregaField = this
                                     }
                                 )
@@ -1801,7 +1918,6 @@ class PedidoWizardView : BorderPane() {
                                         id = "numeroEntregaField"
                                         styleClass.add("text-field")
                                         prefWidth = 80.0
-                                        // Assign to class property
                                         this@OrderTabContent.numeroEntregaField = this
                                     }
                                 )
@@ -1822,7 +1938,6 @@ class PedidoWizardView : BorderPane() {
                                         minWidth = 250.0
                                         maxWidth = Double.POSITIVE_INFINITY
                                         HBox.setHgrow(this, Priority.ALWAYS)
-                                        // Assign to class property
                                         this@OrderTabContent.referenciaEntregaField = this
                                     }
                                 )
@@ -1839,7 +1954,6 @@ class PedidoWizardView : BorderPane() {
                                         id = "cidadeEntregaField"
                                         styleClass.add("text-field")
                                         HBox.setHgrow(this, Priority.ALWAYS)
-                                        // Assign to class property
                                         this@OrderTabContent.cidadeEntregaField = this
                                     }
                                 )
@@ -1851,7 +1965,6 @@ class PedidoWizardView : BorderPane() {
                                         id = "bairroEntregaField"
                                         styleClass.add("text-field")
                                         prefWidth = 200.0
-                                        // Assign to class property
                                         this@OrderTabContent.bairroEntregaField = this
                                     }
                                 )
@@ -1865,7 +1978,6 @@ class PedidoWizardView : BorderPane() {
                                         prefWidth = 120.0
                                         promptText = "00000-000"
                                         controller.formatarCep(this)
-                                        // Assign to class property
                                         this@OrderTabContent.cepEntregaField = this
                                     }
                                 )
@@ -1885,7 +1997,6 @@ class PedidoWizardView : BorderPane() {
                                         alignment = Pos.CENTER_RIGHT
                                         controller.setValorEntregaField(this)
                                         controller.formatarMoeda(this)
-                                        // Assign to class property
                                         this@OrderTabContent.valorEntregaField = this
                                         textProperty().addListener { _, _, _ ->
                                             controller.setValorEntregaTotal(controller.parseMoneyValue(text))
@@ -1901,7 +2012,7 @@ class PedidoWizardView : BorderPane() {
                                         id = "dataEntregaField"
                                         styleClass.add("date-picker")
                                         prefWidth = 150.0
-                                        isEditable = false  // Disable text editing
+                                        isEditable = false
                                         this@OrderTabContent.dataEntregaPicker = this
                                     }
                                 )
@@ -1920,7 +2031,6 @@ class PedidoWizardView : BorderPane() {
                                                 isEditable = true
                                                 items.addAll((0..23).map { String.format("%02d", it) })
                                                 value = "00"
-                                                // Assign to class property
                                                 this@OrderTabContent.horaEntregaCombo = this
                                             },
                                             Label(":").apply {
@@ -1935,7 +2045,6 @@ class PedidoWizardView : BorderPane() {
                                                 isEditable = true
                                                 items.addAll((0..59 step 15).map { String.format("%02d", it) })
                                                 value = "00"
-                                                // Assign to class property
                                                 this@OrderTabContent.minutoEntregaCombo = this
                                             }
                                         )

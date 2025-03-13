@@ -732,10 +732,7 @@
     -fx-spacing: 20px;  /* Increased from 10px for more space */
 }
 
-.dialog-button {
-    -fx-min-width: 100px;
-    -fx-pref-width: 100px;
-}
+
 
 .custom-checkbox .box {
     -fx-background-color: white;
