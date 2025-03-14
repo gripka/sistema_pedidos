@@ -190,8 +190,8 @@ class PrinterController {
                 escpos.write(smallFont, "")
 
                 if (clienteInfo != null) {
-                    val tipoCliente = clienteInfo["tipo"] as? String
-                    if (tipoCliente == "PESSOA_FISICA") {
+                    val tipoCliente = clienteInfo["tipo"] as? String ?: ""
+                    if (tipoCliente.trim().uppercase() == "PESSOA_FISICA") {
                         val nome = normalizarTexto(clienteInfo["nome"] as? String ?: "")
                         val sobrenome = normalizarTexto(clienteInfo["sobrenome"] as? String ?: "")
                         val nomeCompleto = "$nome $sobrenome"
@@ -225,7 +225,6 @@ class PrinterController {
                     val nome = normalizarTexto(item["nome_produto"] as String)
                     val valorUnit = formatarValor(item["valor_unitario"] as Number)
                     val subtotal = formatarValor(item["subtotal"] as Number)
-                    val pedidoObservacao = pedidoData["observacao"] as? String ?: ""
 
                     // Find the first space before position 20
                     val palavras = nome.split(" ")
@@ -282,13 +281,15 @@ class PrinterController {
                             escpos.writeLF("    $linhaAtual")
                         }
                     }
-//aqui
-                    if (pedidoObservacao.isNotEmpty()) {
-                        escpos.feed(1)
-                        imprimirTextoComWrapping(escpos, "Observacao: $pedidoObservacao")
-                    }
                 }
-//ate aqui
+
+// Print the observation only once after all items
+                val pedidoObservacao = pedidoData["observacao"] as? String ?: ""
+                if (pedidoObservacao.isNotEmpty()) {
+                    escpos.feed(1)
+                    imprimirTextoComWrapping(escpos, "Observacao: $pedidoObservacao")
+                }
+
                 escpos.feed(1)
                     .writeLF(linhaDiv)
 

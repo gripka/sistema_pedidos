@@ -684,12 +684,18 @@ class PedidosEmAndamentoController {
             pedidoData["status_pedido"] = pedido["status_pedido"] as String
             pedidoData["valor_total"] = extractNumericValue(pedido["valor_total"] as String)
 
-            // Add cliente info
             val clienteInfoList = orderDetails["cliente"] as List<Pair<String, String>>
             val clienteMap = mutableMapOf<String, Any>()
             clienteInfoList.forEach { (key, value) ->
                 when(key) {
-                    "Nome" -> clienteMap["nome"] = value
+                    "Nome" -> {
+                        // Split the full name into first name and surname
+                        val nameParts = value.trim().split(" ", limit = 2)
+                        clienteMap["nome"] = nameParts.firstOrNull() ?: ""
+                        clienteMap["sobrenome"] = if (nameParts.size > 1) nameParts[1] else ""
+                        // Add the tipo field - default to PESSOA_FISICA since we're treating it as a person
+                        clienteMap["tipo"] = "PESSOA_FISICA"
+                    }
                     "Telefone" -> pedidoData["telefone_contato"] = value
                     "Observação" -> pedidoData["observacao"] = value
                 }
