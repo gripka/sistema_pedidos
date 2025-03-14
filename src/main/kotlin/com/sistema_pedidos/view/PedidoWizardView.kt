@@ -36,6 +36,8 @@ class PedidoWizardView : BorderPane() {
     private lateinit var estadoField: ComboBox<String>
     private lateinit var cepField: TextField
 
+    private lateinit var observacaoPedidoField: TextField
+
     private var descontoField: TextField? = null
     private var valorRadio: RadioButton? = null
     private var percentualRadio: RadioButton? = null
@@ -330,11 +332,15 @@ class PedidoWizardView : BorderPane() {
                         val totalLabel = lookup(".total-nav-value") as? Label
                         val valorTotal = totalLabel?.text ?: "R$ 0,00"
 
-                        // Pass the data to controller to create and save the order
+                        val orderInfo = listOf(
+                            "Observação" to observacaoField.text
+                        )
+
                         val numeroPedido = controller.salvarPedido(
                             clienteInfo,
                             pagamentoInfo,
-                            entregaInfo
+                            entregaInfo,
+                            orderInfo
                         )
 
                         // Create styled success alert with increased height
@@ -556,7 +562,6 @@ class PedidoWizardView : BorderPane() {
                     "Estado" to (clienteData["estado"] ?: "-"),
                     "CEP" to (clienteData["cep"] ?: "-")
                 ))
-
                 println("Client data retrieved: ${commonInfo.size} fields")
                 return commonInfo
             } catch (e: Exception) {
@@ -608,17 +613,14 @@ class PedidoWizardView : BorderPane() {
                 }
                 pagamentoInfo.add("Forma de Pagamento" to selectedPaymentMethod)
 
-                // Get payment method - use direct class-based lookup
                 val paymentButtons = lookupAll(".payment-toggle-button").filterIsInstance<ToggleButton>()
                 println("Found ${paymentButtons.size} payment buttons, selected: $selectedPaymentMethod")
 
-// Get payment status - use direct class-based lookup
                 val statusButtons = listOf(pendingToggle, paidToggle)
                 val selectedStatus = statusButtons.find { it.isSelected }?.text ?: "Pendente"
                 println("Found ${statusButtons.size} status buttons, selected: $selectedStatus")
                 pagamentoInfo.add("Status" to selectedStatus)
 
-                // Get discount information - use class fields directly, not lookup
                 println("Discount field found: ${descontoField != null}, value: ${descontoField?.text}")
                 println("Valor radio found: ${valorRadio != null}, selected: ${valorRadio?.isSelected}")
                 println("Percentual radio found: ${percentualRadio != null}, selected: ${percentualRadio?.isSelected}")
@@ -648,7 +650,10 @@ class PedidoWizardView : BorderPane() {
                     }
                 }
 
-                // Get total after discount
+                if (::observacaoPedidoField.isInitialized && !observacaoPedidoField.text.isNullOrBlank()) {
+                    pagamentoInfo.add("Observação do Pedido" to observacaoPedidoField.text)
+                }
+
                 val totalLabel = lookup(".total-nav-value") as? Label
                 if (totalLabel != null && totalLabel.text != "R$ 0,00") {
                     pagamentoInfo.add("Total" to totalLabel.text)
@@ -1234,16 +1239,18 @@ class PedidoWizardView : BorderPane() {
                     controller.addNovoProduto()
                 }
             }
-
             val observacaoBox = VBox(10.0).apply {
                 children.addAll(
                     Label("Observação do Pedido").apply {
                         styleClass.add("field-label")
                     },
                     TextField().apply {
+                        id = "observacaoPedidoField"
                         styleClass.add("text-field")
                         maxWidth = Double.POSITIVE_INFINITY
                         promptText = "Digite uma observação para o pedido"
+                        // Store reference to this field
+                        observacaoPedidoField = this
                     }
                 )
             }

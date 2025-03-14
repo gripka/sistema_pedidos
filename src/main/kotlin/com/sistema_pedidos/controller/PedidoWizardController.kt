@@ -1224,12 +1224,16 @@ class PedidoWizardController {
     fun salvarPedido(
         clienteInfo: List<Pair<String, String>>,
         pagamentoInfo: List<Pair<String, String>>,
-        entregaInfo: List<Pair<String, String>>
+        entregaInfo: List<Pair<String, String>>,
+        orderInfo: List<Pair<String, String>>
     ): Boolean {
         try {
             val telefoneContato = clienteInfo.find { it.first == "Telefone" }?.second ?: ""
-            val observacaoClient = clienteInfo.find { it.first == "Observação" }?.second
+            val observacaoClient = clienteInfo.find { it.first == "Observação" }?.second ?: ""
+            val observacaoPedido = pagamentoInfo.find { it.first == "Observação do Pedido" }?.second ?: ""
+
             val status = pagamentoInfo.find { it.first == "Status" }?.second ?: "Pendente"
+
             val valorTotal = parseMoneyValue(pagamentoInfo.find { it.first == "Total do Pedido" }?.second ?: "0,00")
             val descontoPair = pagamentoInfo.find { it.first.startsWith("Desconto") }
             val tipoDesconto = if ((descontoToggleGroup.selectedToggle as? RadioButton)?.id == "valor")
@@ -1328,7 +1332,7 @@ class PedidoWizardController {
                         stmt.setString(1, numeroGerado)
                         stmt.setObject(2, clienteId)
                         stmt.setString(3, telefoneContato)
-                        stmt.setString(4, observacaoClient)
+                        stmt.setString(4, observacaoPedido)
                         stmt.setString(5, status)
                         stmt.setDouble(6, calculatedTotal)
                         stmt.setDouble(7, valorDesconto)
@@ -1418,7 +1422,8 @@ class PedidoWizardController {
                     }
                     val pedidoData = mutableMapOf<String, Any>()
                     pedidoData["numero"] = numeroGerado
-                    pedidoData["observacao"] = observacaoClient ?: ""
+                    pedidoData["observacao"] = observacaoPedido ?: ""
+                    pedidoData["observacao_cliente"] = observacaoClient ?: ""
                     pedidoData["telefone_contato"] = telefoneContato
                     pedidoData["data_pedido"] = java.time.LocalDate.now().toString()
                     pedidoData["status"] = status
@@ -1581,8 +1586,8 @@ class PedidoWizardController {
 
     private fun saveProdutos(conn: Connection, pedidoId: Long, produtosInfo: List<Pair<String, String>>) {
         val stmt = conn.prepareStatement("""
-        INSERT INTO itens_pedido (pedido_id, nome_produto, quantidade, valor_unitario, subtotal)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO itens_pedido (pedido_id, nome_produto, quantidade, valor_unitario, subtotal, observacao_pedido)
+        VALUES (?, ?, ?, ?, ?, ?)
     """)
 
         produtosInfo.forEach { (_, value) ->
