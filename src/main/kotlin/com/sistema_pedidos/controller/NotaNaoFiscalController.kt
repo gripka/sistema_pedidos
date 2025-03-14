@@ -5,6 +5,7 @@ import com.github.anastaciocintra.escpos.Style
 import com.github.anastaciocintra.escpos.EscPosConst
 import com.github.anastaciocintra.escpos.EscPos.CutMode
 import com.github.anastaciocintra.output.PrinterOutputStream
+import com.sun.javafx.sg.prism.NGCanvas.LINE_WIDTH
 import java.io.IOException
 import javax.print.PrintService
 import javax.print.PrintServiceLookup
@@ -12,6 +13,7 @@ import java.util.prefs.Preferences
 import java.text.SimpleDateFormat
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.*
 
 class NotaNaoFiscalController {
     private val prefs = Preferences.userNodeForPackage(NotaNaoFiscalController::class.java)
@@ -19,7 +21,8 @@ class NotaNaoFiscalController {
     private val COMPANY_NAME = "FLORICULTURA ADRIANA FLORES"
     private val COMPANY_PHONE = "(42) 99815-5900"
     private val COMPANY_ADDRESS = "Rua 19 de Dezembro, 347 - Centro"
-    private val COMPANY_CNPJ = "XX.XXX.XXX/0001-XX"
+    private val COMPANY_CNPJ = "40.348.582/0001-16"
+    private val LINE_WIDTH = 32 // Maximum characters per line for most thermal printers
 
     // Lista de impressoras térmicas conhecidas
     private val knownThermalPrinters = listOf(
@@ -82,31 +85,48 @@ class NotaNaoFiscalController {
         pedidoData: Map<String, Any>
     ) {
         try {
-            // Use a impressora especificada ou obtenha a impressora padrão
+            // Use a impressora especificada ou obtenha a impressora padrao
             val impressora = printService ?: getImpressoraPadrao()
-            ?: throw IOException("Nenhuma impressora térmica encontrada.")
+            ?: throw IOException("Nenhuma impressora termica encontrada.")
 
             if (!isThermalPrinter(impressora)) {
-                throw IOException("A impressora ${impressora.name} não é uma impressora térmica.")
+                throw IOException("A impressora ${impressora.name} nao e uma impressora termica.")
             }
 
-            println("Usando impressora térmica: ${impressora.name}")
-            imprimirNotaFiscalTermica(impressora, pedidoData)
-            println("Impressão de Nota Fiscal concluída com sucesso!")
+            println("Usando impressora termica: ${impressora.name}")
+            imprimirEmTermica(impressora, pedidoData)
+            println("Impressao concluida com sucesso!")
         } catch (e: Exception) {
             e.printStackTrace()
-            println("Erro ao imprimir nota fiscal: ${e.message}")
+            println("Erro ao imprimir: ${e.message}")
 
             if (e is IOException) {
-                println("Verifique se a impressora térmica está conectada e ligada")
+                println("Verifique se a impressora termica esta conectada e ligada")
             }
         }
     }
 
     /**
-     * Imprime a nota fiscal em impressora térmica usando ESC/POS
+     * Normaliza texto removendo acentos e caracteres especiais
      */
-    private fun imprimirNotaFiscalTermica(
+    private fun normalizarTexto(texto: String): String {
+        return texto.replace("[áàâã]".toRegex(), "a")
+            .replace("[éèê]".toRegex(), "e")
+            .replace("[íìî]".toRegex(), "i")
+            .replace("[óòôõ]".toRegex(), "o")
+            .replace("[úùû]".toRegex(), "u")
+            .replace("[ÁÀÂÃ]".toRegex(), "A")
+            .replace("[ÉÈÊ]".toRegex(), "E")
+            .replace("[ÍÌÎ]".toRegex(), "I")
+            .replace("[ÓÒÔÕ]".toRegex(), "O")
+            .replace("[ÚÙÛ]".toRegex(), "U")
+            .replace("[ç]".toRegex(), "c")
+            .replace("[Ç]".toRegex(), "C")
+            .replace("[ñ]".toRegex(), "n")
+            .replace("[Ñ]".toRegex(), "N")
+    }
+
+    private fun imprimirEmTermica(
         impressora: PrintService,
         pedidoData: Map<String, Any>
     ) {
@@ -125,66 +145,72 @@ class NotaNaoFiscalController {
                 val right = Style()
                     .setJustification(EscPosConst.Justification.Right)
 
-                val linhaDiv = "--------------------------------"
+                val smallFont = Style()
+                    .setFontSize(Style.FontSize._1, Style.FontSize._1)
 
-                // Cabeçalho da empresa
-                escpos.write(boldCenter, COMPANY_NAME)
+                val smallCenter = Style()
+                    .setFontSize(Style.FontSize._1, Style.FontSize._1)
+                    .setJustification(EscPosConst.Justification.Center)
+
+                val smallBold = Style()
+                    .setFontSize(Style.FontSize._1, Style.FontSize._1)
+                    .setBold(true)
+
+                val smallBoldCenter = Style()
+                    .setFontSize(Style.FontSize._1, Style.FontSize._1)
+                    .setBold(true)
+                    .setJustification(EscPosConst.Justification.Center)
+
+                val linhaDiv = "------------------------------------------------"
+
+
+                // Cabecalho da empresa
+                escpos.write(boldCenter, normalizarTexto(COMPANY_NAME))
                     .feed(1)
-                    .write(center, COMPANY_ADDRESS)
+                    .write(center, normalizarTexto(COMPANY_ADDRESS))
                     .feed(1)
-                    .write(center, "Tel: $COMPANY_PHONE")
+                    .write(center, normalizarTexto("Tel: $COMPANY_PHONE"))
                     .feed(1)
-                    .write(center, "CNPJ: $COMPANY_CNPJ")
+                    .write(center, normalizarTexto("CNPJ: $COMPANY_CNPJ"))
                     .feed(1)
-                    .write(boldCenter, "NOTA FISCAL - SEM VALOR FISCAL")
+                    .write(boldCenter, normalizarTexto("CUPOM SEM VALOR FISCAL"))
                     .feed(1)
                     .writeLF(linhaDiv)
 
-                // Data e hora da emissão
-                val dataHoraAtual = LocalDateTime.now()
-                val formatador = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
-                val dataHoraFormatada = dataHoraAtual.format(formatador)
+                val numeroPedido = normalizarTexto(pedidoData["numero"] as String)
+                val dataPedido = normalizarTexto(formatarData(pedidoData["data_pedido"] as String))
+                val statusPedido = normalizarTexto(pedidoData["status_pedido"] as String)
+                val statusPagamento = normalizarTexto(pedidoData["status"] as String)
 
-                escpos.writeLF("Data/Hora Emissão: $dataHoraFormatada")
+
+                escpos.write(boldCenter, normalizarTexto("PEDIDO #$numeroPedido"))
+                    .feed(1)
+                    .writeLF(normalizarTexto("Data: $dataPedido"))
+                    .writeLF(normalizarTexto("Status: $statusPedido"))
                     .feed(1)
                     .writeLF(linhaDiv)
 
-                // Detalhes do pedido
-                val numeroPedido = pedidoData["numero"] as String
-                val dataPedido = formatarData(pedidoData["data_pedido"] as String)
-
-                escpos.write(boldCenter, "PEDIDO #$numeroPedido")
-                    .feed(1)
-                    .writeLF("Data: $dataPedido")
-                    .feed(1)
-                    .writeLF(linhaDiv)
-
-                // Cliente
                 val clienteInfo = pedidoData["cliente"] as? Map<String, Any>
-                val telefoneContato = pedidoData["telefone_contato"] as? String ?: ""
+                val telefoneContato = normalizarTexto(pedidoData["telefone_contato"] as? String ?: "")
 
-                escpos.write(bold, "DADOS DO CLIENTE:")
+                escpos.write(bold, "CLIENTE:")
                     .feed(1)
+                escpos.write(smallFont, "")
 
                 if (clienteInfo != null) {
                     val tipoCliente = clienteInfo["tipo"] as? String
                     if (tipoCliente == "PESSOA_FISICA" || tipoCliente == null) {
-                        val nome = clienteInfo["nome"] as? String ?: ""
-                        val sobrenome = clienteInfo["sobrenome"] as? String ?: ""
-                        escpos.writeLF("Nome: $nome $sobrenome")
+                        val nome = normalizarTexto(clienteInfo["nome"] as? String ?: "")
+                        val sobrenome = normalizarTexto(clienteInfo["sobrenome"] as? String ?: "")
+                        val nomeCompleto = "$nome $sobrenome"
+                        imprimirTextoComWrapping(escpos, "Nome: $nomeCompleto")
                     } else {
-                        val razaoSocial = clienteInfo["razao_social"] as? String ?: ""
-                        val nomeFantasia = clienteInfo["nome_fantasia"] as? String ?: ""
-                        escpos.writeLF("Empresa: $razaoSocial")
+                        val razaoSocial = normalizarTexto(clienteInfo["razao_social"] as? String ?: "")
+                        val nomeFantasia = normalizarTexto(clienteInfo["nome_fantasia"] as? String ?: "")
+                        imprimirTextoComWrapping(escpos, "Empresa: $razaoSocial")
                         if (nomeFantasia.isNotEmpty()) {
-                            escpos.writeLF("Nome Fantasia: $nomeFantasia")
+                            imprimirTextoComWrapping(escpos, "Nome Fantasia: $nomeFantasia")
                         }
-                    }
-
-                    // Endereço do cliente, se disponível
-                    val endereco = clienteInfo["endereco"] as? String
-                    if (!endereco.isNullOrEmpty()) {
-                        escpos.writeLF("End: $endereco")
                     }
 
                     escpos.writeLF("Tel: ${clienteInfo["telefone"] ?: telefoneContato}")
@@ -194,99 +220,237 @@ class NotaNaoFiscalController {
 
                 escpos.feed(1)
                     .writeLF(linhaDiv)
+                escpos.write(Style(), "")
 
-                // Produtos
-                escpos.write(bold, "ITENS DO PEDIDO:")
+                escpos.write(bold, "PRODUTOS:")
                     .feed(1)
 
                 val itens = pedidoData["itens"] as? List<Map<String, Any>> ?: emptyList()
 
-                // Cabeçalho da tabela de itens
-                escpos.writeLF("CÓDIGO DESCRIÇÃO")
-                escpos.writeLF("QTD   VL UNIT   TOTAL")
-                escpos.writeLF(linhaDiv)
+                escpos.writeLF("QTD PRODUTO             VALOR   TOTAL")
 
                 itens.forEach { item ->
                     val qtd = (item["quantidade"] as Number).toInt()
-                    val nome = item["nome_produto"] as String
+                    val nome = normalizarTexto(item["nome_produto"] as String)
                     val valorUnit = formatarValor(item["valor_unitario"] as Number)
                     val subtotal = formatarValor(item["subtotal"] as Number)
+                    val pedidoObservacao = pedidoData["observacao"] as? String ?: ""
 
-                    // Código do produto (se houver)
-                    val codigo = item["codigo_produto"]?.toString() ?: "---"
+                    // Find the first space before position 20
+                    val palavras = nome.split(" ")
+                    var linhaAtual = ""
+                    var primeiraLinha = true
 
-                    // Imprimir produto com código
-                    escpos.writeLF("$codigo ${truncateText(nome, 25)}")
-
-                    // Formato tabular para quantidade, valor unitário e subtotal
-                    escpos.writeLF(String.format("%-5s      %-9s %s",
-                        "${qtd}x", "R$${valorUnit}", "R$${subtotal}"))
-
-                    // Se o nome for muito longo, continuar em nova linha
-                    if (nome.length > 25) {
-                        val remaining = nome.substring(25)
-                        val chunks = remaining.chunked(32)
-                        chunks.forEach { chunk ->
-                            escpos.writeLF(" $chunk")
+                    for (palavra in palavras) {
+                        if (linhaAtual.isEmpty()) {
+                            if ((palavra.length <= 20 && primeiraLinha) || (!primeiraLinha && palavra.length <= 19)) {
+                                linhaAtual = palavra
+                            } else {
+                                if (primeiraLinha) {
+                                    escpos.writeLF(
+                                        String.format(
+                                            "%-3s %-20s %-7s %s",
+                                            "${qtd}x", "", valorUnit, subtotal
+                                        )
+                                    )
+                                }
+                                escpos.writeLF("    $palavra")
+                                primeiraLinha = false
+                                continue
+                            }
+                        } else {
+                            val novaLinha = "$linhaAtual $palavra"
+                            if ((novaLinha.length <= 20 && primeiraLinha) || (!primeiraLinha && novaLinha.length <= 19)) {
+                                linhaAtual = novaLinha
+                            } else {
+                                if (primeiraLinha) {
+                                    escpos.writeLF(
+                                        String.format(
+                                            "%-3s %-20s %-7s %s",
+                                            "${qtd}x", truncateText(linhaAtual, 20), valorUnit, subtotal
+                                        )
+                                    )
+                                    primeiraLinha = false
+                                } else {
+                                    escpos.writeLF("    $linhaAtual")
+                                }
+                                linhaAtual = palavra
+                            }
                         }
                     }
-                }
 
+                    if (linhaAtual.isNotEmpty()) {
+                        if (primeiraLinha) {
+                            escpos.writeLF(
+                                String.format(
+                                    "%-3s %-20s %-7s %s",
+                                    "${qtd}x", truncateText(linhaAtual, 20), valorUnit, subtotal
+                                )
+                            )
+                        } else {
+                            escpos.writeLF("    $linhaAtual")
+                        }
+                    }
+//aqui
+                    if (pedidoObservacao.isNotEmpty()) {
+                        escpos.feed(1)
+                        imprimirTextoComWrapping(escpos, "Observacao: $pedidoObservacao")
+                    }
+                }
+//ate aqui
                 escpos.feed(1)
                     .writeLF(linhaDiv)
 
-                // Valores totais
-                val valorTotal = formatarValor(pedidoData["valor_total"] as Number)
-                val valorDesconto = formatarValor(pedidoData["valor_desconto"] as? Number ?: 0)
+                // Valores e pagamento
+                val valorTotal = pedidoData["valor_total"] as? Number ?: 0.0
+                val valorDesconto = pedidoData["valor_desconto"] as? Number ?: 0.0
                 val tipoDesconto = pedidoData["tipo_desconto"] as? String ?: ""
-                val formaPagamento = pedidoData["forma_pagamento"] as? String ?: "Não informado"
+                val formaPagamento = pedidoData["forma_pagamento"] as? String ?: "Nao informado"
+                val valorTrocoPara = pedidoData["valor_troco_para"] as? Number
+                val valorTroco = pedidoData["valor_troco"] as? Number
 
-                // Entrega
-                val entrega = pedidoData["entrega"] as? Map<String, Any>
-                var valorEntrega = 0.0
-                if (entrega != null) {
-                    valorEntrega = (entrega["valor_entrega"] as? Number)?.toDouble() ?: 0.0
-                }
+                escpos.write(bold, "PAGAMENTO:")
+                    .feed(1)
+                escpos.write(smallFont, "")
+                imprimirTextoComWrapping(escpos, "Forma: $formaPagamento")
 
-                // Subtotal, desconto, frete e total
-                val subtotal = (pedidoData["valor_total"] as Number).toDouble() - valorEntrega
+                if (((valorDesconto as? Number)?.toDouble() ?: 0.0) > 0) {
+                    val descInfo = if (tipoDesconto == "percentual") {
+                        // For percentage discounts, we need to calculate the actual percentage
+                        val totalValue = (pedidoData["valor_total"] as? Number)?.toDouble() ?: 1.0
+                        val descontoValue = (valorDesconto as? Number)?.toDouble() ?: 0.0
 
-                escpos.writeLF("SUBTOTAL:           R$ ${formatarValor(subtotal)}")
+                        // Avoid division by zero
+                        val percentualCalculado = if (totalValue > 0)
+                            (descontoValue / (totalValue + descontoValue)) * 100
+                        else 0.0
 
-                if ((valorDesconto.toDoubleOrNull() ?: 0.0) > 0) {
-                    if (tipoDesconto == "percentual") {
-                        val percentual = pedidoData["valor_desconto"] as Number
-                        escpos.writeLF("DESCONTO (${percentual}%):  R$ $valorDesconto")
+                        val percentualFormatado = String.format("%.2f", percentualCalculado)
+                        "Desconto: ${percentualFormatado}%"
                     } else {
-                        escpos.writeLF("DESCONTO:            R$ $valorDesconto")
+                        "Desconto: R$ $valorDesconto"
                     }
+                    escpos.writeLF(descInfo)
                 }
 
-                if (valorEntrega > 0) {
-                    escpos.writeLF("FRETE:              R$ ${formatarValor(valorEntrega)}")
+                escpos.write(bold, "TOTAL: R$ $valorTotal")
+                    .feed(1)
+
+                if (formaPagamento == "Dinheiro" &&
+                    valorTrocoPara != null && valorTrocoPara.toDouble() > 0 &&
+                    valorTroco != null && valorTroco.toDouble() > 0) {
+                    val valorTrocoParaStr = formatarValor(valorTrocoPara)
+                    val valorTrocoStr = formatarValor(valorTroco)
+                    escpos.writeLF("Troco para: R$ $valorTrocoParaStr")
+                    escpos.writeLF("Troco: R$ $valorTrocoStr")
                 }
 
-                escpos.write(bold, "TOTAL:              R$ $valorTotal")
-                    .feed(1)
-                    .writeLF("FORMA DE PAGAMENTO: $formaPagamento")
-                    .feed(1)
+                escpos.feed(1)
+                    .writeLF("Pagamento: $statusPagamento") //pagamento
+                escpos.feed(1)
                     .writeLF(linhaDiv)
+                    .writeLF(linhaDiv)
+                escpos.write(Style(), "")
 
-                // Informações de entrega ou retirada
+                val entrega = pedidoData["entrega"] as? Map<String, Any>
                 if (entrega != null) {
-                    escpos.write(bold, "DADOS DE ENTREGA:")
+                    escpos.write(bold, "ENTREGA:")
                         .feed(1)
-                        .writeLF("Destinatário: ${entrega["nome_destinatario"]}")
-                        .writeLF("Tel: ${entrega["telefone_destinatario"]}")
-                        .writeLF("Endereço: ${entrega["endereco"]}, ${entrega["numero"]}")
-                        .writeLF("Bairro: ${entrega["bairro"]}")
-                        .writeLF("Cidade: ${entrega["cidade"]}")
-
-                    val dataEntrega = formatarData(entrega["data_entrega"] as String)
-                    val horaEntrega = entrega["hora_entrega"] as String
-
-                    escpos.writeLF("Previsão: $dataEntrega às $horaEntrega")
+                    escpos.write(bold, "PEDIDO #$numeroPedido")
                         .feed(1)
+                    val nomeDestinatario = entrega["nome_destinatario"] as? String ?: ""
+                    imprimirTextoComWrapping(escpos, "Destinatario: $nomeDestinatario")
+
+                    val telefone = entrega["telefone_destinatario"] as? String ?: ""
+                    if (telefone.isNotEmpty()) {
+                        escpos.writeLF("Telefone: $telefone")
+                    }
+
+                    val numero = (entrega["numero"] as? String)?.takeIf { it.isNotBlank() } ?: "S/N"
+                    val endereco = normalizarTexto("${entrega["endereco"]}, $numero")
+                    if (endereco.isNotEmpty()) {
+                        escpos.write(bold, "Endereco:")
+                            .feed(1)
+                        // Process address using word wrapping
+                        val palavras = endereco.split(" ")
+                        var linhaAtual = ""
+                        var primeiraLinha = true
+
+                        for (palavra in palavras) {
+                            if (linhaAtual.isEmpty()) {
+                                linhaAtual = if (primeiraLinha) palavra else "    $palavra"
+                            } else {
+                                val novaLinha = "$linhaAtual $palavra"
+                                if ((novaLinha.length <= LINE_WIDTH && primeiraLinha) ||
+                                    (!primeiraLinha && novaLinha.length <= LINE_WIDTH - 4)) {
+                                    linhaAtual = novaLinha
+                                } else {
+                                    escpos.writeLF(linhaAtual)
+                                    primeiraLinha = false
+                                    linhaAtual = "    $palavra"
+                                }
+                            }
+                        }
+
+                        if (linhaAtual.isNotEmpty()) {
+                            escpos.writeLF(linhaAtual)
+                        }
+                    }
+
+                    val referencia = normalizarTexto(entrega["referencia"] as? String ?: "")
+                    if (referencia.isNotEmpty()) {
+                        escpos.write(bold, "Referencia:")
+                            .feed(1)
+                        // Process reference using word wrapping
+                        val palavras = referencia.split(" ")
+                        var linhaAtual = ""
+                        var primeiraLinha = true
+
+                        for (palavra in palavras) {
+                            if (linhaAtual.isEmpty()) {
+                                linhaAtual = if (primeiraLinha) palavra else "    $palavra"
+                            } else {
+                                val novaLinha = "$linhaAtual $palavra"
+                                if ((novaLinha.length <= LINE_WIDTH && primeiraLinha) ||
+                                    (!primeiraLinha && novaLinha.length <= LINE_WIDTH - 4)) {
+                                    linhaAtual = novaLinha
+                                } else {
+                                    escpos.writeLF(linhaAtual)
+                                    primeiraLinha = false
+                                    linhaAtual = "    $palavra"
+                                }
+                            }
+                        }
+
+                        if (linhaAtual.isNotEmpty()) {
+                            escpos.writeLF(linhaAtual)
+                        }
+                    }
+
+                    val bairro = normalizarTexto(entrega["bairro"] as? String ?: "")
+                    if (bairro.isNotEmpty()) {
+                        imprimirTextoComWrapping(escpos, "Bairro: $bairro")
+                    }
+
+                    val cidade = normalizarTexto(entrega["cidade"] as? String ?: "")
+                    if (cidade.isNotEmpty()) {
+                        imprimirTextoComWrapping(escpos, "Cidade: $cidade")
+                    }
+
+                    val cep = entrega["cep"] as? String ?: ""
+                    if (cep.isNotEmpty()) {
+                        escpos.writeLF("CEP: $cep")
+                    }
+
+                    val dataEntregaRaw = entrega["data_entrega"] as? String
+                    val horaEntregaRaw = entrega["hora_entrega"] as? String
+
+                    val dataEntrega = if (!dataEntregaRaw.isNullOrBlank()) formatarData(dataEntregaRaw) else "A combinar"
+                    val horaEntrega = if (!horaEntregaRaw.isNullOrBlank()) horaEntregaRaw else "A combinar"
+
+                    escpos.writeLF("Data: $dataEntrega")
+                    escpos.writeLF("Horario: $horaEntrega")
+
                 } else {
                     // Informações de retirada
                     val dataRetirada = pedidoData["data_retirada"] as? String
@@ -297,76 +461,84 @@ class NotaNaoFiscalController {
                             .feed(1)
                             .writeLF("Data: ${formatarData(dataRetirada)}")
                             .writeLF("Hora: $horaRetirada")
+                            .writeLF("Local: ${normalizarTexto(COMPANY_ADDRESS)}")
                             .feed(1)
                     }
                 }
 
-                val observacao = pedidoData["observacao"] as? String ?: ""
-                if (observacao.isNotEmpty()) {
-                    escpos.writeLF("Observação: $observacao")
-                        .feed(1)
-                }
+                escpos.feed(1)
+                    .writeLF(linhaDiv)
 
-                // Rodapé
-                escpos.writeLF(linhaDiv)
+                // Rodape
+                escpos.feed(1)
+                    .write(center, COMPANY_NAME)
                     .feed(1)
-                    .write(boldCenter, "DOCUMENTO SEM VALOR FISCAL")
+                    .write(center, normalizarTexto("Obrigado pela preferência!"))
                     .feed(1)
-                    .write(center, "Obrigado pela preferência!")
-                    .feed(1)
-                    .write(center, "Volte sempre!")
-                    .feed(3)
+                    .write(smallCenter, "Impresso em: " + SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(Date()))
+                    .feed(6)
                     .cut(CutMode.FULL)
             }
         }
     }
 
-    /**
-     * Formata texto para o tamanho especificado
-     */
+    private fun imprimirTextoComWrapping(escpos: EscPos, texto: String, maxWidth: Int = LINE_WIDTH) {
+        if (texto.length <= maxWidth) {
+            escpos.writeLF(texto)
+            return
+        }
+
+        var remainingText = texto
+        while (remainingText.isNotEmpty()) {
+            val length = minOf(maxWidth, remainingText.length)
+            val cutPoint = if (length < remainingText.length) {
+                // Try to cut at a space to avoid breaking words
+                val lastSpace = remainingText.substring(0, length).lastIndexOf(' ')
+                if (lastSpace > maxWidth / 2) lastSpace + 1 else length
+            } else {
+                length
+            }
+
+            escpos.writeLF(remainingText.substring(0, cutPoint))
+            remainingText = remainingText.substring(cutPoint).trimStart()
+        }
+    }
+
+    private fun imprimirTextoIndentado(escpos: EscPos, texto: String, indentacao: Int) {
+        val indent = " ".repeat(indentacao)
+        val maxWidth = LINE_WIDTH - indentacao
+
+        var remainingText = texto
+        while (remainingText.isNotEmpty()) {
+            val length = minOf(maxWidth, remainingText.length)
+            val cutPoint = if (length < remainingText.length) {
+                val lastSpace = remainingText.substring(0, length).lastIndexOf(' ')
+                if (lastSpace > maxWidth / 2) lastSpace + 1 else length
+            } else {
+                length
+            }
+
+            escpos.writeLF(indent + remainingText.substring(0, cutPoint))
+            remainingText = remainingText.substring(cutPoint).trimStart()
+        }
+    }
+
     private fun truncateText(text: String, maxLength: Int): String {
         return if (text.length <= maxLength) text else text.substring(0, maxLength)
     }
 
-    /**
-     * Formata um valor monetário
-     */
+    private fun formatarData(data: String): String {
+        try {
+            val formatoOriginal = SimpleDateFormat("yyyy-MM-dd")
+            val formatoDesejado = SimpleDateFormat("dd/MM/yyyy")
+            val date = formatoOriginal.parse(data)
+            return formatoDesejado.format(date)
+        } catch (e: Exception) {
+            return data
+        }
+    }
+
     private fun formatarValor(valor: Number): String {
         return String.format("%.2f", valor.toDouble())
-    }
-
-    /**
-     * Formata uma data no formato brasileiro
-     */
-    private fun formatarData(dataStr: String): String {
-        try {
-            val inputFormat = SimpleDateFormat("yyyy-MM-dd")
-            val outputFormat = SimpleDateFormat("dd/MM/yyyy")
-            val date = inputFormat.parse(dataStr)
-            return outputFormat.format(date)
-        } catch (e: Exception) {
-            return dataStr
-        }
-    }
-
-    /**
-     * Verifica se a impressora térmica especificada está disponível
-     */
-    fun verificarImpressora(printService: PrintService?): Boolean {
-        return try {
-            val impressora = printService ?: getImpressoraPadrao()
-            ?: return false
-
-            // Verifica se é uma impressora térmica
-            if (!isThermalPrinter(impressora)) {
-                return false
-            }
-
-            // Verifica se a impressora está disponível
-            impressora.isDocFlavorSupported(javax.print.DocFlavor.BYTE_ARRAY.AUTOSENSE)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
     }
 }

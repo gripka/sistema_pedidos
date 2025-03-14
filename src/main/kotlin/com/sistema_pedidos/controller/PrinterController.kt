@@ -209,12 +209,6 @@ class PrinterController {
                     escpos.writeLF("Tel: $telefoneContato")
                 }
 
-                val observacao = pedidoData["observacao"] as? String ?: ""
-                if (observacao.isNotEmpty()) {
-                    escpos.feed(1)
-                    imprimirTextoComWrapping(escpos, "Observacao: $observacao")
-                }
-
                 escpos.feed(1)
                     .writeLF(linhaDiv)
                 escpos.write(Style(), "")
@@ -231,7 +225,7 @@ class PrinterController {
                     val nome = normalizarTexto(item["nome_produto"] as String)
                     val valorUnit = formatarValor(item["valor_unitario"] as Number)
                     val subtotal = formatarValor(item["subtotal"] as Number)
-                    val observacao = item["observacao"] as? String
+                    val pedidoObservacao = pedidoData["observacao"] as? String ?: ""
 
                     // Find the first space before position 20
                     val palavras = nome.split(" ")
@@ -289,10 +283,9 @@ class PrinterController {
                         }
                     }
 //aqui
-                    val processedObservacao = observacao?.takeIf { it.isNotBlank() }
-                    if (processedObservacao != null) {
-                        // Use the existing imprimirTextoComWrapping function with proper indentation
-                        imprimirTextoComWrapping(escpos, "    * ${normalizarTexto(processedObservacao)}", 30)
+                    if (pedidoObservacao.isNotEmpty()) {
+                        escpos.feed(1)
+                        imprimirTextoComWrapping(escpos, "Observacao: $pedidoObservacao")
                     }
                 }
 //ate aqui
