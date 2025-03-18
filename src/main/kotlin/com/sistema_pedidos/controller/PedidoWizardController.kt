@@ -1234,18 +1234,6 @@ class PedidoWizardController {
 
             val status = pagamentoInfo.find { it.first == "Status" }?.second ?: "Pendente"
 
-            val valorTotal = parseMoneyValue(pagamentoInfo.find { it.first == "Total do Pedido" }?.second ?: "0,00")
-            val descontoPair = pagamentoInfo.find { it.first.startsWith("Desconto") }
-            val tipoDesconto = if ((descontoToggleGroup.selectedToggle as? RadioButton)?.id == "valor")
-                "valor" else "percentual"
-            val valorDesconto = if (tipoDesconto == "valor") {
-                parseMoneyValue(descontoField.text)
-            } else {
-                val percentualText = descontoField.text.replace("%", "").replace(",", ".")
-                val percentual = percentualText.toDoubleOrNull() ?: 0.0
-                (valorTotal * percentual / 100)
-            }
-            println("Saving discount: $valorDesconto of type $tipoDesconto")
             val itemsTotal = produtosContainer.children.sumOf { node ->
                 val hBox = node as HBox
                 val subtotalField = ((hBox.children[4] as VBox).children[1] as TextField)
@@ -1257,11 +1245,26 @@ class PedidoWizardController {
                 val rawValue = parseMoneyValue(entregaInfo.find { it.first == "Valor" }?.second ?: "0,00")
                 (Math.round(rawValue * 100) / 100.0)  // Round to 2 decimal places
             } else 0.0
-            val calculatedTotal = itemsTotal + entregaValor - valorDesconto
+
+            val subtotalPreDesconto = itemsTotal + entregaValor
+
+            val tipoDesconto = if ((descontoToggleGroup.selectedToggle as? RadioButton)?.id == "valor")
+                "valor" else "percentual"
+
+            val valorDesconto = if (tipoDesconto == "valor") {
+                parseMoneyValue(descontoField.text)
+            } else {
+                val percentualText = descontoField.text.replace("%", "").replace(",", ".")
+                val percentual = percentualText.toDoubleOrNull() ?: 0.0
+                (subtotalPreDesconto * percentual / 100)
+            }
+
+            val calculatedTotal = subtotalPreDesconto - valorDesconto
 
             println("DEBUG: Items Total: $itemsTotal")
             println("DEBUG: Entrega Valor: $entregaValor")
-            println("DEBUG: Discount: $valorDesconto")
+            println("DEBUG: Subtotal Pre-Desconto: $subtotalPreDesconto")
+            println("DEBUG: Discount: $valorDesconto (${if (tipoDesconto == "percentual") descontoField.text else "valor"})")
             println("DEBUG: Final Total: $calculatedTotal")
 
             val formaPagamento = pagamentoInfo.find { it.first == "Forma de Pagamento" }?.second
