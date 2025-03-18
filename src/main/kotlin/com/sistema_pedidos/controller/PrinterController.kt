@@ -351,11 +351,12 @@ class PrinterController {
                     escpos.write(bold, "PEDIDO #$numeroPedido")
                         .feed(1)
                     val nomeDestinatario = entrega["nome_destinatario"] as? String ?: ""
-                    imprimirTextoComWrapping(escpos, "Destinatario: $nomeDestinatario")
+                    escpos.write(bold, "Destinatario: ")
+                    imprimirTextoComWrapping(escpos, nomeDestinatario)
 
                     val telefone = entrega["telefone_destinatario"] as? String ?: ""
                     if (telefone.isNotEmpty()) {
-                        escpos.writeLF("Telefone: $telefone")
+                        escpos.writeLF(bold,"Telefone: $telefone")
                     }
 
                     val numero = (entrega["numero"] as? String)?.takeIf { it.isNotBlank() } ?: "S/N"
