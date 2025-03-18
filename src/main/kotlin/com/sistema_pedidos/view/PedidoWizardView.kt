@@ -1233,9 +1233,13 @@ class PedidoWizardView : BorderPane() {
                         styleClass.add("custom-radio")
                         padding = Insets(10.0, 0.0, 0.0, 0.0)
 
-                        // Toggle visibility of delivery step when checkbox is clicked
+                        // Toggle visibility of delivery step and disable pickup fields when checkbox is clicked
                         selectedProperty().addListener { _, _, isSelected ->
+                            // Existing code for visibility of delivery step
                             updateStepIndicators(isSelected)
+
+                            // Add this line to disable pickup fields when delivery is selected
+                            scene.lookup("#retirada-fields")?.isDisable = isSelected
                         }
                     }
                 )
@@ -1676,6 +1680,11 @@ class PedidoWizardView : BorderPane() {
                         }, 1, 1)
                     }
                 )
+            }
+            if (::entregaClienteRadio.isInitialized) {
+                entregaClienteRadio.selectedProperty().addListener { _, _, isSelected ->
+                    retiradaBox.isDisable = isSelected
+                }
             }
             rightColumn.children.add(retiradaBox)
 
