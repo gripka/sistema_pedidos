@@ -1246,7 +1246,24 @@ class PedidoWizardController {
                 (valorTotal * percentual / 100)
             }
             println("Saving discount: $valorDesconto of type $tipoDesconto")
-            val calculatedTotal = (subtotalValue ?: 0.0) - valorDesconto
+            val itemsTotal = produtosContainer.children.sumOf { node ->
+                val hBox = node as HBox
+                val subtotalField = ((hBox.children[4] as VBox).children[1] as TextField)
+                val rawValue = parseMoneyValue(subtotalField.text)
+                (Math.round(rawValue * 100) / 100.0)  // Round to 2 decimal places
+            }
+
+            val entregaValor = if (entregaInfo.isNotEmpty() && entregaInfo.first().second == "Sim") {
+                val rawValue = parseMoneyValue(entregaInfo.find { it.first == "Valor" }?.second ?: "0,00")
+                (Math.round(rawValue * 100) / 100.0)  // Round to 2 decimal places
+            } else 0.0
+            val calculatedTotal = itemsTotal + entregaValor - valorDesconto
+
+            println("DEBUG: Items Total: $itemsTotal")
+            println("DEBUG: Entrega Valor: $entregaValor")
+            println("DEBUG: Discount: $valorDesconto")
+            println("DEBUG: Final Total: $calculatedTotal")
+
             val formaPagamento = pagamentoInfo.find { it.first == "Forma de Pagamento" }?.second
             val valorTrocoPara = parseMoneyValue(trocoParaField.text)
             val valorTroco = parseMoneyValue(trocoCalculadoLabel.text)

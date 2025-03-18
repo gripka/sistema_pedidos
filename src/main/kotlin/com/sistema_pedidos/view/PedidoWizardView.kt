@@ -142,7 +142,7 @@ class PedidoWizardView : BorderPane() {
         private val controller = PedidoWizardController()
         private lateinit var entregaClienteRadio: RadioButton
         private val stepIndicators = ArrayList<StackPane>()
-        private val stepLabels = listOf("Cliente", "Produtos", "Pagamento", "Entrega", "Confirmação")
+        private val stepLabels = listOf("Cliente", "Produtos", "Entrega", "Pagamento", "Confirmação")
 
         private lateinit var customerTypeToggle: ToggleGroup
 
@@ -176,18 +176,18 @@ class PedidoWizardView : BorderPane() {
 
         // Add this method to the OrderTabContent class
         private fun updateStepIndicators(isDeliveryEnabled: Boolean) {
-            // Update the delivery step indicator (index 3)
+            // Update the delivery step indicator (index 2)
             if (!isDeliveryEnabled) {
                 // If delivery is disabled, always show it as skipped
-                stepIndicators[3].styleClass.removeAll("current-step", "past-step", "future-step")
-                stepIndicators[3].styleClass.add("skipped-step")
+                stepIndicators[2].styleClass.removeAll("current-step", "past-step", "future-step")
+                stepIndicators[2].styleClass.add("skipped-step")
             } else {
                 // If delivery is enabled, show according to current step
-                stepIndicators[3].styleClass.removeAll("skipped-step")
+                stepIndicators[2].styleClass.removeAll("skipped-step")
                 when {
-                    currentStep < 3 -> stepIndicators[3].styleClass.add("future-step")
-                    currentStep == 3 -> stepIndicators[3].styleClass.add("current-step")
-                    else -> stepIndicators[3].styleClass.add("past-step")
+                    currentStep < 2 -> stepIndicators[2].styleClass.add("future-step")
+                    currentStep == 2 -> stepIndicators[2].styleClass.add("current-step")
+                    else -> stepIndicators[2].styleClass.add("past-step")
                 }
             }
         }
@@ -199,11 +199,11 @@ class PedidoWizardView : BorderPane() {
             // Step 2: Produtos
             stepContainers.add(createProductsStep())
 
-            // Step 3: Pagamento
-            stepContainers.add(createPaymentStep())
-
-            // Step 4: Entrega
+            // Step 3: Entrega
             stepContainers.add(createDeliveryStep())
+
+            // Step 4: Pagamento
+            stepContainers.add(createPaymentStep())
 
             // Step 5: Confirmação
             stepContainers.add(createConfirmationStep())
@@ -272,8 +272,8 @@ class PedidoWizardView : BorderPane() {
                 isDisable = true
                 setOnAction {
                     // When going back, check if coming from confirmation and delivery is disabled
-                    if (currentStep == 4 && ::entregaClienteRadio.isInitialized && !entregaClienteRadio.isSelected) {
-                        showStep(2)  // Go back to payment step
+                    if (currentStep == 3 && ::entregaClienteRadio.isInitialized && !entregaClienteRadio.isSelected) {
+                        showStep(1)  // Go back to payment step
                     } else if (currentStep > 0) {
                         showStep(currentStep - 1)
                     }
@@ -307,7 +307,7 @@ class PedidoWizardView : BorderPane() {
                     if (currentStep < stepContainers.size - 1) {
                         // If on payment step and delivery is not selected, skip to confirmation
                         if (currentStep == 2 && ::entregaClienteRadio.isInitialized && !entregaClienteRadio.isSelected) {
-                            showStep(4)  // Skip to confirmation step
+                            showStep(3)  // Skip to confirmation step
                         } else {
                             showStep(currentStep + 1)
                         }
@@ -454,8 +454,8 @@ class PedidoWizardView : BorderPane() {
             }
 
             // Skip delivery step if not delivering to customer's address
-            if (step == 3 && ::entregaClienteRadio.isInitialized && !entregaClienteRadio.isSelected) {
-                targetStep = 4  // Skip to confirmation step
+            if (step == 2 && ::entregaClienteRadio.isInitialized && !entregaClienteRadio.isSelected) {
+                targetStep = 3  // Skip to confirmation step
             }
 
             // Set the new content first, then update confirmation later
@@ -1218,6 +1218,29 @@ class PedidoWizardView : BorderPane() {
         private fun createProductsStep(): Pane {
             val section = createSectionHeader("Produtos")
 
+            // Create delivery option box first to place it above products
+            val entregaBox = VBox(10.0).apply {
+                style = "-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 5; -fx-border-color: #e9ecef; -fx-border-radius: 5;"
+                minWidth = 300.0
+                children.addAll(
+                    Label("Opção de Entrega").apply {
+                        styleClass.add("field-label")
+                        style = "-fx-font-size: 15px; -fx-font-weight: bold;"
+                    },
+                    // Store reference to this radio button
+                    RadioButton("Entregar no endereço do cliente").apply {
+                        entregaClienteRadio = this  // Save reference
+                        styleClass.add("custom-radio")
+                        padding = Insets(10.0, 0.0, 0.0, 0.0)
+
+                        // Toggle visibility of delivery step when checkbox is clicked
+                        selectedProperty().addListener { _, _, isSelected ->
+                            updateStepIndicators(isSelected)
+                        }
+                    }
+                )
+            }
+
             val produtosContainer = controller.getProdutosContainer().apply {
                 styleClass.add("produtos-container")
                 padding = Insets(0.0, 0.0, 10.0, 0.0)
@@ -1231,14 +1254,11 @@ class PedidoWizardView : BorderPane() {
                 text = "Adicionar Produto"
                 prefWidth = 180.0
                 prefHeight = 40.0
-                //graphic = ImageView(Image(javaClass.getResourceAsStream("/icons/mais.png"))).apply {
-                //    fitHeight = 20.0
-                //    fitWidth = 20.0
-                //}
                 setOnAction {
                     controller.addNovoProduto()
                 }
             }
+
             val observacaoBox = VBox(10.0).apply {
                 children.addAll(
                     Label("Observação do Pedido").apply {
@@ -1264,6 +1284,7 @@ class PedidoWizardView : BorderPane() {
                 padding = Insets(20.0)
                 spacing = 20.0
                 children.addAll(
+                    entregaBox,  // Place delivery option at the top
                     produtosContainer,
                     buttonBar,
                     observacaoBox,
@@ -1274,18 +1295,6 @@ class PedidoWizardView : BorderPane() {
         // Step 3: Pagamento
         private fun createPaymentStep(): Pane {
             val section = createSectionHeader("Forma de Pagamento")
-
-            horaRetiradaCombo = ComboBox<String>().apply {
-                items.addAll((0..23).map { String.format("%02d", it) })
-                value = "12"
-                prefWidth = 70.0
-            }
-
-            minutoRetiradaCombo = ComboBox<String>().apply {
-                items.addAll((0..59).map { String.format("%02d", it) })
-                value = "00"
-                prefWidth = 70.0
-            }
 
             // Main container using GridPane for better space utilization
             val mainGrid = GridPane().apply {
@@ -1313,7 +1322,7 @@ class PedidoWizardView : BorderPane() {
                 alignment = Pos.CENTER_LEFT
             }
 
-            // Initialize button references first
+            // Initialize payment buttons
             dinheiroButton = createPaymentToggleButton("Dinheiro", true, paymentToggleGroup, "icons/moneyp.png").apply {
                 id = "dinheiroButton"
             }
@@ -1334,6 +1343,7 @@ class PedidoWizardView : BorderPane() {
                 id = "voucherButton"
             }
 
+            // Create payment box
             val paymentBox = VBox(10.0).apply {
                 style = "-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 5; -fx-border-color: #e9ecef; -fx-border-radius: 5;"
                 HBox.setHgrow(this, Priority.ALWAYS)
@@ -1346,7 +1356,7 @@ class PedidoWizardView : BorderPane() {
                         hgap = 10.0
                         vgap = 10.0
                         alignment = Pos.CENTER_LEFT
-                        prefWrapLength = 500.0 // Adjust based on testing
+                        prefWrapLength = 500.0
                         padding = Insets(10.0, 0.0, 0.0, 0.0)
                         children.addAll(
                             dinheiroButton,
@@ -1359,67 +1369,8 @@ class PedidoWizardView : BorderPane() {
                 )
             }
 
-
-            // Create delivery option box
-            val entregaBox = VBox(10.0).apply {
-                style = "-fx-padding: 15; -fx-background-color: #f8f9fa; -fx-background-radius: 5; -fx-border-color: #e9ecef; -fx-border-radius: 5;"
-                minWidth = 300.0
-                children.addAll(
-                    Label("Opção de Entrega").apply {
-                        styleClass.add("field-label")
-                        style = "-fx-font-size: 15px; -fx-font-weight: bold;"
-                    },
-                    // Store reference to this radio button
-                    RadioButton("Entregar no endereço do cliente").apply {
-                        entregaClienteRadio = this  // Save reference
-                        styleClass.add("custom-radio")
-                        padding = Insets(10.0, 0.0, 0.0, 0.0)
-
-                        // Create delivery details section
-                        val entregaDetails = VBox(10.0).apply {
-                            isVisible = false
-                            isManaged = false
-                            padding = Insets(10.0, 0.0, 0.0, 0.0)
-
-                            children.addAll(
-                                TextField().apply {
-                                    styleClass.add("text-field")
-                                    promptText = "Endereço de entrega"
-                                },
-                                HBox(10.0).apply {
-                                    children.addAll(
-                                        TextField().apply {
-                                            styleClass.add("text-field")
-                                            HBox.setHgrow(this, Priority.ALWAYS)
-                                            promptText = "Taxa de entrega (R$)"
-                                            prefWidth = 150.0
-                                            alignment = Pos.CENTER_RIGHT
-                                            controller.formatarMoeda(this)
-                                        },
-                                        Button("Calcular").apply {
-                                            styleClass.add("button_estilo2")
-                                            prefHeight = 36.0
-                                        }
-                                    )
-                                }
-                            )
-                        }
-
-                        // Add the details to the parent VBox
-                        (parent as? VBox)?.children?.add(entregaDetails)
-
-                        // Toggle visibility of delivery details when checkbox is clicked
-                        selectedProperty().addListener { _, _, isSelected ->
-                            entregaDetails.isVisible = isSelected
-                            entregaDetails.isManaged = isSelected
-                            updateStepIndicators(isSelected)
-                        }
-                    }
-                )
-            }
-
-            topRow.children.addAll(paymentBox, entregaBox)
-            mainGrid.add(topRow, 0, 0, 2, 1) // Span 2 columns
+            topRow.children.add(paymentBox)
+            mainGrid.add(topRow, 0, 0, 2, 1)
 
             // Column 1: Discount and Change
             val leftColumn = VBox(15.0)
@@ -2019,6 +1970,10 @@ class PedidoWizardView : BorderPane() {
                                         prefWidth = 150.0
                                         isEditable = false
                                         this@OrderTabContent.dataEntregaPicker = this
+                                        converter = javafx.util.converter.LocalDateStringConverter(
+                                            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+                                            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
+                                        )
                                     }
                                 )
                             },
