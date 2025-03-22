@@ -508,6 +508,10 @@ private fun updatePagination() {
             valorCompraField.text = "R$ 0,00"
         }
 
+        if (::despesasOperacionaisField.isInitialized) {
+            despesasOperacionaisField.text = "R$ 0,00"
+        }
+
         if (::impostoField.isInitialized) {
             impostoField.text = "0"
         }
@@ -720,6 +724,15 @@ private fun updatePagination() {
                 tooltip = Tooltip("Valor de compra/aquisição do produto")
             }
 
+            val tfDespesasOperacionais = TextField("R$ 0,00").apply {
+                prefWidth = 120.0
+                formatarMoeda(this)
+                textProperty().addListener { _, _, _ ->
+                    Platform.runLater { calcularPrecoSugerido() }
+                }
+                tooltip = Tooltip("Despesas operacionais: aluguel, energia, mão de obra, entrega, etc.")
+            }
+
             // Campo para impostos
             val tfImpostos = TextField("0").apply {
                 prefWidth = 80.0
@@ -732,7 +745,6 @@ private fun updatePagination() {
                 tooltip = Tooltip("Percentual de impostos sobre o produto")
             }
 
-            // Inicialize these fields first before they're referenced
             val tfQuantidadeMinima = TextField("10").apply {
                 prefWidth = 80.0
                 tooltip = Tooltip("Quantidade mínima para aplicar desconto")
@@ -803,7 +815,6 @@ private fun updatePagination() {
             val lblLucroEstimado = Label("R$ 0,00 (0%)")
             val lblDescontosAplicados = Label("")
 
-            // Cost display layout
             val custoBox = HBox(10.0).apply {
                 alignment = Pos.CENTER_LEFT
                 children.addAll(
@@ -818,6 +829,14 @@ private fun updatePagination() {
                 children.addAll(
                     Label("Valor de Compra:").apply { prefWidth = 120.0 },
                     tfValorCompra
+                )
+            }
+
+            val despesasBox = HBox(10.0).apply {
+                alignment = Pos.CENTER_LEFT
+                children.addAll(
+                    Label("Despesas Operac.:").apply { prefWidth = 120.0 },
+                    tfDespesasOperacionais
                 )
             }
 
@@ -909,6 +928,7 @@ private fun updatePagination() {
             fun calcularPrecoSugerido() {
                 var custoInsumos = 0.0
                 val custoCompra = extrairValorMonetario(tfValorCompra.text)
+                val despesasOperacionais = extrairValorMonetario(tfDespesasOperacionais.text)
                 val descontosAplicados = mutableListOf<String>()
 
                 // Desconto por volume
@@ -958,7 +978,7 @@ private fun updatePagination() {
                     .replace(".", ",")
 
                 // Calculate total cost (ingredients + purchase)
-                val custoTotal = custoInsumos + custoCompra
+                val custoTotal = custoInsumos + custoCompra + despesasOperacionais
 
                 // Adicionar impostos
                 val percentualImpostos = tfImpostos.text.toDoubleOrNull() ?: 0.0
@@ -990,6 +1010,7 @@ private fun updatePagination() {
                 title,
                 custoBox,
                 compraBox,
+                despesasBox,
                 impostosBox,
                 descontoVolumeBox,
                 margemBox,
@@ -997,15 +1018,13 @@ private fun updatePagination() {
                 lucroBox
             )
 
-            // Store reference for later access
             this.calcularPrecoSugerido = ::calcularPrecoSugerido
-
-            // Store references for use in preencherFormulario
             this.valorCompraField = tfValorCompra
             this.impostoField = tfImpostos
             this.descontoVolumeField = cbDescontoVolume
             this.qtdMinimaField = tfQuantidadeMinima
             this.percentualDescontoField = tfPercentualDesconto
+            this.despesasOperacionaisField = tfDespesasOperacionais
 
             return section
         }
@@ -1575,6 +1594,7 @@ private fun updatePagination() {
     private lateinit var cbStatus: ComboBox<String>
     private lateinit var btnSalvar: Button
     private lateinit var btnCancelar: Button
+    private lateinit var despesasOperacionaisField: TextField
 
     private fun salvarProduto() {
         if (!validarCampos()) {
@@ -1583,11 +1603,13 @@ private fun updatePagination() {
 
         try {
             val valorUnitario = extrairValorMonetario(tfValorUnitario.text)
+            val valorCompra = extrairValorMonetario(valorCompraField.text)
+            val despesasOperacionais = extrairValorMonetario(despesasOperacionaisField.text)
+            val percentualImposto = impostoField.text.toDoubleOrNull() ?: 0.0
 
             val estoqueMinimo = tfEstoqueMinimo.text.toIntOrNull() ?: 0
             val estoqueAtual = tfEstoqueAtual.text.toIntOrNull() ?: 0
             val ehInsumo = if (cbEhInsumo.isSelected) 1 else 0
-            val percentualImposto = impostoField.text.toDoubleOrNull() ?: 0.0
 
             try {
                 db.getConnection().use { conn ->
@@ -1605,10 +1627,11 @@ private fun updatePagination() {
 
                     if (produtoId == null) {
                         val sql = """
-                        INSERT INTO produtos (codigo, nome, descricao, valor_unitario, categoria,
-                        unidade_medida, estoque_minimo, estoque_atual, status, eh_insumo, percentual_imposto)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """
+                    INSERT INTO produtos (codigo, nome, descricao, valor_unitario, categoria,
+                    unidade_medida, estoque_minimo, estoque_atual, status, eh_insumo, 
+                    percentual_imposto, valor_compra, despesas_operacionais)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """
 
                         val stmt = conn.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS)
                         stmt.setString(1, gerarCodigo())
@@ -1622,6 +1645,8 @@ private fun updatePagination() {
                         stmt.setString(9, cbStatus.value)
                         stmt.setInt(10, ehInsumo)
                         stmt.setDouble(11, percentualImposto)
+                        stmt.setDouble(12, valorCompra)
+                        stmt.setDouble(13, despesasOperacionais)
 
                         stmt.executeUpdate()
 
@@ -1631,12 +1656,13 @@ private fun updatePagination() {
                         }
                     } else {
                         val sql = """
-                        UPDATE produtos
-                        SET nome = ?, descricao = ?, valor_unitario = ?, categoria = ?,
-                        unidade_medida = ?, estoque_minimo = ?, estoque_atual = ?, status = ?,
-                        eh_insumo = ?, data_atualizacao = CURRENT_TIMESTAMP
-                        WHERE id = ?
-                        """
+                    UPDATE produtos
+                    SET nome = ?, descricao = ?, valor_unitario = ?, categoria = ?,
+                    unidade_medida = ?, estoque_minimo = ?, estoque_atual = ?, status = ?,
+                    eh_insumo = ?, percentual_imposto = ?, valor_compra = ?, 
+                    despesas_operacionais = ?, data_atualizacao = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                    """
 
                         val stmt = conn.prepareStatement(sql)
                         stmt.setString(1, tfNome.text.trim())
@@ -1648,7 +1674,10 @@ private fun updatePagination() {
                         stmt.setInt(7, estoqueAtual)
                         stmt.setString(8, cbStatus.value)
                         stmt.setInt(9, ehInsumo)
-                        stmt.setLong(10, produtoId)
+                        stmt.setDouble(10, percentualImposto)
+                        stmt.setDouble(11, valorCompra)
+                        stmt.setDouble(12, despesasOperacionais)
+                        stmt.setLong(13, produtoId)
 
                         stmt.executeUpdate()
 
@@ -1894,14 +1923,11 @@ private fun updatePagination() {
         cbStatus.value = produto.status
         cbEhInsumo.isSelected = produto.ehInsumo
 
-        // Carregar valor de compra (se existir)
         carregarValorCompra(produto.id)
-
-        // Carregar insumos do produto
+        carregarDespesasOperacionais(produto.id)
         carregarInsumosDoProduto(produto.id)
         carregarInsumosDisponiveis()
 
-        // Calcular preço sugerido depois que todos os dados estiverem carregados
         Platform.runLater {
             calcularPrecoSugerido()
         }
@@ -2231,6 +2257,27 @@ private fun updatePagination() {
                     produtoSelecionado = newSelection
                 }
             }
+        }
+    }
+
+    private fun carregarDespesasOperacionais(produtoId: Long) {
+        if (!::despesasOperacionaisField.isInitialized) return
+
+        try {
+            db.getConnection().use { conn ->
+                conn.prepareStatement("SELECT despesas_operacionais FROM produtos WHERE id = ?").use { stmt ->
+                    stmt.setLong(1, produtoId)
+                    val rs = stmt.executeQuery()
+
+                    if (rs.next()) {
+                        val despesas = rs.getDouble("despesas_operacionais")
+                        val formatter = java.text.DecimalFormat("#,##0.00")
+                        despesasOperacionaisField.text = "R$ " + formatter.format(despesas).replace(".", ",")
+                    }
+                }
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
         }
     }
 

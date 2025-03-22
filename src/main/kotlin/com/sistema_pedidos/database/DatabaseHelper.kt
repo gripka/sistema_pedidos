@@ -227,6 +227,27 @@ class DatabaseHelper {
                     stmt.execute(query)
                 }
             }
+            addColumnIfNotExists(conn, "produtos", "despesas_operacionais", "REAL DEFAULT 0")
+        }
+    }
+
+    private fun addColumnIfNotExists(conn: Connection, table: String, column: String, definition: String) {
+        try {
+            val rs = conn.createStatement().executeQuery("PRAGMA table_info($table)")
+            var columnExists = false
+
+            while (rs.next()) {
+                if (rs.getString("name").equals(column, ignoreCase = true)) {
+                    columnExists = true
+                    break
+                }
+            }
+
+            if (!columnExists) {
+                conn.createStatement().execute("ALTER TABLE $table ADD COLUMN $column $definition")
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
         }
     }
 
