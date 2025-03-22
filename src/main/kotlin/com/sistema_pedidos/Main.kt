@@ -60,7 +60,7 @@ class Main : Application() {
 
         mainView.setTopTitleBar(titleBarView)
         mainView.setLeftMenu(menuView)
-        mainView.setCenterView(dashboardView)
+        mainView.setCenterView(pedidoWizardView)
 
         val scene = Scene(mainView, 1000.0, 680.0, Color.TRANSPARENT)
         scene.stylesheets.add(javaClass.getResource("/styles.css").toExternalForm())

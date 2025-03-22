@@ -59,6 +59,12 @@ class ClientesView : VBox(10.0) {
     private lateinit var pessoaFisicaForm: VBox
     private lateinit var pessoaJuridicaForm: VBox
 
+    private var currentPage = 1
+    private var pageSize = 50
+    private var totalRecords = 0
+    private var totalPages = 1
+    private val currentPageLabel = Label("Página 1 de 1")
+
     init {
         padding = Insets(20.0)
         prefWidth = 1000.0
@@ -122,7 +128,7 @@ class ClientesView : VBox(10.0) {
         children.addAll(headerBox, splitPane)
     }
 
-    private fun createTableView(): TableView<Cliente> {
+    private fun createTableView(): VBox {
         tableView.apply {
             columnResizePolicy = TableView.UNCONSTRAINED_RESIZE_POLICY
             items = clientes
@@ -131,10 +137,223 @@ class ClientesView : VBox(10.0) {
 
         setupTableColumns()
 
-        VBox.setVgrow(tableView, Priority.ALWAYS)
-        HBox.setHgrow(tableView, Priority.ALWAYS)
+        // Create container for table and pagination
+        return VBox(10.0).apply {
+            children.addAll(
+                tableView,
+                createPaginationControls() // Add pagination below table
+            )
 
-        return tableView
+            VBox.setVgrow(tableView, Priority.ALWAYS)
+            HBox.setHgrow(this, Priority.ALWAYS)
+        }
+    }
+
+    private fun createPaginationControls(): HBox {
+        return HBox(10.0).apply {
+            padding = Insets(10.0, 0.0, 0.0, 0.0)
+
+            val paginationBox = HBox(10.0).apply {
+                alignment = Pos.CENTER_LEFT
+                HBox.setHgrow(this, Priority.ALWAYS)
+
+                val firstPageButton = Button("<<").apply {
+                    styleClass.add("pagination-button")
+                    setOnAction {
+                        if (currentPage > 1) {
+                            currentPage = 1
+                            refreshData()
+                        }
+                    }
+                }
+
+                val prevPageButton = Button("<").apply {
+                    styleClass.add("pagination-button")
+                    setOnAction {
+                        if (currentPage > 1) {
+                            currentPage--
+                            refreshData()
+                        }
+                    }
+                }
+
+                val nextPageButton = Button(">").apply {
+                    styleClass.add("pagination-button")
+                    setOnAction {
+                        if (currentPage < totalPages) {
+                            currentPage++
+                            refreshData()
+                        }
+                    }
+                }
+
+                val lastPageButton = Button(">>").apply {
+                    styleClass.add("pagination-button")
+                    setOnAction {
+                        if (currentPage < totalPages) {
+                            currentPage = totalPages
+                            refreshData()
+                        }
+                    }
+                }
+
+                currentPageLabel.styleClass.add("pagination-label")
+
+                val pageSizeComboBox = ComboBox<Int>().apply {
+                    items.addAll(20, 50, 100, 200)
+                    selectionModel.select(1) // Default 50
+                    prefWidth = 80.0
+                    setOnAction {
+                        pageSize = value
+                        currentPage = 1  // Reset to first page when changing page size
+                        refreshData()
+                    }
+                }
+
+                val pageSizeLabel = Label("Itens por página:")
+
+                children.addAll(
+                    firstPageButton,
+                    prevPageButton,
+                    currentPageLabel,
+                    nextPageButton,
+                    lastPageButton,
+                    pageSizeLabel,
+                    pageSizeComboBox
+                )
+            }
+
+            // Create right section with action buttons
+            val actionBox = HBox(10.0).apply {
+                alignment = Pos.CENTER_RIGHT
+
+                val refreshButton = Button("Atualizar").apply {
+                    styleClass.add("primary-button")
+                    setOnAction {
+                        refreshData()
+                    }
+                }
+
+                children.add(refreshButton)
+            }
+
+            children.addAll(paginationBox, actionBox)
+        }
+    }
+
+    private fun setupPagination(): HBox {
+        return HBox(10.0).apply {
+            padding = Insets(10.0, 0.0, 0.0, 0.0)
+
+            val paginationBox = HBox(10.0).apply {
+                alignment = Pos.CENTER_LEFT
+                HBox.setHgrow(this, Priority.ALWAYS)
+
+                val firstPageButton = Button("<<").apply {
+                    styleClass.add("pagination-button")
+                    setOnAction {
+                        if (currentPage > 1) {
+                            currentPage = 1
+                            refreshData()
+                        }
+                    }
+                }
+
+                val prevPageButton = Button("<").apply {
+                    styleClass.add("pagination-button")
+                    setOnAction {
+                        if (currentPage > 1) {
+                            currentPage--
+                            refreshData()
+                        }
+                    }
+                }
+
+                val nextPageButton = Button(">").apply {
+                    styleClass.add("pagination-button")
+                    setOnAction {
+                        if (currentPage < totalPages) {
+                            currentPage++
+                            refreshData()
+                        }
+                    }
+                }
+
+                val lastPageButton = Button(">>").apply {
+                    styleClass.add("pagination-button")
+                    setOnAction {
+                        if (currentPage < totalPages) {
+                            currentPage = totalPages
+                            refreshData()
+                        }
+                    }
+                }
+
+                currentPageLabel.styleClass.add("pagination-label")
+
+                val pageSizeComboBox = ComboBox<Int>().apply {
+                    items.addAll(20, 50, 100, 200)
+                    selectionModel.select(1) // Default 50
+                    prefWidth = 80.0
+                    setOnAction {
+                        pageSize = value
+                        currentPage = 1  // Reset to first page when changing page size
+                        refreshData()
+                    }
+                }
+
+                val pageSizeLabel = Label("Itens por página:")
+
+                children.addAll(
+                    firstPageButton,
+                    prevPageButton,
+                    currentPageLabel,
+                    nextPageButton,
+                    lastPageButton,
+                    pageSizeLabel,
+                    pageSizeComboBox
+                )
+            }
+
+            // Create right section with action buttons
+            val actionBox = HBox(10.0).apply {
+                alignment = Pos.CENTER_RIGHT
+
+                val refreshButton = Button("Atualizar").apply {
+                    styleClass.add("primary-button")
+                    setOnAction {
+                        refreshData()
+                    }
+                }
+
+                children.add(refreshButton)
+            }
+
+            children.addAll(paginationBox, actionBox)
+        }.also {
+            children.add(it) // Add pagination to the main container
+        }
+    }
+
+    private fun refreshData() {
+        totalRecords = controller.contarClientes(searchField.text)
+        totalPages = Math.ceil(totalRecords.toDouble() / pageSize).toInt().coerceAtLeast(1)
+
+        // Adjust current page if it's beyond total pages
+        if (currentPage > totalPages) {
+            currentPage = totalPages
+        }
+
+        currentPageLabel.text = "Página $currentPage de $totalPages"
+
+        val clientesList = controller.buscarClientesPaginado(
+            searchField.text,
+            currentPage,
+            pageSize
+        )
+
+        clientes.clear()
+        clientes.addAll(clientesList)
     }
 
     private fun setupTableColumns() {

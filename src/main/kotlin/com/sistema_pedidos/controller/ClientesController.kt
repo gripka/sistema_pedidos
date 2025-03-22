@@ -53,6 +53,104 @@ class ClientesController {
         }
     }
 
+    fun contarClientes(termo: String = ""): Int {
+        var total = 0
+        val termoBusca = "%${termo.trim()}%"
+
+        try {
+            database.getConnection().use { conn ->
+                conn.prepareStatement("""
+                SELECT COUNT(*) as total
+                FROM clientes 
+                WHERE nome LIKE ? 
+                   OR sobrenome LIKE ? 
+                   OR telefone LIKE ? 
+                   OR cpf LIKE ? 
+                   OR cnpj LIKE ?
+                   OR razao_social LIKE ?
+                   OR nome_fantasia LIKE ?
+                   OR email LIKE ?
+            """).use { stmt ->
+                    stmt.setString(1, termoBusca)
+                    stmt.setString(2, termoBusca)
+                    stmt.setString(3, termoBusca)
+                    stmt.setString(4, termoBusca)
+                    stmt.setString(5, termoBusca)
+                    stmt.setString(6, termoBusca)
+                    stmt.setString(7, termoBusca)
+                    stmt.setString(8, termoBusca)
+
+                    val rs = stmt.executeQuery()
+                    if (rs.next()) {
+                        total = rs.getInt("total")
+                    }
+                }
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
+            showAlert("Erro", "Falha ao contar clientes: ${e.message}")
+        }
+
+        return total
+    }
+
+
+
+    fun buscarClientesPaginado(termo: String = "", pagina: Int = 1, itensPorPagina: Int = 50): List<Cliente> {
+        val clientes = mutableListOf<Cliente>()
+        val termoBusca = "%${termo.trim()}%"
+        val offset = (pagina - 1) * itensPorPagina
+
+        try {
+            database.getConnection().use { conn ->
+                conn.prepareStatement("""
+                SELECT id, tipo, 
+                       nome, sobrenome, cpf,
+                       razao_social, nome_fantasia, cnpj, inscricao_estadual,
+                       telefone, email, observacao,
+                       cep, logradouro, numero, complemento, bairro, cidade, estado
+                FROM clientes 
+                WHERE nome LIKE ? 
+                   OR sobrenome LIKE ? 
+                   OR telefone LIKE ? 
+                   OR cpf LIKE ? 
+                   OR cnpj LIKE ?
+                   OR razao_social LIKE ?
+                   OR nome_fantasia LIKE ?
+                   OR email LIKE ?
+                ORDER BY CASE tipo
+                    WHEN 'PESSOA_FISICA' THEN nome
+                    WHEN 'PESSOA_JURIDICA' THEN razao_social
+                END
+                LIMIT ? OFFSET ?
+            """).use { stmt ->
+                    stmt.setString(1, termoBusca)
+                    stmt.setString(2, termoBusca)
+                    stmt.setString(3, termoBusca)
+                    stmt.setString(4, termoBusca)
+                    stmt.setString(5, termoBusca)
+                    stmt.setString(6, termoBusca)
+                    stmt.setString(7, termoBusca)
+                    stmt.setString(8, termoBusca)
+                    stmt.setInt(9, itensPorPagina)
+                    stmt.setInt(10, offset)
+
+                    val rs = stmt.executeQuery()
+
+                    while (rs.next()) {
+                        // Your existing cliente mapping code here
+                        // Copy from your existing buscarClientesPorTermo method
+                    }
+                }
+            }
+        } catch (e: SQLException) {
+            e.printStackTrace()
+            showAlert("Erro", "Falha ao buscar clientes: ${e.message}")
+        }
+
+        return clientes
+    }
+
     fun buscarTodosClientes(): List<Cliente> {
         val clientes = mutableListOf<Cliente>()
 
