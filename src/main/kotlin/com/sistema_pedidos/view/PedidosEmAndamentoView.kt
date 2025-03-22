@@ -8,6 +8,7 @@ import javafx.scene.layout.*
 import javafx.stage.StageStyle
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import javafx.application.Platform
 
 class PedidosEmAndamentoView : VBox(10.0), ViewLifecycle {
     private val controller = PedidosEmAndamentoController()
@@ -27,15 +28,80 @@ class PedidosEmAndamentoView : VBox(10.0), ViewLifecycle {
 
         val headerBox = createHeaderBox()
 
+        // Add keyboard shortcut help indicator
+        val shortcutHelp = Label("Atalhos: [P] Pagamento | [S] Status | [I] Imprimir | [V] Ver detalhes").apply {
+            style = "-fx-font-size: 12px; -fx-text-fill: #707070;"
+        }
+
         val filterBox = createFilterBox()
 
         setupTableView()
 
         val actionBox = createActionBox()
 
-        children.addAll(headerBox, filterBox, tableView, actionBox)
+        children.addAll(headerBox, shortcutHelp, filterBox, tableView, actionBox)
 
         refreshData()
+
+        // Add keyboard shortcuts for quickly managing orders
+        tableView.setOnKeyPressed { event ->
+            val selectedItem = tableView.selectionModel.selectedItem ?: return@setOnKeyPressed
+            val pedidoId = selectedItem["id"] as Long
+
+            when (event.code) {
+                javafx.scene.input.KeyCode.P -> {
+                    // P key toggles payment status
+                    val currentStatus = selectedItem["status"] as String
+                    val newStatus = if (currentStatus == "Pendente") "Pago" else "Pendente"
+
+                    // Add confirmation dialog
+                    val confirmMessage = "Deseja alterar o status de pagamento de '$currentStatus' para '$newStatus'?"
+                    if (showConfirmationDialog("Confirmar Alteração", confirmMessage)) {
+                        if (controller.atualizarStatusPagamentoPedido(pedidoId, newStatus)) {
+                            (selectedItem as MutableMap<String, Any>)["status"] = newStatus
+                            tableView.refresh()
+                        }
+                    }
+                    event.consume()
+                }
+
+                javafx.scene.input.KeyCode.S -> {
+                    // S key advances order status
+                    val currentStatus = selectedItem["status_pedido"] as? String ?: "Pendente"
+                    val newStatus = when (currentStatus) {
+                        "Pendente" -> "Preparando"
+                        "Preparando" -> "Em Entrega"
+                        "Em Entrega" -> "Concluido"
+                        else -> currentStatus
+                    }
+
+                    // Add confirmation dialog
+                    val confirmMessage = "Deseja alterar o status do pedido de '$currentStatus' para '$newStatus'?"
+                    if (showConfirmationDialog("Confirmar Alteração", confirmMessage)) {
+                        if (controller.atualizarStatusPedido(pedidoId, newStatus)) {
+                            (selectedItem as MutableMap<String, Any>)["status_pedido"] = newStatus
+                            tableView.refresh()
+
+                            if (newStatus == "Concluido" || newStatus == "Cancelado") {
+                                tableView.items.remove(selectedItem)
+                            }
+                        }
+                    }
+                    event.consume()
+                }
+                javafx.scene.input.KeyCode.I -> {
+                    // I key for printing
+                    controller.imprimirPedido(selectedItem)
+                    event.consume()
+                }
+                javafx.scene.input.KeyCode.V -> {
+                    // V key to view order details
+                    showOrderDetailsDialog(selectedItem)
+                    event.consume()
+                }
+                else -> {}
+            }
+        }
     }
 
     override fun refresh() {
@@ -276,14 +342,127 @@ class PedidosEmAndamentoView : VBox(10.0), ViewLifecycle {
                     if (empty || item == null) {
                         text = null
                         style = ""
+                        graphic = null
                     } else {
-                        text = item
-                        style = when (item) {
-                            "Pendente" -> "-fx-text-fill: orange; -fx-font-weight: bold;"
-                            "Preparando" -> "-fx-text-fill: blue; -fx-font-weight: bold;"
-                            "Em Entrega" -> "-fx-text-fill: purple; -fx-font-weight: bold;"
-                            else -> ""
+                        val statusLabel = Label(item).apply {
+                            padding = Insets(3.0, 8.0, 3.0, 8.0)
+                            style = when (item) {
+                                "Pendente" -> "-fx-background-color: #FFF3CD; -fx-text-fill: #856404; -fx-background-radius: 4;"
+                                "Preparando" -> "-fx-background-color: #CCE5FF; -fx-text-fill: #004085; -fx-background-radius: 4;"
+                                "Em Entrega" -> "-fx-background-color: #E2D9F3; -fx-text-fill: #5A3A7E; -fx-background-radius: 4;"
+                                "Concluido" -> "-fx-background-color: #D4EDDA; -fx-text-fill: #155724; -fx-background-radius: 4;"
+                                "Cancelado" -> "-fx-background-color: #F8D7DA; -fx-text-fill: #721C24; -fx-background-radius: 4;"
+                                else -> ""
+                            }
                         }
+
+                        graphic = statusLabel
+                        text = null
+
+// Add click handler to cycle through common status progressions
+                        setOnMouseClicked { event ->
+                            val pedido = tableView.items[index]
+                            val pedidoId = pedido["id"] as Long
+                            val novoStatus = when (item) {
+                                "Pendente" -> "Preparando"
+                                "Preparando" -> "Em Entrega"
+                                "Em Entrega" -> "Concluido"
+                                else -> "Pendente"
+                            }
+
+                            // Add confirmation dialog
+                            val confirmMessage = "Deseja alterar o status do pedido de '$item' para '$novoStatus'?"
+                            if (showConfirmationDialog("Confirmar Alteração", confirmMessage)) {
+                                if (controller.atualizarStatusPedido(pedidoId, novoStatus)) {
+                                    (pedido as MutableMap<String, Any>)["status_pedido"] = novoStatus
+                                    tableView.refresh()
+
+                                    // Remove completed orders
+                                    if (novoStatus == "Concluido" || novoStatus == "Cancelado") {
+                                        tableView.items.remove(pedido)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        val acoesCol = TableColumn<Map<String, Any>, Void>("Ações")
+        acoesCol.prefWidth = 290.0
+        acoesCol.setCellFactory {
+            object : TableCell<Map<String, Any>, Void>() {
+                // Helper function to safely load an image or return null
+                private fun safeLoadImage(path: String): javafx.scene.image.Image? {
+                    val inputStream = javaClass.getResourceAsStream(path)
+                    return if (inputStream != null) javafx.scene.image.Image(inputStream) else null
+                }
+
+                private val viewButton = Button().apply {
+                    // Try to load the image, use text fallback if not available
+                    val viewImage = safeLoadImage("/icons/view.png")
+                    if (viewImage != null) {
+                        graphic = javafx.scene.image.ImageView(viewImage).apply {
+                            fitHeight = 20.0
+                            fitWidth = 20.0
+                        }
+                    } else {
+                        text = "Ver"
+                    }
+                    tooltip = Tooltip("Visualizar detalhes")
+                    styleClass.add("icon-button")
+                    setOnAction {
+                        val pedido = tableView.items[index]
+                        showOrderDetailsDialog(pedido)
+                    }
+                }
+
+                private val printButton = Button().apply {
+                    val printImage = safeLoadImage("/icons/print.png")
+                    if (printImage != null) {
+                        graphic = javafx.scene.image.ImageView(printImage).apply {
+                            fitHeight = 20.0
+                            fitWidth = 20.0
+                        }
+                    } else {
+                        text = "Imprimir"
+                    }
+                    tooltip = Tooltip("Imprimir pedido")
+                    styleClass.add("icon-button")
+                    setOnAction {
+                        val pedido = tableView.items[index]
+                        controller.imprimirPedido(pedido)
+                    }
+                }
+
+                private val completeButton = Button().apply {
+                    val checkImage = safeLoadImage("/icons/check.png")
+                    if (checkImage != null) {
+                        graphic = javafx.scene.image.ImageView(checkImage).apply {
+                            fitHeight = 20.0
+                            fitWidth = 20.0
+                        }
+                    } else {
+                        text = "Concluir"
+                    }
+                    tooltip = Tooltip("Marcar como Concluído")
+                    styleClass.add("icon-button")
+                    setOnAction {
+                        val pedido = tableView.items[index]
+                        val pedidoId = pedido["id"] as Long
+
+                        if (controller.atualizarStatusPedido(pedidoId, "Concluido")) {
+                            tableView.items.remove(pedido)
+                        }
+                    }
+                }
+
+                override fun updateItem(item: Void?, empty: Boolean) {
+                    super.updateItem(item, empty)
+                    graphic = if (empty) null else HBox(10.0).apply {
+                        children.addAll(viewButton, printButton, completeButton)
+                        alignment = Pos.CENTER
                     }
                 }
             }
@@ -299,13 +478,41 @@ class PedidosEmAndamentoView : VBox(10.0), ViewLifecycle {
                     if (empty || item == null) {
                         text = null
                         style = ""
+                        graphic = null
                     } else {
-                        text = item
-                        style = when (item) {
-                            "Pendente" -> "-fx-text-fill: orange; -fx-font-weight: bold;"
-                            "Pago" -> "-fx-text-fill: green; -fx-font-weight: bold;"
-                            "Cancelado" -> "-fx-text-fill: red; -fx-font-weight: bold;"
-                            else -> ""
+                        // Create a clickable label with status indicator
+                        val statusLabel = Label(item).apply {
+                            padding = Insets(3.0, 8.0, 3.0, 8.0)
+                            style = when (item) {
+                                "Pendente" -> "-fx-background-color: #FFF3CD; -fx-text-fill: #856404; -fx-background-radius: 4;"
+                                "Pago" -> "-fx-background-color: #D4EDDA; -fx-text-fill: #155724; -fx-background-radius: 4;"
+                                "Cancelado" -> "-fx-background-color: #F8D7DA; -fx-text-fill: #721C24; -fx-background-radius: 4;"
+                                else -> ""
+                            }
+                        }
+
+                        graphic = statusLabel
+                        text = null
+
+                        // Add click handler to cycle through statuses
+                        setOnMouseClicked { event ->
+                            val pedido = tableView.items[index]
+                            val pedidoId = pedido["id"] as Long
+                            val novoStatus = when (item) {
+                                "Pendente" -> "Pago"
+                                "Pago" -> "Pendente"
+                                "Cancelado" -> "Pendente"
+                                else -> "Pendente"
+                            }
+
+                            // Add confirmation dialog
+                            val confirmMessage = "Deseja alterar o status de pagamento de '$item' para '$novoStatus'?"
+                            if (showConfirmationDialog("Confirmar Alteração", confirmMessage)) {
+                                if (controller.atualizarStatusPagamentoPedido(pedidoId, novoStatus)) {
+                                    (pedido as MutableMap<String, Any>)["status"] = novoStatus
+                                    tableView.refresh()
+                                }
+                            }
                         }
                     }
                 }
@@ -316,191 +523,10 @@ class PedidosEmAndamentoView : VBox(10.0), ViewLifecycle {
         retiradaCol.setCellValueFactory { data -> javafx.beans.property.SimpleStringProperty(data.value["retirada"] as String) }
         retiradaCol.prefWidth = 200.0
 
-        val acoesCol = TableColumn<Map<String, Any>, Void>("Ações")
-        acoesCol.prefWidth = 420.0
-        acoesCol.setCellFactory {
-            object : TableCell<Map<String, Any>, Void>() {
-                private val viewButton = Button("Ver").apply {
-                    styleClass.add("small-button")
-                    prefWidth = 70.0
-                    setOnAction {
-                        val pedido = tableView.items[index]
-                        showOrderDetailsDialog(pedido)
-                    }
-                }
 
-                private val pagamentoButton = Button("Pagamento").apply {
-                    styleClass.add("small-button")
-                    prefWidth = 120.0
-                    setOnAction {
-                        val pedido = tableView.items[index]
-                        val pedidoId = pedido["id"] as Long
-                        val currentStatus = pedido["status"] as String
-
-                        val dialog = Dialog<String>()
-                        dialog.title = "Atualizar Status de Pagamento"
-                        dialog.headerText = "Selecione o status de pagamento"
-                        dialog.initStyle(StageStyle.UNDECORATED)
-
-                        val buttonTypeOk = ButtonType("Confirmar", ButtonBar.ButtonData.OK_DONE)
-                        val buttonTypeCancel = ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE)
-                        dialog.dialogPane.buttonTypes.addAll(buttonTypeOk, buttonTypeCancel)
-
-                        (dialog.dialogPane.lookup(".button-bar") as ButtonBar).apply {
-                            buttonOrder = ""
-                            buttonMinWidth = 100.0
-                            alignment = Pos.CENTER
-                            styleClass.add("dialog-button-bar")
-                        }
-
-                        val statusOptions = listOf("Pendente", "Pago", "Cancelado")
-                        val comboBox = ComboBox<String>().apply {
-                            items.addAll(statusOptions)
-                            value = currentStatus
-                            prefHeight = 36.0
-                            prefWidth = 200.0
-                        }
-
-                        val content = VBox(10.0).apply {
-                            padding = Insets(20.0)
-                            spacing = 10.0
-                            prefWidth = 400.0
-                            styleClass.add("dialog-content")
-                            children.addAll(
-                                Label("Status de pagamento:").apply {
-                                    styleClass.add("field-label")
-                                },
-                                comboBox
-                            )
-                        }
-
-                        dialog.dialogPane.stylesheets.addAll(this@PedidosEmAndamentoView.stylesheets)
-                        dialog.dialogPane.content = content
-                        dialog.dialogPane.styleClass.add("custom-dialog")
-
-                        dialog.setResultConverter { buttonType ->
-                            if (buttonType == buttonTypeOk) comboBox.value else null
-                        }
-
-                        val result = dialog.showAndWait()
-
-                        result.ifPresent { novoStatus ->
-                            if (controller.atualizarStatusPagamentoPedido(pedidoId, novoStatus)) {
-                                (pedido as MutableMap<String, Any>)["status"] = novoStatus
-                                tableView.refresh()
-                            } else {
-                                Alert(Alert.AlertType.ERROR).apply {
-                                    title = "Erro"
-                                    headerText = null
-                                    contentText = "Erro ao atualizar o status de pagamento"
-                                    showAndWait()
-                                }
-                            }
-                        }
-                    }
-                }
-
-                private val printButton = Button("Imprimir").apply {
-                    styleClass.add("small-button")
-                    prefWidth = 120.0
-                    setOnAction {
-                        val pedido = tableView.items[index]
-                        controller.imprimirPedido(pedido)
-                    }
-                }
-
-                private val statusButton = Button("Atualizar Status").apply {
-                    styleClass.add("small-button")
-                    prefWidth = 140.0
-
-                    setOnAction {
-                        val pedido = tableView.items[index]
-                        val pedidoId = pedido["id"] as Long
-                        val currentStatus = pedido["status_pedido"] as? String ?: "Pendente"
-
-                        val dialog = Dialog<String>()
-                        dialog.title = "Atualizar Status do Pedido"
-                        dialog.headerText = "Selecione o novo status do pedido"
-                        dialog.initStyle(StageStyle.UNDECORATED)
-
-                        val buttonTypeOk = ButtonType("Confirmar", ButtonBar.ButtonData.OK_DONE)
-                        val buttonTypeCancel = ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE)
-                        dialog.dialogPane.buttonTypes.addAll(buttonTypeOk, buttonTypeCancel)
-
-                        (dialog.dialogPane.lookup(".button-bar") as ButtonBar).apply {
-                            buttonOrder = ""
-                            buttonMinWidth = 100.0
-                            alignment = Pos.CENTER
-                            styleClass.add("dialog-button-bar")
-                        }
-
-                        val statusOptions = listOf("Concluido", "Preparando", "Pendente", "Em Entrega", "Cancelado")
-                        val comboBox = ComboBox<String>().apply {
-                            items.addAll(statusOptions)
-                            value = currentStatus
-                            prefHeight = 36.0
-                            prefWidth = 200.0
-                        }
-
-                        val content = VBox(10.0).apply {
-                            padding = Insets(20.0)
-                            spacing = 10.0
-                            prefWidth = 400.0
-                            styleClass.add("dialog-content")
-                            children.addAll(
-                                Label("Novo status:").apply {
-                                    styleClass.add("field-label")
-                                },
-                                comboBox
-                            )
-                        }
-
-                        dialog.dialogPane.stylesheets.addAll(this@PedidosEmAndamentoView.stylesheets)
-                        dialog.dialogPane.content = content
-                        dialog.dialogPane.styleClass.add("custom-dialog")
-
-                        dialog.setResultConverter { buttonType ->
-                            if (buttonType == buttonTypeOk) comboBox.value else null
-                        }
-
-                        val result = dialog.showAndWait()
-
-                        result.ifPresent { novoStatus ->
-                            if (controller.atualizarStatusPedido(pedidoId, novoStatus)) {
-                                (pedido as MutableMap<String, Any>)["status_pedido"] = novoStatus
-                                tableView.refresh()
-
-                                // If order is marked as completed or canceled, remove it from the table
-                                if (novoStatus == "Concluido" || novoStatus == "Cancelado") {
-                                    tableView.items.remove(pedido)
-                                }
-                            } else {
-                                Alert(Alert.AlertType.ERROR).apply {
-                                    title = "Erro"
-                                    headerText = null
-                                    contentText = "Erro ao atualizar o status do pedido"
-                                    showAndWait()
-                                }
-                            }
-                        }
-                    }
-                }
-
-                override fun updateItem(item: Void?, empty: Boolean) {
-                    super.updateItem(item, empty)
-                    graphic = if (empty) null else box
-                }
-
-                private val box = HBox(5.0).apply {
-                    children.addAll(viewButton, pagamentoButton, printButton, statusButton)
-                    alignment = Pos.CENTER
-                }
-            }
-        }
 
         tableView.columns.addAll(
             numeroCol,
-            dataCol,
             statusPedidoCol,
             clienteCol,
             telefoneCol,
@@ -508,14 +534,40 @@ class PedidosEmAndamentoView : VBox(10.0), ViewLifecycle {
             totalCol,
             pagamentoCol,
             retiradaCol,
-            acoesCol
-        )
+            acoesCol,
+            dataCol,
+            )
 
         tableView.columnResizePolicy = TableView.UNCONSTRAINED_RESIZE_POLICY
         tableView.placeholder = Label("Nenhum pedido em andamento")
 
         val totalColumnWidth = tableView.columns.sumOf { it.prefWidth }
         tableView.prefWidth = totalColumnWidth
+    }
+
+    private fun showConfirmationDialog(title: String, message: String): Boolean {
+        val alert = Alert(Alert.AlertType.CONFIRMATION).apply {
+            this.title = title
+            headerText = null
+            contentText = message
+            dialogPane.styleClass.add("custom-dialog")
+        }
+
+        with(alert.dialogPane) {
+            lookupAll(".content").forEach { it.styleClass.add("dialog-content") }
+            lookupAll(".header-panel").forEach { it.styleClass.add("dialog-header") }
+            lookupAll(".button-bar").forEach { it.styleClass.add("dialog-button-bar") }
+        }
+
+        Platform.runLater {
+            alert.dialogPane.buttonTypes.forEach { buttonType ->
+                val button = alert.dialogPane.lookupButton(buttonType)
+                button.styleClass.add("dialog-button")
+            }
+        }
+
+        val result = alert.showAndWait()
+        return result.isPresent && result.get() == ButtonType.OK
     }
 
     private fun createActionBox(): HBox {
