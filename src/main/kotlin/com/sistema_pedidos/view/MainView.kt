@@ -19,7 +19,7 @@ class MainView(private val stage: Stage) : BorderPane() {
     private val contentContainer = VBox()
 
     init {
-        val cornerRadii = CornerRadii(15.0, 15.0, 0.0, 0.0, false)
+        val cornerRadii = CornerRadii(0.0, 0.0, 0.0, 0.0, false)
         background = Background(BackgroundFill(Color.web("#F7F7F7"), cornerRadii, null))
 
         scrollPane.apply {
@@ -39,8 +39,8 @@ class MainView(private val stage: Stage) : BorderPane() {
         center = scrollPane
 
         val clipRectangle = Rectangle().apply {
-            arcWidth = 15.0
-            arcHeight = 15.0
+            arcWidth = 0.0
+            arcHeight = 0.0
             widthProperty().bind(this@MainView.widthProperty())
             heightProperty().bind(this@MainView.heightProperty())
         }

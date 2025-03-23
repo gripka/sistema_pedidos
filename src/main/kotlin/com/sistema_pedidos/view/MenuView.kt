@@ -15,18 +15,25 @@ import javafx.util.Duration
 class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
     private var selectedButton: Button? = null
     private var isExpanded = false
+    private val viewButtonMap = mutableMapOf<String, Button>()
+    private var isAnimating = false
 
     init {
-        background = Background(BackgroundFill(Color.web("#2B2D31"), CornerRadii.EMPTY, Insets.EMPTY))
+        background = Background(BackgroundFill(Color.web("#202020"), CornerRadii.EMPTY, Insets.EMPTY))
         prefWidth = 40.0
         padding = Insets(1.0)
-        styleClass.addAll("menu-right-border", "menu-left-bottom-border")
+        styleClass.addAll("menu-right-border", "menu-straight-border")
+        style = "-fx-background-color: #202020; -fx-background-radius: 0; -fx-border-radius: 0;"
 
-        val topButton = createTopButton("/icons/menu.png") { toggleMenu() }
+        val topButton = createTopButton("/icons/menu.png") {
+            if (!isAnimating) { // Only toggle if not animating
+                toggleMenu()
+            }
+        }
         val topSection = HBox(topButton).apply {
             alignment = Pos.TOP_LEFT
             padding = Insets(10.0, 0.0, 10.0, 17.0)
-            style = "-fx-border-color: #212121; -fx-border-width: 0 1px 0 0;"
+            style = "-fx-background-color: #202020; -fx-border-color: #212121; -fx-border-width: 0 1px 0 0; -fx-background-radius: 0; -fx-border-radius: 0;"
         }
         children.add(topSection)
 
@@ -34,15 +41,16 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
             alignment = Pos.CENTER
             spacing = 10.0
             padding = Insets(10.0, 0.0, 10.0, 0.0)
-            style = "-fx-border-color: #212121; -fx-border-width: 0 1px 0 0;"
+            style = "-fx-background-color: #202020; -fx-border-color: #212121; -fx-border-width: 0 1px 0 0; -fx-background-radius: 0; -fx-border-radius: 0;"
         }
 
-        val homeButton = createMenuButton("/icons/produtos.png", "Produtos") { onNavigate("produtos") }
-        val dashboardButton = createMenuButton("/icons/dashboard.png", "Dashboard") { onNavigate("dashboard") }
-        val newOrderButton = createMenuButton("/icons/novopedido.png", "Novo Pedido") { onNavigate("wizard") }
-        val pedidosEmAndamentoButton = createMenuButton("/icons/pedidos.png", "Pedidos em Andamento") { onNavigate("pedidosAndamento") }
-        val ordersButton = createMenuButton("/icons/historicopedidos.png", "Histórico de Pedidos") { onNavigate("historicoPedidos") }
-        val clienteButton = createMenuButton("/icons/cliente.png", "Clientes") { onNavigate("clientes") }
+        val homeButton = createMenuButton("/icons/produtos.png", "Produtos", "produtos")
+        val dashboardButton = createMenuButton("/icons/dashboard.png", "Dashboard", "dashboard")
+        val newOrderButton = createMenuButton("/icons/novopedido.png", "Novo Pedido", "wizard")
+        val pedidosEmAndamentoButton = createMenuButton("/icons/pedidos.png", "Pedidos em Andamento", "pedidosAndamento")
+        val ordersButton = createMenuButton("/icons/historicopedidos.png", "Histórico de Pedidos", "historicoPedidos")
+        val clienteButton = createMenuButton("/icons/cliente.png", "Clientes", "clientes")
+
         sectionsContainer.children.addAll(dashboardButton, newOrderButton, pedidosEmAndamentoButton, ordersButton, homeButton, clienteButton)
         VBox.setVgrow(sectionsContainer, Priority.ALWAYS)
         children.add(sectionsContainer)
@@ -51,11 +59,13 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
             alignment = Pos.BOTTOM_CENTER
             spacing = 10.0
             padding = Insets(0.0, 0.0, 20.0, 0.0)
-            style = "-fx-border-color: #212121; -fx-border-width: 0 1px 0 0;"
+            style = "-fx-background-color: #202020; -fx-border-color: #212121; -fx-border-width: 0 1px 0 0; -fx-background-radius: 0; -fx-border-radius: 0;"
         }
-        val settingsButton = createMenuButton("/icons/config.png", "Configurações") { onNavigate("configuracoes") }
+        val settingsButton = createMenuButton("/icons/config.png", "Configurações", "configuracoes")
         bottomSection.children.add(settingsButton)
         children.add(bottomSection)
+
+        selectView("wizard")
     }
 
     private fun createTopButton(iconPath: String, onClick: () -> Unit): Button {
@@ -72,7 +82,7 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
         }
     }
 
-    private fun createMenuButton(iconPath: String, buttonText: String, onClick: () -> Unit): HBox {
+    private fun createMenuButton(iconPath: String, buttonText: String, viewName: String): HBox {
         val btn = Button().apply {
             graphic = ImageView(Image(iconPath)).apply {
                 fitHeight = 23.0
@@ -82,10 +92,8 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
             style = "-fx-background-color: transparent; -fx-border-radius: 10px;"
             tooltip = Tooltip(buttonText)
             setOnAction {
-                selectedButton?.parent?.style = "-fx-background-color: transparent; -fx-border-radius: 10px;"
-                selectedButton = this
-                (parent as HBox).style = "-fx-background-color: #777777; -fx-border-radius: 10px;"
-                onClick()
+                selectButton(this)
+                onNavigate(viewName)
             }
             setOnMousePressed {
                 (parent as HBox).style = "-fx-background-color: rgba(200, 200, 200, 0.3); -fx-border-radius: 10px;"
@@ -98,6 +106,9 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
                 }
             }
         }
+
+        viewButtonMap[viewName] = btn
+
         val label = Label(buttonText).apply {
             textFill = Color.web("#F5F5F5")
             isVisible = isExpanded
@@ -121,7 +132,22 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
         return hbox
     }
 
+    private fun selectButton(button: Button) {
+        selectedButton?.parent?.style = "-fx-background-color: transparent; -fx-border-radius: 10px;"
+        selectedButton = button
+        (button.parent as HBox).style = "-fx-background-color: #777777; -fx-border-radius: 10px;"
+    }
+
+    fun selectView(viewName: String) {
+        viewButtonMap[viewName]?.let { button ->
+            selectButton(button)
+        }
+    }
+
     private fun toggleMenu() {
+        if (isAnimating) return
+        isAnimating = true
+
         val startWidth = prefWidth
         val endWidth = if (isExpanded) 40.0 else 230.0
 
@@ -143,8 +169,8 @@ class MenuView(private val onNavigate: (String) -> Unit) : VBox() {
                 }
             }
             isExpanded = !isExpanded
+            isAnimating = false
         }
-
         transition.play()
     }
 }

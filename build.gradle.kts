@@ -18,6 +18,8 @@ dependencies {
     implementation("com.jfoenix:jfoenix:9.0.10")
     implementation("com.github.anastaciocintra:escpos-coffee:4.1.0")
     implementation("com.itextpdf:itext7-core:7.2.3")
+    implementation("net.java.dev.jna:jna:5.13.0")
+    implementation("net.java.dev.jna:jna-platform:5.13.0")
 }
 
 application {

@@ -1,6 +1,8 @@
 package com.sistema_pedidos
 
 import com.sistema_pedidos.database.DatabaseHelper
+import com.sistema_pedidos.util.DwmApi
+import com.sistema_pedidos.util.WindowsStyler
 import javafx.application.Application
 import javafx.application.Platform
 import javafx.geometry.Rectangle2D
@@ -15,9 +17,7 @@ import java.lang.management.ManagementFactory
 
 class Main : Application() {
     override fun start(primaryStage: Stage) {
-        // Initialize the single instance lock with our stage
         if (!SingleInstanceLock.initialize(primaryStage)) {
-            // Another instance is already running and was notified to focus
             Platform.exit()
             return
         }
@@ -56,19 +56,18 @@ class Main : Application() {
         val tables = dbHelper.listTables()
         println("Tabelas no banco de dados: $tables")
 
-        val titleBarView = TitleBarView(primaryStage)
-
-        mainView.setTopTitleBar(titleBarView)
         mainView.setLeftMenu(menuView)
         mainView.setCenterView(pedidoWizardView)
 
         val scene = Scene(mainView, 1000.0, 680.0, Color.TRANSPARENT)
         scene.stylesheets.add(javaClass.getResource("/styles.css").toExternalForm())
-        primaryStage.initStyle(StageStyle.TRANSPARENT)
+
+        primaryStage.initStyle(StageStyle.DECORATED)
         primaryStage.scene = scene
         primaryStage.title = "Blossom ERP"
-
         primaryStage.icons.add(Image("icons/icon.ico"))
+
+        WindowsStyler.setTitleBarColor(primaryStage, DwmApi.DARK_MODE_COLOR)
 
         primaryStage.minWidth = 800.0
         primaryStage.minHeight = 600.0
@@ -81,8 +80,6 @@ class Main : Application() {
                 primaryStage.height = screenBounds.height
             }
         }
-
-        ResizableWindow(primaryStage)
 
         primaryStage.setOnCloseRequest {
             SingleInstanceLock.release()

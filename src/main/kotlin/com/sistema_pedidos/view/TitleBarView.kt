@@ -44,7 +44,6 @@ class TitleBarView(private val stage: Stage) : HBox() {
             }
         }
 
-        // Add a label or other components to the title bar
         val titleLabel = Label("Blossom ERP\n").apply {
             textFill = Color.WHITE
             padding = Insets(0.0, 0.0, 0.0, 10.0) // Move the title slightly to the right
@@ -58,7 +57,6 @@ class TitleBarView(private val stage: Stage) : HBox() {
             }
         }
 
-        // Window control buttons
         val buttonSize = 16.0
         val buttonContainer = HBox(0.0).apply {
             alignment = Pos.CENTER_RIGHT
@@ -75,7 +73,6 @@ class TitleBarView(private val stage: Stage) : HBox() {
             )
         }
 
-        // Draggable area for moving the window
         val draggableArea = HBox().apply {
             alignment = Pos.CENTER_LEFT
             HBox.setHgrow(this, javafx.scene.layout.Priority.ALWAYS)
@@ -89,17 +86,14 @@ class TitleBarView(private val stage: Stage) : HBox() {
             }
         }
 
-        // Add components to the title bar
         children.addAll(logoContainer, titleLabel, draggableArea, buttonContainer)
 
-        // Maximize the window when double-clicking the draggable area
         draggableArea.setOnMouseClicked { event: MouseEvent ->
             if (event.clickCount == 2) {
                 stage.isMaximized = !stage.isMaximized
             }
         }
 
-        // Listener to change the maximize icon to shrink icon
         stage.maximizedProperty().addListener { _, _, maximized ->
             if (maximized) {
                 maximizeIcon.image = Image("/icons/shrink.png")
