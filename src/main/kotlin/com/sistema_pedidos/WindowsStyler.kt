@@ -7,6 +7,7 @@ import com.sun.jna.platform.win32.WinNT.HANDLE
 import com.sun.jna.win32.W32APIOptions
 import javafx.application.Platform
 import javafx.stage.Stage
+import javafx.stage.StageStyle
 import java.util.concurrent.CountDownLatch
 
 interface DwmApi : com.sun.jna.Library {
@@ -47,7 +48,7 @@ class WindowsStyler {
             }
         }
 
-        private fun applyStyling(stage: Stage, color: Int) {
+        fun applyStyling(stage: Stage, color: Int) {
             try {
                 val hWnd = getWindowHandle(stage)
                 if (hWnd != null) {
@@ -108,6 +109,37 @@ class WindowsStyler {
 
                 println("Dark mode with attribute 19 result: $oldResult")
                 return oldResult == 0
+            } catch (e: Exception) {
+                e.printStackTrace()
+                return false
+            }
+        }
+
+        // Add this method to WindowsStyler companion object
+        fun applyStyleBeforeShowing(stage: Stage, color: Int): Boolean {
+            // Use the right BGR format for #2B2D31
+            val correctColor = 0x00312D2B // BGR format
+
+            try {
+                // Stage must be shown to get window handle
+                // So we need to make a one-time call
+                val temporaryStage = Stage()
+                temporaryStage.initStyle(StageStyle.UTILITY)
+                temporaryStage.opacity = 0.0
+                temporaryStage.show()
+
+                // Get HWND for temporary stage
+                val hWnd = getWindowHandle(stage)
+                if (hWnd != null) {
+                    // Apply all styles at once before showing main window
+                    val darkModeResult = setDarkMode(hWnd)
+                    val colorResult = setSpecificTitleBarColor(hWnd, correctColor)
+                    println("Pre-applied style results - Dark mode: $darkModeResult, Color: $colorResult")
+                    temporaryStage.close()
+                    return true
+                }
+                temporaryStage.close()
+                return false
             } catch (e: Exception) {
                 e.printStackTrace()
                 return false

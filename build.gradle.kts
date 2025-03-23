@@ -35,12 +35,18 @@ runtime {
     options.set(listOf("--strip-debug", "--compress", "2", "--no-header-files", "--no-man-pages"))
     jpackage {
         imageName = "BlossomERP"
-        imageOptions = listOf("--icon", "src/main/resources/icons/icon.ico")
+
+        imageOptions = listOf(
+            "--icon", "src/main/resources/icons/icon.ico"
+        )
+
         installerOptions = listOf(
             "--win-menu",
             "--win-shortcut",
+            "--win-per-user-install",
+            "--icon", "src/main/resources/icons/icon.ico",
             "--name", "Blossom ERP",
-            "--app-version", "0.6.1",
+            "--app-version", "0.7.1",
             "--description", "Otimize a administração da sua floricultura ...",
             "--vendor", "Gripka"
         )

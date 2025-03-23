@@ -13,79 +13,159 @@ import javafx.stage.StageStyle
 import com.sistema_pedidos.view.*
 import javafx.scene.paint.Color
 import javafx.scene.image.Image
+import java.io.InputStream
 import java.lang.management.ManagementFactory
 
 class Main : Application() {
     override fun start(primaryStage: Stage) {
-        if (!SingleInstanceLock.initialize(primaryStage)) {
-            Platform.exit()
-            return
-        }
+        // Show splash screen first
+        val splashScreen = SplashScreen(3000)
+        splashScreen.show()
 
-        setProcessName("Blossom ERP")
+        // Load application in background thread
+        Thread {
+            try {
+                Thread.sleep(100) // Pequena pausa para garantir que as animações começem
 
-        Runtime.getRuntime().addShutdownHook(Thread {
-            SingleInstanceLock.release()
-        })
+                // Application initialization
+                if (!SingleInstanceLock.initialize(primaryStage)) {
+                    Platform.exit()
+                    return@Thread
+                }
 
-        DatabaseHelper()
-        val dbHelper = DatabaseHelper()
+                setProcessName("Blossom ERP")
+                Runtime.getRuntime().addShutdownHook(Thread { SingleInstanceLock.release() })
 
-        val mainView = MainView(primaryStage)
-        val dashboardView = DashboardView()
-        val novoPedidoView = NovoPedidoView()
-        val produtosView = ProdutosView()
-        val pedidosEmAndamentoView = PedidosEmAndamentoView()
-        val historicoPedidosView = HistoricoPedidosView()
-        val configuracoesView = ConfiguracoesView()
-        val clientesView = ClientesView()
-        val pedidoWizardView = PedidoWizardView()
+                // Initialize database (only once)
+                val dbHelper = DatabaseHelper()
+                val tables = dbHelper.listTables()
+                println("Tabelas no banco de dados: $tables")
 
-        val menuView = MenuView { viewName ->
-            when (viewName) {
-                "dashboard" -> mainView.setCenterView(dashboardView)
-                "pedidosAndamento" -> mainView.setCenterView(pedidosEmAndamentoView)
-                "produtos" -> mainView.setCenterView(produtosView)
-                "historicoPedidos" -> mainView.setCenterView(historicoPedidosView)
-                "configuracoes" -> mainView.setCenterView(configuracoesView)
-                "clientes" -> mainView.setCenterView(clientesView)
-                "wizard" -> mainView.setCenterView(pedidoWizardView)
+
+                // Prepare UI on JavaFX thread when ready
+                Platform.runLater {
+                    try {
+                        // Initialize views
+                        val mainView = MainView(primaryStage)
+                        val dashboardView = DashboardView()
+                        val novoPedidoView = NovoPedidoView()
+                        val produtosView = ProdutosView()
+                        val pedidosEmAndamentoView = PedidosEmAndamentoView()
+                        val historicoPedidosView = HistoricoPedidosView()
+                        val configuracoesView = ConfiguracoesView()
+                        val clientesView = ClientesView()
+                        val pedidoWizardView = PedidoWizardView()
+
+                        val menuView = MenuView { viewName ->
+                            when (viewName) {
+                                "dashboard" -> mainView.setCenterView(dashboardView)
+                                "pedidosAndamento" -> mainView.setCenterView(pedidosEmAndamentoView)
+                                "produtos" -> mainView.setCenterView(produtosView)
+                                "historicoPedidos" -> mainView.setCenterView(historicoPedidosView)
+                                "configuracoes" -> mainView.setCenterView(configuracoesView)
+                                "clientes" -> mainView.setCenterView(clientesView)
+                                "wizard" -> mainView.setCenterView(pedidoWizardView)
+                            }
+                        }
+
+                        mainView.setLeftMenu(menuView)
+                        mainView.setCenterView(pedidoWizardView)
+
+                        // Setup scene
+                        val scene = Scene(mainView, 1000.0, 680.0, Color.TRANSPARENT)
+                        scene.stylesheets.add(javaClass.getResource("/styles.css").toExternalForm())
+
+                        // Configure primary stage
+                        primaryStage.initStyle(StageStyle.DECORATED)
+                        primaryStage.scene = scene
+                        primaryStage.title = "Blossom ERP"
+
+                        val image = Image("/icons/icon.png")
+                        primaryStage.icons.add(image)
+
+                        loadIcons(primaryStage)
+
+                        primaryStage.minWidth = 800.0
+                        primaryStage.minHeight = 600.0
+
+                        // Show the window but keep it invisible
+                        primaryStage.opacity = 0.0
+                        primaryStage.show()
+
+                        Thread {
+                            // Apply styling to the now-present window
+                            WindowsStyler.applyStyling(primaryStage, 0xFF312D2B.toInt())
+
+                            // Após a estilização, voltar para a thread da UI para fazer transição
+                            Platform.runLater {
+                                // Use animation timeline instead of sleep
+                                javafx.animation.PauseTransition(javafx.util.Duration.millis(300.0)).apply {
+                                    setOnFinished {
+                                        // Then hide splash and make window visible
+                                        splashScreen.hide {
+                                            primaryStage.opacity = 1.0
+                                        }
+                                    }
+                                    play()
+                                }
+                            }
+                        }.start()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Platform.runLater { splashScreen.hide() }
             }
-        }
+        }.start()
+    }
 
-        val tables = dbHelper.listTables()
-        println("Tabelas no banco de dados: $tables")
-
-        mainView.setLeftMenu(menuView)
-        mainView.setCenterView(pedidoWizardView)
-
-        val scene = Scene(mainView, 1000.0, 680.0, Color.TRANSPARENT)
-        scene.stylesheets.add(javaClass.getResource("/styles.css").toExternalForm())
-
-        primaryStage.initStyle(StageStyle.DECORATED)
-        primaryStage.scene = scene
-        primaryStage.title = "Blossom ERP"
-        primaryStage.icons.add(Image("icons/icon.ico"))
-
-        WindowsStyler.setTitleBarColor(primaryStage, DwmApi.DARK_MODE_COLOR)
-
-        primaryStage.minWidth = 800.0
-        primaryStage.minHeight = 600.0
-
-        primaryStage.maximizedProperty().addListener { _, _, maximized ->
-            if (maximized) {
-                val screenBounds: Rectangle2D = Screen.getPrimary().visualBounds
-                primaryStage.x = screenBounds.minX
-                primaryStage.width = screenBounds.width
-                primaryStage.height = screenBounds.height
+    private fun loadIcons(stage: Stage) {
+        try {
+            // Carregar o ícone principal para o executável e barra de tarefas
+            val icoStream = javaClass.getResourceAsStream("/icons/icon.ico")
+            if (icoStream != null) {
+                try {
+                    val image = Image(icoStream)
+                    stage.icons.add(image)
+                } finally {
+                    icoStream.close()
+                }
             }
-        }
 
-        primaryStage.setOnCloseRequest {
-            SingleInstanceLock.release()
-        }
+            // Adicionar múltiplas resoluções para diferentes situações
+            val iconSizes = listOf(16, 32, 48, 64, 128, 256)
+            for (size in iconSizes) {
+                val iconStream = javaClass.getResourceAsStream("/icons/icon${size}.png")
+                if (iconStream != null) {
+                    try {
+                        val image = Image(iconStream)
+                        stage.icons.add(image)
+                    } finally {
+                        iconStream.close()
+                    }
+                }
+            }
 
-        primaryStage.show()
+            // Se nenhum ícone específico foi encontrado, tente um genérico
+            if (stage.icons.isEmpty()) {
+                val defaultIconStream = javaClass.getResourceAsStream("/icons/icon.png")
+                if (defaultIconStream != null) {
+                    try {
+                        stage.icons.add(Image(defaultIconStream))
+                    } finally {
+                        defaultIconStream.close()
+                    }
+                }
+            }
+
+            // Verificar se o ícone foi carregado
+            println("Ícones carregados: ${stage.icons.size}")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            println("Falha ao carregar ícones: ${e.message}")
+        }
     }
 }
 
