@@ -10,6 +10,11 @@ repositories {
     maven { url = uri("https://jitpack.io") }
 }
 
+val appVersion = "0.7.9"
+val appName = "Blossom ERP"
+val appVendor = "Gripka"
+val appDescription = "Otimize a administração da sua floricultura com um sistema completo de gestão de pedidos, estoque e clientes."
+
 dependencies {
     implementation("org.openjfx:javafx-controls:17.0.2")
     implementation("org.openjfx:javafx-fxml:17.0.2")
@@ -24,6 +29,7 @@ dependencies {
 
 application {
     mainClass.set("com.sistema_pedidos.MainKt")
+    version = appVersion
 }
 
 javafx {
@@ -31,27 +37,77 @@ javafx {
     modules = listOf("javafx.controls", "javafx.fxml")
 }
 
+// Create license file directly at configuration time
+val licenseFile = file("installer-resources/license.txt")
+licenseFile.parentFile.mkdirs() // Create the directory
+if (!licenseFile.exists()) {
+    licenseFile.writeText("""
+        $appName - License Agreement
+
+        Copyright © 2024 $appVendor
+        All rights reserved.
+
+        This software is provided 'as-is', without any express or implied warranty.
+    """.trimIndent())
+}
+
 runtime {
     options.set(listOf("--strip-debug", "--compress", "2", "--no-header-files", "--no-man-pages"))
-    jpackage {
-        imageName = "BlossomERP"
 
+    jpackage {
+        // Application details
+        imageName = appName
+        appVersion = this@Build_gradle.appVersion
+
+        // Copy additional files to the distribution
+        resourceDir = file("installer-resources")
+
+        // Base image options
         imageOptions = listOf(
-            "--icon", "src/main/resources/icons/icon.ico"
+            "--icon", "src/main/resources/icons/icon.ico",
+            "--copyright", "Copyright © 2024 $appVendor",
+            "--verbose"
         )
 
         installerOptions = listOf(
+            // Windows-specific options
             "--win-menu",
+            "--win-menu-group", appName,
             "--win-shortcut",
+            //"--win-dir-chooser",
             "--win-per-user-install",
+            "--win-upgrade-uuid", "d5195868-1f73-4223-b45a-328c62b4d7a1",
+            "--win-shortcut-prompt",
+            "--resource-dir", "installer-resources",
+
             "--icon", "src/main/resources/icons/icon.ico",
-            "--name", "Blossom ERP",
-            "--app-version", "0.7.1",
-            "--description", "Otimize a administração da sua floricultura ...",
-            "--vendor", "Gripka"
+
+            "--description", appDescription,
+            "--vendor", appVendor,
+
+            "--license-file", licenseFile.absolutePath
         )
+
         installerType = "exe"
     }
+}
+
+// Add this to your build.gradle.kts
+tasks.register("generateVersionProperties") {
+    doLast {
+        val propertiesDir = file("src/main/resources")
+        propertiesDir.mkdirs()
+
+        val propertiesFile = file("$propertiesDir/app.properties")
+        propertiesFile.writeText("""
+            app.version=$appVersion
+            app.name=$appName
+        """.trimIndent())
+    }
+}
+
+tasks.named("processResources") {
+    dependsOn("generateVersionProperties")
 }
 
 kotlin {
@@ -69,4 +125,21 @@ tasks.withType<JavaExec> {
         "--module-path", configurations.runtimeClasspath.get().asPath,
         "--add-modules", "javafx.controls,javafx.fxml"
     )
+}
+
+// Optional: copy additional installer resources if they exist
+tasks.register<Copy>("prepareInstallerResources") {
+    from("src/main/resources/installer") {
+        include("**/*")
+    }
+    into("installer-resources")
+}
+
+// Make tasks depend on prepareInstallerResources
+tasks.named("jpackageImage") {
+    dependsOn("prepareInstallerResources")
+}
+
+tasks.named("jpackage") {
+    dependsOn("prepareInstallerResources")
 }

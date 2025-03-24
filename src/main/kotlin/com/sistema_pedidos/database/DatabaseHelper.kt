@@ -1,5 +1,6 @@
 package com.sistema_pedidos.database
 
+import java.io.File
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
@@ -13,19 +14,23 @@ class DatabaseHelper {
         }
     }
 
-    private val dbPath = "jdbc:sqlite:pedidos.db"
+    private val dbPath: String
     private var connection: Connection? = null
 
     init {
+        val dbDir = File(System.getProperty("user.home") + File.separator +
+                "AppData" + File.separator + "Local" + File.separator +
+                "BlossomERP")
+
+        if (!dbDir.exists()) {
+            dbDir.mkdirs()
+        }
+
+        val dbFile = File(dbDir, "database.db")
+        dbPath = "jdbc:sqlite:" + dbFile.absolutePath
+
         connection = DriverManager.getConnection(dbPath)
         createTables()
-    }
-
-    fun getConnection(): Connection {
-        if (connection == null || connection?.isClosed == true) {
-            connection = DriverManager.getConnection(dbPath)
-        }
-        return connection!!
     }
 
     private fun createTables() {
@@ -248,6 +253,18 @@ class DatabaseHelper {
             }
         } catch (e: SQLException) {
             e.printStackTrace()
+        }
+    }
+
+    fun getConnection(): Connection {
+        try {
+            if (connection == null || connection!!.isClosed) {
+                connection = DriverManager.getConnection(dbPath)
+            }
+            return connection!!
+        } catch (e: SQLException) {
+            e.printStackTrace()
+            throw e
         }
     }
 

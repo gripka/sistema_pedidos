@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration>
+    <MajorUpgrade DowngradeErrorMessage="Uma versão mais recente já está instalada"
+                  Schedule="afterInstallInitialize"
+                  AllowSameVersionUpgrades="yes" />
+    <InstallExecuteSequence>
+        <RemoveExistingProducts After="InstallInitialize"/>
+    </InstallExecuteSequence>
+</Configuration>

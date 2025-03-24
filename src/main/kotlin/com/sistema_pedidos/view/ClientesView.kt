@@ -237,7 +237,7 @@ class ClientesView : VBox(10.0) {
                 children.add(refreshButton)
             }
 
-            children.addAll(paginationBox, actionBox)
+            children.addAll(paginationBox)
         }
     }
 

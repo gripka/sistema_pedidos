@@ -1,0 +1,29 @@
+Blossom ERP - Licença de Uso
+
+Copyright © 2023-2024 Gripka. Todos os direitos reservados.
+
+TERMOS E CONDIÇÕES DE USO DO SOFTWARE
+
+1. ACEITAÇÃO DOS TERMOS
+Ao instalar ou utilizar este software, você concorda com todos os termos e condições desta licença.
+
+2. CONCESSÃO DE LICENÇA
+Esta licença concede ao usuário o direito não exclusivo e intransferível de utilizar o software.
+
+3. PROPRIEDADE INTELECTUAL
+Todos os direitos autorais e de propriedade intelectual relativos ao software pertencem exclusivamente a Gripka.
+
+4. RESTRIÇÕES
+É proibido:
+- Modificar, adaptar ou traduzir o software
+- Fazer engenharia reversa, descompilar ou desmontar o programa
+- Redistribuir, vender, alugar ou sublicenciar o software
+
+5. GARANTIA LIMITADA
+O software é fornecido "como está", sem garantias de qualquer tipo.
+
+6. LIMITAÇÃO DE RESPONSABILIDADE
+Em nenhuma circunstância Gripka será responsável por danos indiretos, incidentais, especiais ou consequentes.
+
+7. LEI APLICÁVEL
+Esta licença será regida e interpretada de acordo com as leis do Brasil.
