@@ -824,10 +824,10 @@ class HistoricoPedidosController {
             val notaNaoFiscalController = NotaNaoFiscalController()
             notaNaoFiscalController.imprimirNotaFiscal(pedidoData = pedidoData)
 
-            showAlert("Sucesso", "Nota fiscal enviada para impressão", Alert.AlertType.INFORMATION)
+            showAlert("Sucesso", "Via do cliente enviada para impressão", Alert.AlertType.INFORMATION)
         } catch (e: Exception) {
             e.printStackTrace()
-            showAlert("Erro", "Falha ao imprimir nota fiscal: ${e.message}")
+            showAlert("Erro", "Falha ao imprimir via do cliente: ${e.message}")
         }
     }
 

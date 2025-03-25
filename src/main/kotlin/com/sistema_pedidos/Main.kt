@@ -21,20 +21,18 @@ import kotlin.system.exitProcess
 
 class Main : Application() {
     override fun start(primaryStage: Stage) {
-        // Show splash screen first
+
         val splashScreen = SplashScreen(3000)
         splashScreen.show()
 
-        // Load application in background thread
         Thread {
             try {
-                Thread.sleep(100) // Pequena pausa para garantir que as animações começem
+                Thread.sleep(100)
 
-                // Check for updates
                 val versionChecker = VersionChecker()
                 versionChecker.onStatusUpdate = { statusMessage ->
                     Platform.runLater {
-                        // Update splash screen status label
+
                         val scene = splashScreen.getScene()
                         val root = scene.root
                         if (root is javafx.scene.layout.VBox) {
@@ -49,25 +47,21 @@ class Main : Application() {
                     }
                 }
 
-                // Show current version
                 versionChecker.onStatusUpdate?.invoke("Versão atual: ${versionChecker.getCurrentVersion()}")
                 Thread.sleep(500)
 
-                // Check for updates
                 val (updateAvailable, latestVersion, downloadUrl) = versionChecker.isUpdateAvailable()
 
                 if (updateAvailable && downloadUrl != null) {
                     versionChecker.onStatusUpdate?.invoke("Nova versão disponível: $latestVersion")
                     Thread.sleep(1000)
 
-                    // Download and install update
                     val updateSuccess = versionChecker.downloadAndInstallUpdate(downloadUrl)
 
                     if (updateSuccess) {
                         versionChecker.onStatusUpdate?.invoke("Atualização instalada. Reiniciando...")
                         Thread.sleep(2000)
 
-                        // Exit application - the installer will restart it
                         Platform.runLater {
                             splashScreen.hide {
                                 exit()
@@ -84,10 +78,8 @@ class Main : Application() {
                     Thread.sleep(500)
                 }
 
-                // Continue with normal application startup
                 versionChecker.onStatusUpdate?.invoke("Inicializando o sistema...")
 
-                // Application initialization
                 if (!SingleInstanceLock.initialize(primaryStage)) {
                     Platform.exit()
                     return@Thread
@@ -96,16 +88,12 @@ class Main : Application() {
                 setProcessName("Blossom ERP")
                 Runtime.getRuntime().addShutdownHook(Thread { SingleInstanceLock.release() })
 
-                // Initialize database (only once)
                 val dbHelper = DatabaseHelper()
                 val tables = dbHelper.listTables()
                 println("Tabelas no banco de dados: $tables")
 
-
-                // Prepare UI on JavaFX thread when ready
                 Platform.runLater {
                     try {
-                        // Initialize views
                         val mainView = MainView(primaryStage)
                         val dashboardView = DashboardView()
                         val novoPedidoView = NovoPedidoView()
@@ -131,11 +119,16 @@ class Main : Application() {
                         mainView.setLeftMenu(menuView)
                         mainView.setCenterView(pedidoWizardView)
 
-                        // Setup scene
+                        val screenBounds: Rectangle2D = Screen.getPrimary().visualBounds
+                        primaryStage.x = screenBounds.minX
+                        primaryStage.y = screenBounds.minY
+                        primaryStage.width = screenBounds.width
+                        primaryStage.height = screenBounds.height
+
+                        // Set the scene and other properties
                         val scene = Scene(mainView, 1000.0, 680.0, Color.TRANSPARENT)
                         scene.stylesheets.add(javaClass.getResource("/styles.css").toExternalForm())
 
-                        // Configure primary stage
                         primaryStage.initStyle(StageStyle.DECORATED)
                         primaryStage.scene = scene
                         primaryStage.title = "Blossom ERP"
@@ -148,20 +141,15 @@ class Main : Application() {
                         primaryStage.minWidth = 800.0
                         primaryStage.minHeight = 600.0
 
-                        // Show the window but keep it invisible
                         primaryStage.opacity = 0.0
                         primaryStage.show()
 
                         Thread {
-                            // Apply styling to the now-present window
                             WindowsStyler.applyStyling(primaryStage, 0xFF312D2B.toInt())
 
-                            // Após a estilização, voltar para a thread da UI para fazer transição
                             Platform.runLater {
-                                // Use animation timeline instead of sleep
                                 javafx.animation.PauseTransition(javafx.util.Duration.millis(300.0)).apply {
                                     setOnFinished {
-                                        // Then hide splash and make window visible
                                         splashScreen.hide {
                                             primaryStage.opacity = 1.0
                                         }
@@ -183,7 +171,6 @@ class Main : Application() {
 
     private fun loadIcons(stage: Stage) {
         try {
-            // Carregar o ícone principal para o executável e barra de tarefas
             val icoStream = javaClass.getResourceAsStream("/icons/icon.ico")
             if (icoStream != null) {
                 try {
@@ -194,7 +181,6 @@ class Main : Application() {
                 }
             }
 
-            // Adicionar múltiplas resoluções para diferentes situações
             val iconSizes = listOf(16, 32, 48, 64, 128, 256)
             for (size in iconSizes) {
                 val iconStream = javaClass.getResourceAsStream("/icons/icon${size}.png")
@@ -208,7 +194,6 @@ class Main : Application() {
                 }
             }
 
-            // Se nenhum ícone específico foi encontrado, tente um genérico
             if (stage.icons.isEmpty()) {
                 val defaultIconStream = javaClass.getResourceAsStream("/icons/icon.png")
                 if (defaultIconStream != null) {
@@ -220,7 +205,6 @@ class Main : Application() {
                 }
             }
 
-            // Verificar se o ícone foi carregado
             println("Ícones carregados: ${stage.icons.size}")
         } catch (e: Exception) {
             e.printStackTrace()

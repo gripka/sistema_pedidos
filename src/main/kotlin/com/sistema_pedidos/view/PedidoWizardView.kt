@@ -1231,18 +1231,19 @@ class PedidoWizardView : BorderPane() {
                         style = "-fx-font-size: 15px; -fx-font-weight: bold;"
                     },
                     // Store reference to this radio button
+// In createProductsStep() method, change this part:
                     RadioButton("Entregar no endereço do cliente").apply {
-                        entregaClienteRadio = this  // Save reference
+                        entregaClienteRadio = this
                         styleClass.add("custom-radio")
                         padding = Insets(10.0, 0.0, 0.0, 0.0)
 
                         // Toggle visibility of delivery step and disable pickup fields when checkbox is clicked
                         selectedProperty().addListener { _, _, isSelected ->
-                            // Existing code for visibility of delivery step
+                            // Only update the current tab's indicators
                             updateStepIndicators(isSelected)
 
-                            // Add this line to disable pickup fields when delivery is selected
-                            scene.lookup("#retirada-fields")?.isDisable = isSelected
+                            // Replace scene.lookup with this@OrderTabContent.lookup to scope to current tab only
+                            this@OrderTabContent.lookup("#retirada-fields")?.isDisable = isSelected
                         }
                     }
                 )
