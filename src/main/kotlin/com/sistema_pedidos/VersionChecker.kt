@@ -17,7 +17,7 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 class VersionChecker {
-    private val FALLBACK_VERSION = "0.8.2"
+    private val FALLBACK_VERSION = "0.7.3"
 
     var progressCallback: ((Double) -> Unit)? = null
     //progressCallback?.invoke(progress / 100.0)
