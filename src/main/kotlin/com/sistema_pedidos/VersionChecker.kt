@@ -17,7 +17,10 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 class VersionChecker {
-    private val FALLBACK_VERSION = "0.7.2"
+    private val FALLBACK_VERSION = "0.8.2"
+
+    var progressCallback: ((Double) -> Unit)? = null
+    //progressCallback?.invoke(progress / 100.0)
 
     private val trustManager = object : X509TrustManager {
         override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
@@ -222,8 +225,9 @@ class VersionChecker {
                             bytesDownloaded += bytesRead
 
                             if (totalBytes > 0) {
-                                val progress = (bytesDownloaded * 100 / totalBytes).toInt()
-                                onStatusUpdate?.invoke("Baixando atualização: $progress%")
+                                val progress = bytesDownloaded.toDouble() / totalBytes.toDouble()
+                                progressCallback?.invoke(progress)
+                                onStatusUpdate?.invoke("Baixando atualização: ${(progress * 100).toInt()}%")
                             }
                         }
                     }
@@ -231,21 +235,37 @@ class VersionChecker {
             }
 
             if (installerFile.exists()) {
-                AppLogger.info("Executing installer silently: ${installerFile.absolutePath}")
+                AppLogger.info("Executing installer: ${installerFile.absolutePath}")
+                progressCallback?.invoke(0.0)
                 onStatusUpdate?.invoke("Instalando atualização...")
 
-                // Pass silent installation parameters:
-                // /quiet = completely silent, no UI
-                // /passive = shows only progress bar
-                // /norestart = don't restart computer after installation
+                // Use /passive instead of /quiet to show progress bar do instalador
                 val installCommand = "\"${installerFile.absolutePath}\" /quiet /norestart"
-
                 AppLogger.info("Install command: $installCommand")
+
+                // Inicia thread de progresso artificial antes de iniciar a instalação
+                val progressThread = Thread {
+                    try {
+                        for (progress in 1..100) {
+                            // Ajusta velocidade da barra de progresso
+                            val delay = if (progress < 30) 50L else if (progress < 70) 100L else 200L
+                            Thread.sleep(delay)
+                            val progressValue = progress / 100.0
+                            progressCallback?.invoke(progressValue)
+                            onStatusUpdate?.invoke("Instalando atualização: $progress%")
+                        }
+                    } catch (e: Exception) {
+                        AppLogger.error("Erro ao atualizar progresso", e)
+                    }
+                }
+                progressThread.start()
+
+                // Inicia o processo de instalação
                 val process = ProcessBuilder("cmd", "/c", installCommand)
                     .redirectErrorStream(true)
                     .start()
 
-                // Monitor installation progress
+                // Monitor installation output
                 process.inputStream.bufferedReader().use { reader ->
                     var line: String?
                     while (reader.readLine().also { line = it } != null) {

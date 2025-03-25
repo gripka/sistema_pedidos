@@ -5,6 +5,7 @@ import javafx.application.Platform
 import javafx.geometry.Pos
 import javafx.scene.Scene
 import javafx.scene.control.Label
+import javafx.scene.control.ProgressBar
 import javafx.scene.image.Image
 import javafx.scene.image.ImageView
 import javafx.scene.layout.Pane
@@ -22,6 +23,16 @@ class SplashScreen(private val minimumDisplayTimeMs: Long = 2000) {
     private var showTime: Long = 0
     private val animations = mutableListOf<Animation>()
     private val backgroundExecutor = Executors.newSingleThreadExecutor()
+
+    // Barra de progresso para instalação
+    private val progressBar = ProgressBar(0.0).apply {
+        prefWidth = 240.0
+        style = """
+            -fx-accent: #FF3D00;
+            -fx-control-inner-background: rgba(255, 255, 255, 0.1);
+        """
+        isVisible = false // Oculta por padrão
+    }
 
     // Adicionar logging auxiliar
     private fun log(message: String) {
@@ -47,7 +58,8 @@ class SplashScreen(private val minimumDisplayTimeMs: Long = 2000) {
             style = "-fx-font-size: 14px;"
         }
 
-        val root = VBox(20.0, logoPlaceholder, loadingIndicator, label).apply {
+        // Adiciona a barra de progresso entre o indicador de carregamento e o label
+        val root = VBox(20.0, logoPlaceholder, loadingIndicator, progressBar, label).apply {
             alignment = Pos.CENTER
             style = "-fx-background-color: #202020; -fx-background-radius: 10;"
             padding = javafx.geometry.Insets(30.0)
@@ -65,11 +77,30 @@ class SplashScreen(private val minimumDisplayTimeMs: Long = 2000) {
         }
         log("Cena configurada")
 
-        // Pré-carregar recursos em thread separado - NÃO faça isso no construtor
         log("Configuração inicial da SplashScreen concluída")
     }
+
     fun getScene(): Scene {
         return splashStage.scene
+    }
+
+    /**
+     * Atualiza a barra de progresso e opcionalmente a mensagem de status
+     * @param progress Valor entre 0.0 e 1.0
+     * @param message Mensagem de status opcional para exibir
+     */
+    fun updateProgress(progress: Double, message: String? = null) {
+        Platform.runLater {
+            progressBar.isVisible = true
+            progressBar.progress = progress
+
+            // Atualiza o label se a mensagem for fornecida
+            if (message != null) {
+                val root = splashStage.scene.root as VBox
+                val label = root.children.last() as? Label
+                label?.text = message
+            }
+        }
     }
 
     fun preloadResources() {

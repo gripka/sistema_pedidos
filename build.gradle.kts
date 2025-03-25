@@ -10,7 +10,7 @@ repositories {
     maven { url = uri("https://jitpack.io") }
 }
 
-val appVersion = "0.7.2"
+val appVersion = "0.8.2"
 val appName = "Blossom ERP"
 val appVendor = "Gripka"
 val appDescription = "Sistema completo de gestão de pedidos, estoque e clientes."
