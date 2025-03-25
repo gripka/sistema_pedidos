@@ -383,12 +383,15 @@ class PedidoWizardView : BorderPane() {
                         successAlert.showAndWait()
 
                         val currentTab = tabPane.selectionModel.selectedItem
+                        val currentIndex = tabPane.selectionModel.selectedIndex
                         val newOrderTab = createOrderTab("Novo Pedido")
-                        tabPane.tabs.add(0, newOrderTab)
-                        tabPane.selectionModel.select(newOrderTab)
                         if (currentTab != null) {
                             tabPane.tabs.remove(currentTab)
+                            tabPane.tabs.add(currentIndex, newOrderTab)
+                        } else {
+                            tabPane.tabs.add(newOrderTab)
                         }
+                        tabPane.selectionModel.select(newOrderTab)
 
                     } catch (e: Exception) {
                         // Create styled error alert with increased height

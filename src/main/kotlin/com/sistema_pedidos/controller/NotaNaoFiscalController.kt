@@ -173,7 +173,7 @@ class NotaNaoFiscalController {
                     .feed(1)
                     .write(center, normalizarTexto("CNPJ: $COMPANY_CNPJ"))
                     .feed(1)
-                    .write(boldCenter, normalizarTexto("CUPOM SEM VALOR FISCAL"))
+                    .write(boldCenter, normalizarTexto("CUPOM DE RESERVA - VIA CLIENTE"))
                     .feed(1)
                     .writeLF(linhaDiv)
 
@@ -202,8 +202,13 @@ class NotaNaoFiscalController {
                     if (tipoCliente == "PESSOA_FISICA" || tipoCliente == null) {
                         val nome = normalizarTexto(clienteInfo["nome"] as? String ?: "")
                         val sobrenome = normalizarTexto(clienteInfo["sobrenome"] as? String ?: "")
-                        val nomeCompleto = "$nome $sobrenome"
-                        imprimirTextoComWrapping(escpos, "Nome: $nomeCompleto")
+                        val nomeCompleto = "$nome $sobrenome".trim()
+
+                        if (nomeCompleto.isEmpty()) {
+                            imprimirTextoComWrapping(escpos, "Nome: Cliente nao identificado")
+                        } else {
+                            imprimirTextoComWrapping(escpos, "Nome: $nomeCompleto")
+                        }
                     } else {
                         val razaoSocial = normalizarTexto(clienteInfo["razao_social"] as? String ?: "")
                         val nomeFantasia = normalizarTexto(clienteInfo["nome_fantasia"] as? String ?: "")
@@ -301,13 +306,15 @@ class NotaNaoFiscalController {
                 escpos.feed(1)
                     .writeLF(linhaDiv)
 
-                // Valores e pagamento
                 val valorTotal = pedidoData["valor_total"] as? Number ?: 0.0
                 val valorDesconto = pedidoData["valor_desconto"] as? Number ?: 0.0
                 val tipoDesconto = pedidoData["tipo_desconto"] as? String ?: ""
                 val formaPagamento = pedidoData["forma_pagamento"] as? String ?: "Nao informado"
                 val valorTrocoPara = pedidoData["valor_troco_para"] as? Number
                 val valorTroco = pedidoData["valor_troco"] as? Number
+
+                val entrega = pedidoData["entrega"] as? Map<String, Any>
+                val valorEntrega = entrega?.get("valor_entrega") as? Number ?: 0.0
 
                 escpos.write(bold, "PAGAMENTO:")
                     .feed(1)
@@ -333,6 +340,10 @@ class NotaNaoFiscalController {
                     escpos.writeLF(descInfo)
                 }
 
+                if (valorEntrega.toDouble() > 0) {
+                    escpos.writeLF("Taxa de entrega: R$ ${formatarValor(valorEntrega)}")
+                }
+
                 escpos.write(bold, "TOTAL: R$ $valorTotal")
                     .feed(1)
 
@@ -352,11 +363,8 @@ class NotaNaoFiscalController {
                     .writeLF(linhaDiv)
                 escpos.write(Style(), "")
 
-                val entrega = pedidoData["entrega"] as? Map<String, Any>
                 if (entrega != null) {
                     escpos.write(bold, "ENTREGA:")
-                        .feed(1)
-                    escpos.write(bold, "PEDIDO #$numeroPedido")
                         .feed(1)
                     val nomeDestinatario = entrega["nome_destinatario"] as? String ?: ""
                     imprimirTextoComWrapping(escpos, "Destinatario: $nomeDestinatario")
