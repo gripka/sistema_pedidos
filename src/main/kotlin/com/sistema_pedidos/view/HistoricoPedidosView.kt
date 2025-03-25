@@ -495,7 +495,7 @@ class HistoricoPedidosView : VBox(10.0) {
                     }
                 }
 
-                private val btnImprimirNotaNaoFiscal = Button("Nota Não Fiscal").apply {
+                private val btnImprimirNotaNaoFiscal = Button("Via do cliente").apply {
                     styleClass.add("small-button")
                     prefWidth = 140.0
                     setOnAction {

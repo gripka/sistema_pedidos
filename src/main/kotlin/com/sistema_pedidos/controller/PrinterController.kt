@@ -191,15 +191,29 @@ class PrinterController {
 
                 if (clienteInfo != null) {
                     val tipoCliente = clienteInfo["tipo"] as? String ?: ""
+
                     if (tipoCliente.trim().uppercase() == "PESSOA_FISICA") {
+                        // Pessoa Física - Individual customer
                         val nome = normalizarTexto(clienteInfo["nome"] as? String ?: "")
                         val sobrenome = normalizarTexto(clienteInfo["sobrenome"] as? String ?: "")
-                        val nomeCompleto = "$nome $sobrenome"
-                        imprimirTextoComWrapping(escpos, "Nome: $nomeCompleto")
+                        val nomeCompleto = "$nome $sobrenome".trim()
+
+                        if (nomeCompleto.isEmpty()) {
+                            imprimirTextoComWrapping(escpos, "Nome: Cliente nao identificado")
+                        } else {
+                            imprimirTextoComWrapping(escpos, "Nome: $nomeCompleto")
+                        }
                     } else {
+                        // Pessoa Jurídica - Company customer
                         val razaoSocial = normalizarTexto(clienteInfo["razao_social"] as? String ?: "")
                         val nomeFantasia = normalizarTexto(clienteInfo["nome_fantasia"] as? String ?: "")
-                        imprimirTextoComWrapping(escpos, "Empresa: $razaoSocial")
+
+                        if (razaoSocial.isEmpty()) {
+                            imprimirTextoComWrapping(escpos, "Empresa: Cliente nao identificado")
+                        } else {
+                            imprimirTextoComWrapping(escpos, "Empresa: $razaoSocial")
+                        }
+
                         if (nomeFantasia.isNotEmpty()) {
                             imprimirTextoComWrapping(escpos, "Nome Fantasia: $nomeFantasia")
                         }
