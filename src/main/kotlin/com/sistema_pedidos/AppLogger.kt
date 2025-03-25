@@ -8,9 +8,10 @@ import java.util.Date
 
 object AppLogger {
     private val logFile: File by lazy {
-        val appDataDir = File(System.getProperty("user.home"), ".blossom-erp")
-        if (!appDataDir.exists()) appDataDir.mkdirs()
-        File(appDataDir, "application.log")
+        val installDir = File(System.getProperty("user.dir"))
+        val logDir = File(installDir, "log")
+        if (!logDir.exists()) logDir.mkdirs()
+        File(logDir, "application.log")
     }
 
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS")
@@ -22,8 +23,8 @@ object AppLogger {
         }
 
         info("------- Application Started -------")
-        info("User directory: ${System.getProperty("user.dir")}")
-        info("App data directory: ${logFile.parentFile.absolutePath}")
+        info("Installation directory: ${System.getProperty("user.dir")}")
+        info("Log directory: ${logFile.parentFile.absolutePath}")
         info("Java version: ${System.getProperty("java.version")}")
         info("App version: ${try {
             VersionChecker().getCurrentVersion()
