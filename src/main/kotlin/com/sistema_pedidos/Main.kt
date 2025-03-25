@@ -2,6 +2,7 @@ package com.sistema_pedidos
 
 import com.sistema_pedidos.database.DatabaseHelper
 import com.sistema_pedidos.util.DwmApi
+import com.sistema_pedidos.util.VersionChecker
 import com.sistema_pedidos.util.WindowsStyler
 import javafx.application.Application
 import javafx.application.Platform
@@ -15,6 +16,8 @@ import javafx.scene.paint.Color
 import javafx.scene.image.Image
 import java.io.InputStream
 import java.lang.management.ManagementFactory
+import javafx.application.Platform.exit
+import kotlin.system.exitProcess
 
 class Main : Application() {
     override fun start(primaryStage: Stage) {
@@ -26,6 +29,58 @@ class Main : Application() {
         Thread {
             try {
                 Thread.sleep(100) // Pequena pausa para garantir que as animações começem
+
+                // Check for updates
+                val versionChecker = VersionChecker()
+                versionChecker.onStatusUpdate = { statusMessage ->
+                    Platform.runLater {
+                        // Update splash screen status label
+                        val scene = splashScreen.getScene()
+                        val root = scene.root
+                        if (root is javafx.scene.layout.VBox) {
+                            val label = root.children.last() as? javafx.scene.control.Label
+                            label?.text = statusMessage
+                        }
+                    }
+                }
+
+                // Show current version
+                versionChecker.onStatusUpdate?.invoke("Versão atual: ${versionChecker.getCurrentVersion()}")
+                Thread.sleep(500)
+
+                // Check for updates
+                val (updateAvailable, latestVersion, downloadUrl) = versionChecker.isUpdateAvailable()
+
+                if (updateAvailable && downloadUrl != null) {
+                    versionChecker.onStatusUpdate?.invoke("Nova versão disponível: $latestVersion")
+                    Thread.sleep(1000)
+
+                    // Download and install update
+                    val updateSuccess = versionChecker.downloadAndInstallUpdate(downloadUrl)
+
+                    if (updateSuccess) {
+                        versionChecker.onStatusUpdate?.invoke("Atualização instalada. Reiniciando...")
+                        Thread.sleep(2000)
+
+                        // Exit application - the installer will restart it
+                        Platform.runLater {
+                            splashScreen.hide {
+                                exit()
+                                exitProcess(0)
+                            }
+                        }
+                        return@Thread
+                    } else {
+                        versionChecker.onStatusUpdate?.invoke("Falha na atualização. Continuando...")
+                        Thread.sleep(1000)
+                    }
+                } else {
+                    versionChecker.onStatusUpdate?.invoke("Sistema atualizado!")
+                    Thread.sleep(500)
+                }
+
+                // Continue with normal application startup
+                versionChecker.onStatusUpdate?.invoke("Inicializando o sistema...")
 
                 // Application initialization
                 if (!SingleInstanceLock.initialize(primaryStage)) {

@@ -10,10 +10,10 @@ repositories {
     maven { url = uri("https://jitpack.io") }
 }
 
-val appVersion = "0.7.9"
+val appVersion = "0.7.2"
 val appName = "Blossom ERP"
 val appVendor = "Gripka"
-val appDescription = "Otimize a administração da sua floricultura com um sistema completo de gestão de pedidos, estoque e clientes."
+val appDescription = "Sistema completo de gestão de pedidos, estoque e clientes."
 
 dependencies {
     implementation("org.openjfx:javafx-controls:17.0.2")
@@ -25,6 +25,8 @@ dependencies {
     implementation("com.itextpdf:itext7-core:7.2.3")
     implementation("net.java.dev.jna:jna:5.13.0")
     implementation("net.java.dev.jna:jna-platform:5.13.0")
+    implementation("com.squareup.okhttp3:okhttp:4.11.0")
+    implementation("org.json:json:20230618")
 }
 
 application {
@@ -58,6 +60,7 @@ runtime {
         // Application details
         imageName = appName
         appVersion = this@Build_gradle.appVersion
+        installerName = "${appName}-${this@Build_gradle.appVersion}"
 
         // Copy additional files to the distribution
         resourceDir = file("installer-resources")
@@ -92,17 +95,11 @@ runtime {
     }
 }
 
-// Add this to your build.gradle.kts
 tasks.register("generateVersionProperties") {
     doLast {
-        val propertiesDir = file("src/main/resources")
-        propertiesDir.mkdirs()
-
-        val propertiesFile = file("$propertiesDir/app.properties")
-        propertiesFile.writeText("""
-            app.version=$appVersion
-            app.name=$appName
-        """.trimIndent())
+        val propertiesFile = file("${projectDir}/src/main/resources/app.properties")
+        propertiesFile.parentFile.mkdirs()
+        propertiesFile.writeText("app.version=$appVersion\n")
     }
 }
 
@@ -141,5 +138,18 @@ tasks.named("jpackageImage") {
 }
 
 tasks.named("jpackage") {
-    dependsOn("prepareInstallerResources")
+    dependsOn("verifyJar")
+}
+
+tasks.register("verifyJar") {
+    dependsOn("jar")
+    doLast {
+        val jarTask = tasks.jar.get()
+        println("Checking JAR contents: ${jarTask.archiveFile.get().asFile}")
+        zipTree(jarTask.archiveFile).files.filter {
+            it.name == "app.properties"
+        }.forEach {
+            println("Found ${it.name} in JAR")
+        }
+    }
 }
