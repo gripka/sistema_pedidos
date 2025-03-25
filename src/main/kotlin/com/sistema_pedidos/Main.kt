@@ -43,6 +43,11 @@ class Main : Application() {
                         }
                     }
                 }
+                versionChecker.progressCallback = { progress ->
+                    Platform.runLater {
+                        splashScreen.updateProgress(progress)
+                    }
+                }
 
                 // Show current version
                 versionChecker.onStatusUpdate?.invoke("Versão atual: ${versionChecker.getCurrentVersion()}")
