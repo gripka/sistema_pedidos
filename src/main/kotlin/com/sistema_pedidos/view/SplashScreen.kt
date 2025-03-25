@@ -68,8 +68,10 @@ class SplashScreen(private val minimumDisplayTimeMs: Long = 2000) {
         // Pré-carregar recursos em thread separado - NÃO faça isso no construtor
         log("Configuração inicial da SplashScreen concluída")
     }
+    fun getScene(): Scene {
+        return splashStage.scene
+    }
 
-    // Separar o carregamento de recursos para ser chamado explicitamente após show()
     fun preloadResources() {
         log("Iniciando pré-carregamento de recursos")
         backgroundExecutor.submit {
