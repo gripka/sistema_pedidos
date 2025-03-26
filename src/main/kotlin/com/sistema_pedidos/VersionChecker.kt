@@ -49,6 +49,66 @@ class VersionChecker {
         isPackaged
     }
 
+    fun getLatestReleaseInfo(): Triple<String, String, String?> {
+        try {
+            AppLogger.info("Getting latest release info from GitHub...")
+
+            val request = Request.Builder()
+                .url(releasesUrl)
+                .header("Accept", "application/vnd.github.v3+json")
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    AppLogger.error("GitHub API error: ${response.code} - ${response.message}")
+                    return Triple("", "", null)
+                }
+
+                val responseBody = response.body?.string() ?: return Triple("", "", null)
+                val jsonArray = JSONArray(responseBody)
+                if (jsonArray.length() == 0) {
+                    return Triple("", "", null)
+                }
+
+                val latestRelease = jsonArray.getJSONObject(0)
+                val tagName = latestRelease.getString("tag_name").removePrefix("v")
+                val releaseDate = latestRelease.getString("published_at").substring(0, 10) // Get YYYY-MM-DD
+
+                // Format date to DD/MM/YYYY
+                val formattedDate = if (releaseDate.length >= 10) {
+                    val parts = releaseDate.split("-")
+                    if (parts.size == 3) {
+                        "${parts[2]}/${parts[1]}/${parts[0]}"
+                    } else {
+                        releaseDate
+                    }
+                } else {
+                    releaseDate
+                }
+
+                var downloadUrl = ""
+                val assets = latestRelease.getJSONArray("assets")
+                for (i in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(i)
+                    val name = asset.getString("name").lowercase()
+                    if (name.endsWith(".exe") && (
+                                name.contains("blossom") ||
+                                        name.contains("erp") ||
+                                        name.contains("sistema_pedidos")
+                                )) {
+                        downloadUrl = asset.getString("browser_download_url")
+                        break
+                    }
+                }
+
+                return Triple(tagName, downloadUrl, formattedDate)
+            }
+        } catch (e: Exception) {
+            AppLogger.error("Error getting release info", e)
+            return Triple("", "", null)
+        }
+    }
+
     fun getCurrentVersion(): String {
         try {
             AppLogger.info("Getting current version...")
