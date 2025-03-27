@@ -316,6 +316,7 @@ class ConfiguracoesView(stage: Stage) : MainView(stage), Refreshable {
         val minimizeToTrayCheck = CheckBox("Manter na bandeja ao fechar")
         minimizeToTrayCheck.styleClass.add("custom-checkbox")
         minimizeToTrayCheck.isSelected = controller.minimizeToTray ?: false
+        minimizeToTrayCheck.isDisable = true
 
         startWithSystemCheck.selectedProperty().addListener { _, _, newValue ->
             startMinimizedCheck.isDisable = !newValue

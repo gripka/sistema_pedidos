@@ -9,6 +9,9 @@ import java.util.concurrent.TimeUnit
 import java.util.Properties
 import com.sistema_pedidos.Main
 import com.sistema_pedidos.util.AppLogger
+import java.io.FileInputStream
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import javax.net.ssl.SSLContext
@@ -18,8 +21,19 @@ import javax.net.ssl.X509TrustManager
 
 class VersionChecker {
     private val FALLBACK_VERSION = "0.7.3"
+    private val MAX_FAILED_ATTEMPTS = 3
+    private val CONNECTIVITY_TIMEOUT_MS = 2000
+
+    // Constants for preferences file
+    private val PREFS_FILE = File(System.getProperty("user.home"), ".blossom_erp_prefs")
+    private val PREF_FAILED_ATTEMPTS = "update_failed_attempts"
+    private val PREF_LAST_FAILED_TIME = "last_failed_update_time"
+    private val RETRY_COOLDOWN_HOURS = 24 // Wait 24 hours after max failures
 
     var progressCallback: ((Double) -> Unit)? = null
+    var onStatusUpdate: ((String) -> Unit)? = null
+
+
     //progressCallback?.invoke(progress / 100.0)
 
     private val trustManager = object : X509TrustManager {
@@ -37,8 +51,6 @@ class VersionChecker {
 
     private val releasesUrl = "https://api.github.com/repos/gripka/sistema_pedidos/releases"
 
-    var onStatusUpdate: ((String) -> Unit)? = null
-
     private val isPackagedApp by lazy {
         val userDir = System.getProperty("user.dir")
         AppLogger.info("Checking if packaged app. User dir: $userDir")
@@ -47,6 +59,81 @@ class VersionChecker {
                     it.name.contains("erp", ignoreCase = true)) } ?: false
         AppLogger.info("Is packaged app: $isPackaged")
         isPackaged
+    }
+
+    fun isInternetAvailable(): Boolean {
+        return try {
+            val socket = Socket()
+            val socketAddress = InetSocketAddress("api.github.com", 443)
+            socket.connect(socketAddress, CONNECTIVITY_TIMEOUT_MS)
+            socket.close()
+            true
+        } catch (e: Exception) {
+            AppLogger.info("Internet connection check failed: ${e.message}")
+            false
+        }
+    }
+
+    private fun loadPreferences(): Properties {
+        val props = Properties()
+        try {
+            if (PREFS_FILE.exists()) {
+                FileInputStream(PREFS_FILE).use { fis ->
+                    props.load(fis)
+                }
+            }
+        } catch (e: Exception) {
+            AppLogger.error("Error loading preferences", e)
+        }
+        return props
+    }
+
+    private fun savePreferences(props: Properties) {
+        try {
+            PREFS_FILE.parentFile?.mkdirs()
+            FileOutputStream(PREFS_FILE).use { fos ->
+                props.store(fos, "Blossom ERP Preferences")
+            }
+        } catch (e: Exception) {
+            AppLogger.error("Error saving preferences", e)
+        }
+    }
+
+    private fun recordFailedAttempt() {
+        val props = loadPreferences()
+        val currentAttempts = props.getProperty(PREF_FAILED_ATTEMPTS, "0").toInt()
+        props.setProperty(PREF_FAILED_ATTEMPTS, (currentAttempts + 1).toString())
+        props.setProperty(PREF_LAST_FAILED_TIME, System.currentTimeMillis().toString())
+        savePreferences(props)
+        AppLogger.info("Recorded failed update attempt: ${currentAttempts + 1}")
+    }
+
+    private fun resetFailedAttempts() {
+        val props = loadPreferences()
+        props.setProperty(PREF_FAILED_ATTEMPTS, "0")
+        savePreferences(props)
+        AppLogger.info("Reset failed update attempts counter")
+    }
+
+    fun shouldSkipUpdateCheck(): Boolean {
+        val props = loadPreferences()
+        val failedAttempts = props.getProperty(PREF_FAILED_ATTEMPTS, "0").toInt()
+
+        if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+            val lastFailedTime = props.getProperty(PREF_LAST_FAILED_TIME, "0").toLong()
+            val hoursSinceLastFailure = (System.currentTimeMillis() - lastFailedTime) / (1000 * 60 * 60)
+
+            // If cooldown period has passed, allow checking again
+            if (hoursSinceLastFailure >= RETRY_COOLDOWN_HOURS) {
+                resetFailedAttempts()
+                return false
+            }
+
+            AppLogger.info("Skipping update check due to $failedAttempts previous failures")
+            return true
+        }
+
+        return false
     }
 
     fun getLatestReleaseInfo(): Triple<String, String, String?> {
@@ -101,10 +188,14 @@ class VersionChecker {
                     }
                 }
 
+                // Reset failed attempts since we successfully got the release info
+                resetFailedAttempts()
+
                 return Triple(tagName, downloadUrl, formattedDate)
             }
         } catch (e: Exception) {
             AppLogger.error("Error getting release info", e)
+            recordFailedAttempt()
             return Triple("", "", null)
         }
     }
@@ -165,9 +256,23 @@ class VersionChecker {
 
     fun getLatestVersion(): Pair<String, String>? {
         try {
+            if (shouldSkipUpdateCheck()) {
+                AppLogger.info("Skipping update check due to previous failures")
+                onStatusUpdate?.invoke("Pulando verificação de atualizações...")
+                return null
+            }
+
+            if (!isInternetAvailable()) {
+                AppLogger.info("Skipping update check - no internet connection")
+                onStatusUpdate?.invoke("Sem conexão com internet, iniciando em modo offline...")
+                recordFailedAttempt()
+                return null
+            }
+
             AppLogger.info("Checking for updates from GitHub...")
             onStatusUpdate?.invoke("Verificando atualizações...")
 
+            // Rest of existing implementation...
             val request = Request.Builder()
                 .url(releasesUrl)
                 .header("Accept", "application/vnd.github.v3+json")
@@ -177,18 +282,21 @@ class VersionChecker {
                 if (response.code == 403) {
                     AppLogger.error("GitHub API rate limit exceeded")
                     onStatusUpdate?.invoke("API GitHub: Limite de requisições atingido")
+                    recordFailedAttempt()
                     return null
                 }
 
                 if (!response.isSuccessful) {
                     AppLogger.error("GitHub API error: ${response.code} - ${response.message}")
                     onStatusUpdate?.invoke("Erro API GitHub: ${response.code}")
+                    recordFailedAttempt()
                     return null
                 }
 
                 val responseBody = response.body?.string()
                 if (responseBody.isNullOrEmpty()) {
                     AppLogger.error("Empty response from GitHub API")
+                    recordFailedAttempt()
                     return null
                 }
 
@@ -231,6 +339,7 @@ class VersionChecker {
                                 )) {
                         val downloadUrl = asset.getString("browser_download_url")
                         AppLogger.info("Found update file: $name ($downloadUrl)")
+                        resetFailedAttempts()
                         return Pair(tagName, downloadUrl)
                     }
                 }
@@ -241,6 +350,7 @@ class VersionChecker {
         } catch (e: Exception) {
             AppLogger.error("Error checking for updates", e)
             onStatusUpdate?.invoke("Erro de rede: ${e.message}")
+            recordFailedAttempt()
             return null
         }
     }
@@ -407,6 +517,19 @@ class VersionChecker {
         logEnvironmentInfo()
 
         try {
+            if (shouldSkipUpdateCheck()) {
+                AppLogger.info("Skipping update check due to previous failures")
+                onStatusUpdate?.invoke("Iniciando sem verificar atualizações...")
+                return Triple(false, getCurrentVersion(), null)
+            }
+
+            if (!isInternetAvailable()) {
+                AppLogger.info("No internet connection available, skipping update check")
+                onStatusUpdate?.invoke("Sem conexão com internet, iniciando em modo offline...")
+                recordFailedAttempt()
+                return Triple(false, getCurrentVersion(), null)
+            }
+
             // Get current version
             val currentVersion = getCurrentVersion()
             AppLogger.info("Current version: $currentVersion")
@@ -426,14 +549,17 @@ class VersionChecker {
             AppLogger.info("Comparison result: $comparisonResult")
 
             val isNewer = comparisonResult > 0
+            resetFailedAttempts() // Reset on successful check
             return Triple(isNewer, latestVersion, if (isNewer) downloadUrl else null)
         } catch (e: Exception) {
             AppLogger.error("Critical error in isUpdateAvailable", e)
+            recordFailedAttempt()
             return Triple(false, getCurrentVersion(), null)
         }
     }
 
     private fun compareVersions(v1: String, v2: String): Int {
+        // Existing implementation...
         AppLogger.info("Comparing versions: '$v1' vs '$v2'")
 
         try {
@@ -450,7 +576,6 @@ class VersionChecker {
             return 0
         } catch (e: Exception) {
             AppLogger.error("Error comparing versions", e)
-            // If comparison fails, assume versions are equal
             return 0
         }
     }
