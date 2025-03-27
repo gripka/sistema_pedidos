@@ -9,20 +9,13 @@ import com.sun.javafx.sg.prism.NGCanvas.LINE_WIDTH
 import java.io.IOException
 import javax.print.PrintService
 import javax.print.PrintServiceLookup
-import java.util.prefs.Preferences
 import java.text.SimpleDateFormat
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.*
 
 class NotaNaoFiscalController {
-    private val prefs = Preferences.userNodeForPackage(NotaNaoFiscalController::class.java)
-    private val DEFAULT_PRINTER_KEY = "default_thermal_printer"
-    private val COMPANY_NAME = "FLORICULTURA ADRIANA FLORES"
-    private val COMPANY_PHONE = "(42) 99815-5900"
-    private val COMPANY_ADDRESS = "Rua 19 de Dezembro, 347 - Centro"
-    private val COMPANY_CNPJ = "40.348.582/0001-16"
+    private val configController = ConfiguracoesController()
     private val LINE_WIDTH = 32 // Maximum characters per line for most thermal printers
+
 
     // Lista de impressoras térmicas conhecidas
     private val knownThermalPrinters = listOf(
@@ -48,9 +41,9 @@ class NotaNaoFiscalController {
      * Obtém a impressora térmica padrão configurada para impressões
      */
     fun getImpressoraPadrao(): PrintService? {
-        val nomeSalvo = prefs.get(DEFAULT_PRINTER_KEY, null)
+        val nomeSalvo = configController.defaultPrinter
 
-        return if (nomeSalvo != null) {
+        return if (nomeSalvo.isNotEmpty()) {
             listarImpressoras().find { it.name == nomeSalvo && isThermalPrinter(it) }
         } else {
             // Tenta encontrar a primeira impressora térmica disponível
@@ -63,9 +56,10 @@ class NotaNaoFiscalController {
      */
     fun definirImpressoraPadrao(printService: PrintService) {
         if (isThermalPrinter(printService)) {
-            prefs.put(DEFAULT_PRINTER_KEY, printService.name)
+            configController.defaultPrinter = printService.name
+            configController.saveConfigProperties()
         } else {
-            throw IllegalArgumentException("A impressora selecionada não é uma impressora térmica")
+            throw IllegalArgumentException("A impressora selecionada nao e uma impressora termica")
         }
     }
 
@@ -165,13 +159,13 @@ class NotaNaoFiscalController {
 
 
                 // Cabecalho da empresa
-                escpos.write(boldCenter, normalizarTexto(COMPANY_NAME))
+                escpos.write(boldCenter, normalizarTexto(configController.companyName))
                     .feed(1)
-                    .write(center, normalizarTexto(COMPANY_ADDRESS))
+                    .write(center, normalizarTexto(configController.companyAddress))
                     .feed(1)
-                    .write(center, normalizarTexto("Tel: $COMPANY_PHONE"))
+                    .write(center, normalizarTexto("Tel: ${configController.companyPhone}"))
                     .feed(1)
-                    .write(center, normalizarTexto("CNPJ: $COMPANY_CNPJ"))
+                    .write(center, normalizarTexto("CNPJ: ${configController.companyCnpj}"))
                     .feed(1)
                     .write(boldCenter, normalizarTexto("CUPOM DE RESERVA - VIA CLIENTE"))
                     .feed(1)
@@ -469,7 +463,7 @@ class NotaNaoFiscalController {
                             .feed(1)
                             .writeLF("Data: ${formatarData(dataRetirada)}")
                             .writeLF("Hora: $horaRetirada")
-                            .writeLF("Local: ${normalizarTexto(COMPANY_ADDRESS)}")
+                            .writeLF("Local: ${normalizarTexto(configController.companyAddress)}")
                             .feed(1)
                     }
                 }
@@ -479,7 +473,8 @@ class NotaNaoFiscalController {
 
                 // Rodape
                 escpos.feed(1)
-                    .write(center, COMPANY_NAME)
+                    .write(center, normalizarTexto(configController.companyName))
+
                     .feed(1)
                     .write(center, normalizarTexto("Obrigado pela preferência!"))
                     .feed(1)

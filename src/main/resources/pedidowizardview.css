@@ -654,7 +654,8 @@
 .tab-pane .tab:selected {
     -fx-background-color: #ffffff;
     -fx-border-color: #6056e8 #6056e8 #ffffff #6056e8;
-    -fx-border-width: 2 2 1 2;
+    -fx-border-width: 2 2 0 2;
+    -fx-background-insets: 0 0 -1 0;
 }
 
 .tab-pane .tab .tab-label {
@@ -671,7 +672,7 @@
 .tab-pane .tab-content-area {
     -fx-background-color: #ffffff;
     -fx-border-color: #dfe4ea;
-    -fx-border-width: 1;
+    -fx-border-width: 0;
     -fx-border-radius: 0 5 5 5;
 }
 
