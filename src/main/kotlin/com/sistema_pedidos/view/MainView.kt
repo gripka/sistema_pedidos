@@ -14,7 +14,7 @@ import javafx.scene.paint.Color
 import javafx.scene.shape.Rectangle
 import javafx.stage.Stage
 
-class MainView(private val stage: Stage) : BorderPane() {
+open class MainView(private val stage: Stage) : BorderPane() {
     private val scrollPane = ScrollPane()
     private val contentContainer = VBox()
 

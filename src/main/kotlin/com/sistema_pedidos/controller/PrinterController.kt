@@ -13,11 +13,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 
 class PrinterController {
-    private val prefs = Preferences.userNodeForPackage(PrinterController::class.java)
-    private val DEFAULT_PRINTER_KEY = "default_thermal_printer"
-    private val COMPANY_NAME = "FLORICULTURA ADRIANA FLORES"
-    private val COMPANY_PHONE = "(42) 99815-5900"
-    private val COMPANY_ADDRESS = "Rua 19 de Dezembro, 347 - Centro"
+    private val configController = ConfiguracoesController()
     private val LINE_WIDTH = 32 // Maximum characters per line for most thermal printers
 
     // Lista de impressoras termicas conhecidas (pode ser expandida conforme necessario)
@@ -25,6 +21,98 @@ class PrinterController {
         "EPSON TM-T20", "EPSON TM-T88", "Bematech MP-4200", "Daruma DR700", "Elgin i9",
         "POS-80", "Generic / Text Only", "POS58 Printer"
     )
+
+    /**
+     * Imprime uma página de teste na impressora especificada
+     */
+    fun printTestPage(printerName: String, testData: Map<String, String>) {
+        try {
+            val impressora = listarImpressoras().find { it.name == printerName }
+                ?: throw IOException("Impressora não encontrada: $printerName")
+
+            if (!isThermalPrinter(impressora)) {
+                throw IOException("A impressora ${impressora.name} não é uma impressora térmica.")
+            }
+
+            PrinterOutputStream(impressora).use { outputStream ->
+                EscPos(outputStream).use { escpos ->
+                    // Estilos
+                    val boldCenter = Style()
+                        .setBold(true)
+                        .setJustification(EscPosConst.Justification.Center)
+
+                    val center = Style()
+                        .setJustification(EscPosConst.Justification.Center)
+
+                    val bold = Style().setBold(true)
+
+                    val linhaDiv = "------------------------------------------------"
+
+                    // Cabeçalho
+                    escpos.write(boldCenter, "TESTE DE IMPRESSÃO")
+                        .feed(2)
+                        .writeLF(boldCenter, "DADOS DA EMPRESA")
+                        .feed(1)
+                        .writeLF(linhaDiv)
+
+                    // Dados da empresa do teste
+                    val companyName = testData["company_name"] ?: "Nome da Empresa"
+                    val companyPhone = testData["company_phone"] ?: "Telefone"
+                    val companyAddress = testData["company_address"] ?: "Endereço"
+
+                    escpos.write(boldCenter, normalizarTexto(companyName))
+                        .feed(1)
+                        .write(center, normalizarTexto(companyAddress))
+                        .feed(1)
+                        .write(center, normalizarTexto("Tel: $companyPhone"))
+                        .feed(1)
+                        .writeLF(linhaDiv)
+
+                    // Corpo do teste
+                    escpos.feed(1)
+                        .writeLF("Testando fonte normal")
+                        .write(bold, "Testando fonte em negrito")
+                        .feed(1)
+                        .write(center, "Testando alinhamento centralizado")
+                        .feed(1)
+                        .write(Style().setJustification(EscPosConst.Justification.Right),
+                            "Testando alinhamento à direita")
+                        .feed(1)
+                        .writeLF(linhaDiv)
+
+                    // Teste de caracteres especiais
+                    escpos.feed(1)
+                        .writeLF("Caracteres especiais: áéíóúçãõâêô")
+                        .writeLF("Normalizado: " + normalizarTexto("áéíóúçãõâêô"))
+                        .feed(1)
+                        .writeLF(linhaDiv)
+
+                    // Teste de números
+                    escpos.feed(1)
+                        .writeLF("Teste de números: 1234567890")
+                        .writeLF("Teste de valor: R$ 1.234,56")
+                        .feed(1)
+                        .writeLF(linhaDiv)
+
+                    // Rodapé
+                    escpos.feed(1)
+                        .write(center, "Impressora: " + impressora.name)
+                        .feed(1)
+                        .writeLF(center, "Data: " + SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(Date()))
+                        .feed(1)
+                        .writeLF(boldCenter, "TESTE CONCLUÍDO COM SUCESSO")
+                        .feed(4)
+                        .cut(CutMode.FULL)
+                }
+            }
+
+            println("Teste de impressão concluído com sucesso!")
+        } catch (e: Exception) {
+            e.printStackTrace()
+            println("Erro ao imprimir teste: ${e.message}")
+            throw e
+        }
+    }
 
     /**
      * Lista todas as impressoras disponiveis no sistema
@@ -44,9 +132,9 @@ class PrinterController {
      * Obtem a impressora termica padrao configurada para impressoes
      */
     fun getImpressoraPadrao(): PrintService? {
-        val nomeSalvo = prefs.get(DEFAULT_PRINTER_KEY, null)
+        val nomeSalvo = configController.defaultPrinter
 
-        return if (nomeSalvo != null) {
+        return if (nomeSalvo.isNotEmpty()) {
             listarImpressoras().find { it.name == nomeSalvo && isThermalPrinter(it) }
         } else {
             // Tenta encontrar a primeira impressora termica disponivel
@@ -59,7 +147,8 @@ class PrinterController {
      */
     fun definirImpressoraPadrao(printService: PrintService) {
         if (isThermalPrinter(printService)) {
-            prefs.put(DEFAULT_PRINTER_KEY, printService.name)
+            configController.defaultPrinter = printService.name
+            configController.saveConfigProperties()
         } else {
             throw IllegalArgumentException("A impressora selecionada nao e uma impressora termica")
         }
@@ -161,11 +250,11 @@ class PrinterController {
 
 
                 // Cabecalho da empresa
-                escpos.write(boldCenter, normalizarTexto(COMPANY_NAME))
+                escpos.write(boldCenter, normalizarTexto(configController.companyName))
                     .feed(1)
-                    .write(center, normalizarTexto(COMPANY_ADDRESS))
+                    .write(center, normalizarTexto(configController.companyAddress))
                     .feed(1)
-                    .write(center, normalizarTexto("Tel: $COMPANY_PHONE"))
+                    .write(center, normalizarTexto("Tel: ${configController.companyPhone}"))
                     .feed(1)
                     .writeLF(linhaDiv)
 
@@ -491,7 +580,7 @@ class PrinterController {
 
                 // Rodape
                 escpos.feed(1)
-                    .write(center, COMPANY_NAME)
+                    .write(center, normalizarTexto(configController.companyName))
                     .feed(1)
                     .writeLF(center,"Impresso em: " + SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(Date()))
                     .feed(6)  // Increased from 3 to 6 for more space before cutting

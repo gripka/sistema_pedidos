@@ -26,6 +26,80 @@
     -fx-font-size: 14px;
 }
 
+.tab-pane {
+    -fx-background-color: transparent;
+    -fx-tab-min-width: 120px;
+    -fx-tab-max-width: 120px;
+    -fx-tab-min-height: 20px;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.tab-pane .tab-header-area {
+    -fx-padding: 5 0 0 0;
+}
+
+.tab-pane .tab {
+    -fx-background-color: #f5f6fa;
+    -fx-background-radius: 5 5 0 0;
+    -fx-border-color: #dfe4ea;
+    -fx-border-width: 1 1 0 1;
+    -fx-border-radius: 5 5 0 0;
+    -fx-padding: 5 15;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+.tab-pane:focused > .tab-header-area > .headers-region > .tab:selected .focus-indicator {
+    -fx-border-color: transparent;
+}
+
+.tab-pane .tab:selected {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #6056e8 #6056e8 #ffffff #6056e8;
+    -fx-border-width: 2 2 0 2;
+    -fx-background-insets: 0 0 -1 0;
+}
+
+.tab-pane .tab .tab-label {
+    -fx-text-fill: #495057;
+    -fx-font-size: 14px;
+    -fx-font-weight: normal;
+}
+
+.tab-pane .tab:selected .tab-label {
+    -fx-text-fill: #6056e8;
+    -fx-font-weight: bold;
+}
+
+.tab-pane .tab-content-area {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #dfe4ea;
+    -fx-border-width: 0;
+    -fx-border-radius: 0 5 5 5;
+}
+
+/* Special styling for new tab button */
+.tab-pane .tab:last-child {
+    -fx-background-color: #e9ecef;
+    -fx-min-width: 50px;
+    -fx-max-width: 50px;
+}
+
+.tab-pane .tab:last-child .tab-label {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #6c757d;
+}
+
+.tab-pane .tab:last-child:hover {
+    -fx-background-color: #dee2e6;
+}
+
+.order-tab-content {
+    -fx-background-color: #f5f6fa;
+}
+
 /* Table View Styling */
 .table-view {
     -fx-background-color: white;

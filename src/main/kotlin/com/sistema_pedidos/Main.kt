@@ -1,5 +1,6 @@
 package com.sistema_pedidos
 
+import com.sistema_pedidos.controller.ConfiguracoesController
 import com.sistema_pedidos.database.DatabaseHelper
 import com.sistema_pedidos.util.DwmApi
 import com.sistema_pedidos.util.VersionChecker
@@ -19,8 +20,49 @@ import java.lang.management.ManagementFactory
 import javafx.application.Platform.exit
 import kotlin.system.exitProcess
 
+import java.awt.MenuItem
+import java.awt.PopupMenu
+import java.awt.SystemTray
+import java.awt.Toolkit
+import java.awt.TrayIcon
+import java.awt.AWTException
+
 class Main : Application() {
+    companion object {
+        var startMinimized = false
+        private var trayIcon: TrayIcon? = null
+    }
+    override fun init() {
+        val args = parameters.raw
+        startMinimized = args.contains("-minimized")
+    }
+
     override fun start(primaryStage: Stage) {
+
+        ConfiguracoesController.initializeDailyBackup()
+
+        primaryStage.setOnCloseRequest { event ->
+            // Get a fresh instance of ConfiguracoesController to ensure latest settings
+            val configController = ConfiguracoesController()
+            println("Closing window. minimizeToTray setting: ${configController.minimizeToTray}")
+
+            if (configController.minimizeToTray) {
+                event.consume() // Prevent default close action
+                println("Minimizing to tray instead of closing")
+                primaryStage.hide() // Hide the window instead of closing
+
+                setupSystemTray(primaryStage)
+            } else {
+                if (trayIconInstance != null) {
+                    try {
+                        SystemTray.getSystemTray().remove(trayIconInstance)
+                        trayIconInstance = null
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
 
         val splashScreen = SplashScreen(3000)
         splashScreen.show()
@@ -86,7 +128,15 @@ class Main : Application() {
                 }
 
                 setProcessName("Blossom ERP")
-                Runtime.getRuntime().addShutdownHook(Thread { SingleInstanceLock.release() })
+                Runtime.getRuntime().addShutdownHook(Thread {
+                    try {
+                        ConfiguracoesController.backupOnExitIfEnabled()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    } finally {
+                        SingleInstanceLock.release()
+                    }
+                })
 
                 val dbHelper = DatabaseHelper()
                 val tables = dbHelper.listTables()
@@ -100,7 +150,7 @@ class Main : Application() {
                         val produtosView = ProdutosView()
                         val pedidosEmAndamentoView = PedidosEmAndamentoView()
                         val historicoPedidosView = HistoricoPedidosView()
-                        val configuracoesView = ConfiguracoesView()
+                        val configuracoesView = ConfiguracoesView(primaryStage)
                         val clientesView = ClientesView()
                         val pedidoWizardView = PedidoWizardView()
 
@@ -210,6 +260,70 @@ class Main : Application() {
             e.printStackTrace()
             println("Falha ao carregar ícones: ${e.message}")
         }
+    }
+}
+
+private var trayIconInstance: TrayIcon? = null
+
+private fun setupSystemTray(stage: Stage) {
+    if (!SystemTray.isSupported()) {
+        println("SystemTray is not supported")
+        return
+    }
+
+    // If tray icon already exists, just return
+    if (trayIconInstance != null) {
+        println("Tray icon already exists")
+        return
+    }
+
+    println("Creating new tray icon")
+    val tray = SystemTray.getSystemTray()
+    val image = Toolkit.getDefaultToolkit().getImage(Main::class.java.getResource("/icons/icon.png"))
+
+    val popup = PopupMenu()
+    val openItem = MenuItem("Abrir")
+    openItem.addActionListener {
+        Platform.runLater {
+            stage.show()
+            stage.toFront()
+        }
+    }
+
+    val exitItem = MenuItem("Sair")
+    exitItem.addActionListener {
+        // Remove tray icon before exiting
+        try {
+            tray.remove(trayIconInstance)
+            trayIconInstance = null
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        Platform.exit()
+        exitProcess(0)
+    }
+
+    popup.add(openItem)
+    popup.addSeparator()
+    popup.add(exitItem)
+
+    val trayIcon = TrayIcon(image, "Blossom ERP", popup)
+    trayIcon.isImageAutoSize = true
+
+    trayIcon.addActionListener {
+        Platform.runLater {
+            stage.show()
+            stage.toFront()
+        }
+    }
+
+    try {
+        tray.add(trayIcon)
+        trayIconInstance = trayIcon
+        println("Tray icon added successfully")
+    } catch (e: AWTException) {
+        println("TrayIcon could not be added: ${e.message}")
     }
 }
 
