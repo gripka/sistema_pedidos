@@ -86,11 +86,11 @@ O sistema permite a criação, edição e exclusão de usuários, perfis, módul
   ```
   ./gradlew build
   ```
-4. Para a criação do instalador:
+##### Para a criação do instalador:
   ```
   ./gradlew jpackage
   ```
-O instalador será criado no diretório build/jpackage.
+OBS: O instalador será criado no diretório build/jpackage.
 
 ## Compilação do Código-Fonte
 O projeto utiliza o padrão MVC (Model-View-Controller) e é estruturado com os seguintes pacotes principais:
