@@ -305,9 +305,20 @@ class PedidoWizardView : BorderPane() {
                 prefHeight = 40.0
                 setOnAction {
                     if (currentStep < stepContainers.size - 1) {
-                        // If on payment step and delivery is not selected, skip to confirmation
-                        if (currentStep == 2 && ::entregaClienteRadio.isInitialized && !entregaClienteRadio.isSelected) {
-                            showStep(3)  // Skip to confirmation step
+                        if (currentStep == 0 && ::telefoneField.isInitialized) {
+                            val telefone = telefoneField.text
+                            val isValid = controller.validarTelefone(telefone)
+
+                            if (!isValid) {
+                                val proceedAnyway = controller.confirmarTelefoneIncompleto(telefone)
+                                if (!proceedAnyway) {
+                                    return@setOnAction
+                                }
+                            }
+                            showStep(currentStep + 1)
+                        }
+                        else if (currentStep == 2 && ::entregaClienteRadio.isInitialized && !entregaClienteRadio.isSelected) {
+                            showStep(3)
                         } else {
                             showStep(currentStep + 1)
                         }
@@ -343,7 +354,6 @@ class PedidoWizardView : BorderPane() {
                             orderInfo
                         )
 
-                        // Create styled success alert with increased height
                         val successAlert = Alert(Alert.AlertType.INFORMATION).apply {
                             title = "Sucesso"
                             headerText = "Sucesso"
@@ -974,12 +984,23 @@ class PedidoWizardView : BorderPane() {
                         return@addListener
                     }
 
-                    val value = newValue.replace(Regex("[^0-9]"), "").take(11)
+                    // Extract digits only
+                    val digitsOnly = newValue.replace(Regex("[^0-9]"), "")
 
+                    // Check if it's a 10-digit number (likely missing the 9 prefix)
+                    val processedValue = if (digitsOnly.length == 10) {
+                        // Insert "9" after the DDD (first 2 digits)
+                        digitsOnly.substring(0, 2) + "9" + digitsOnly.substring(2)
+                    } else {
+                        // Otherwise use as is (but limit to 11 digits)
+                        digitsOnly.take(11)
+                    }
+
+                    // Format the processed value
                     val formattedValue = when {
-                        value.length > 6 -> "(${value.substring(0, 2)}) ${value.substring(2, 7)}-${value.substring(7)}"
-                        value.length > 2 -> "(${value.substring(0, 2)}) ${value.substring(2)}"
-                        else -> value
+                        processedValue.length > 6 -> "(${processedValue.substring(0, 2)}) ${processedValue.substring(2, 7)}-${processedValue.substring(7)}"
+                        processedValue.length > 2 -> "(${processedValue.substring(0, 2)}) ${processedValue.substring(2)}"
+                        else -> processedValue
                     }
 
                     if (formattedValue != newValue) {

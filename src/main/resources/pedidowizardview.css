@@ -138,14 +138,7 @@
     -fx-border-color: #28a745;
 }
 
-.primary-button {
-    -fx-background-color: #3498db;
-    -fx-text-fill: white;
-}
 
-.primary-button:hover {
-    -fx-background-color: #2980b9;
-}
 
 .success-button {
     -fx-background-color: #2ecc71;
@@ -972,13 +965,11 @@
     -fx-background-radius: 3px;
 }
 
-/* Reset de todos os paddings internos */
 .alert .dialog-pane > * {
     -fx-padding: 0;
     -fx-background-insets: 0;
 }
 
-/* Remover ícones e espaços padrão */
 .alert .dialog-pane .graphic,
 .alert .dialog-pane > .graphic,
 .dialog-pane .window-icon {
@@ -990,7 +981,6 @@
     -fx-background-insets: 0;
 }
 
-/* Ocultar header */
 .alert .dialog-pane .header-panel {
     visibility: hidden;
     -fx-pref-height: 0;
@@ -999,7 +989,6 @@
     -fx-padding: 0;
 }
 
-/* Estilos do conteúdo */
 .alert .dialog-pane .content {
     -fx-padding: 0;
     -fx-alignment: center;
@@ -1056,7 +1045,6 @@
     -fx-pref-width: 100px;
 }
 
-/* Alert styling */
 .success {
     -fx-background-color: white;
 }
@@ -1086,6 +1074,26 @@
     -fx-padding: 0;
     -fx-background-color: transparent;
     -fx-spacing: 10px;
+}
+
+.primary-button {
+    -fx-background-color: #6056E8;
+    -fx-text-fill: white;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-padding: 8px 16px;
+    -fx-background-radius: 4px;
+    -fx-cursor: hand;
+    -fx-border-width: 0;
+}
+
+.primary-button:hover {
+    -fx-background-color: #433A94;
+}
+
+.primary-button:pressed {
+    -fx-background-color: #433A94;
+    -fx-translate-y: 1px;
 }
 
 .secondary-button {
