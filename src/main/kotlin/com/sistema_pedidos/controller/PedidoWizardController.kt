@@ -347,6 +347,37 @@ class PedidoWizardController {
     }
 
 
+    // Create this method in PedidoWizardController
+    fun validarTelefone(telefone: String): Boolean {
+        // Only digits
+        val digitsOnly = telefone.replace(Regex("[^0-9]"), "")
+        // Brazilian phone numbers should have 10 or 11 digits
+        return digitsOnly.length >= 10
+    }
+
+    // Create this method to show confirmation dialog
+    fun confirmarTelefoneIncompleto(telefone: String): Boolean {
+        val alert = Alert(Alert.AlertType.CONFIRMATION)
+        alert.title = "Telefone Incompleto"
+        alert.headerText = "O telefone informado parece estar incompleto"
+        alert.contentText = "O telefone '$telefone' pode estar incompleto ou incorreto. Deseja continuar mesmo assim?"
+
+
+        alert.dialogPane.stylesheets.add(PedidoWizardController::class.java.getResource("/pedidowizardview.css").toExternalForm())
+
+        // Custom button types
+        val btnContinuar = ButtonType("Continuar assim mesmo", ButtonBar.ButtonData.OK_DONE)
+        val btnVoltar = ButtonType("Voltar e corrigir", ButtonBar.ButtonData.CANCEL_CLOSE)
+        alert.buttonTypes.setAll(btnContinuar, btnVoltar)
+
+        // Style the buttons
+        alert.dialogPane.lookupButton(btnContinuar).styleClass.add("secondary-button")
+        alert.dialogPane.lookupButton(btnVoltar).styleClass.add("primary-button")
+
+        val result = alert.showAndWait()
+        return result.isPresent && result.get() == btnContinuar
+    }
+
     private fun createRemoveButton(produtoHBox: HBox, produto: Produto): Button {
         return Button().apply {
             styleClass.add("remove-button")
