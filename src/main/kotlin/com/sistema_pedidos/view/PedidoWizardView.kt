@@ -977,30 +977,19 @@ class PedidoWizardView : BorderPane() {
                 prefWidth = 150.0
                 promptText = "(00) 00000-0000"
 
-                // Phone formatter
                 textProperty().addListener { _, oldValue, newValue ->
                     if (newValue == null) {
                         text = oldValue
                         return@addListener
                     }
 
-                    // Extract digits only
                     val digitsOnly = newValue.replace(Regex("[^0-9]"), "")
 
-                    // Check if it's a 10-digit number (likely missing the 9 prefix)
-                    val processedValue = if (digitsOnly.length == 10) {
-                        // Insert "9" after the DDD (first 2 digits)
-                        digitsOnly.substring(0, 2) + "9" + digitsOnly.substring(2)
-                    } else {
-                        // Otherwise use as is (but limit to 11 digits)
-                        digitsOnly.take(11)
-                    }
-
-                    // Format the processed value
                     val formattedValue = when {
-                        processedValue.length > 6 -> "(${processedValue.substring(0, 2)}) ${processedValue.substring(2, 7)}-${processedValue.substring(7)}"
-                        processedValue.length > 2 -> "(${processedValue.substring(0, 2)}) ${processedValue.substring(2)}"
-                        else -> processedValue
+                        digitsOnly.length > 6 -> "(${digitsOnly.substring(0, 2)}) ${digitsOnly.substring(2, Math.min(7, digitsOnly.length))}" +
+                                (if (digitsOnly.length > 7) "-${digitsOnly.substring(7, Math.min(digitsOnly.length, 11))}" else "")
+                        digitsOnly.length > 2 -> "(${digitsOnly.substring(0, 2)}) ${digitsOnly.substring(2, digitsOnly.length)}"
+                        else -> digitsOnly
                     }
 
                     if (formattedValue != newValue) {
@@ -1009,14 +998,21 @@ class PedidoWizardView : BorderPane() {
                     }
                 }
 
-                // Add focus lost listener to search for existing customer
                 focusedProperty().addListener { _, wasFocused, isNowFocused ->
-                    if (wasFocused && !isNowFocused && !text.isNullOrBlank() && text.length >= 14) {
-                        // Only search if we have a complete phone number
-                        val clienteData = controller.buscarClientePorTelefone(text)
-                        if (clienteData != null && this@OrderTabContent.isVisible) {
-                            // Only populate if this tab is visible/active
-                            populateFormFields(clienteData)
+                    if (wasFocused && !isNowFocused && !text.isNullOrBlank()) {
+                        val digitsOnly = text.replace(Regex("[^0-9]"), "")
+
+                        if (digitsOnly.length == 10) {
+                            val processedValue = digitsOnly.substring(0, 2) + "9" + digitsOnly.substring(2)
+                            val formattedValue = "(${processedValue.substring(0, 2)}) ${processedValue.substring(2, 7)}-${processedValue.substring(7)}"
+                            text = formattedValue
+                        }
+
+                        if (digitsOnly.length >= 10) {
+                            val clienteData = controller.buscarClientePorTelefone(text)
+                            if (clienteData != null && this@OrderTabContent.isVisible) {
+                                populateFormFields(clienteData)
+                            }
                         }
                     }
                 }
